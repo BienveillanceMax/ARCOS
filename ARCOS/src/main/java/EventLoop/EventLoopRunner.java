@@ -32,10 +32,9 @@ public class EventLoopRunner
         File keywordFile = new File(keywordPaths[0]);
         if (!keywordFile.exists()) {
             throw new IllegalArgumentException(String.format("Keyword file at '%s' " +
-                    "does not exist", keywordPaths));
+                    "does not exist", keywordPaths[0]));
         }
         this.keywords = keywordPaths;
-        //this.audioInputStream;                        // TODO  ALED
         this.audioDeviceIndex = 7;                      //magic number : to update, but it makes sense to keep it hardcoded for said usage
         initializePorcupine(keywordPaths,modelPath);
         startRecording();
@@ -83,77 +82,6 @@ public class EventLoopRunner
         }
     }
 
-    private void startRecording() {
-
-
-        ByteArrayOutputStream outputStream = new ByteArrayOutputStream(); //for communication purpose
-        AudioFormat format = new AudioFormat(16000f, 16, 1, true, false);
-        DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, format);
-        TargetDataLine micDataLine;
-        try {
-            micDataLine = getAudioDevice(audioDeviceIndex, dataLineInfo);
-            micDataLine.open(format);
-        } catch (LineUnavailableException e) {
-            System.err.println(
-                    "Failed to get a valid capture device. Use --show_audio_devices to " +
-                            "show available capture devices and their indices");
-            System.exit(1);
-            return;
-        }
-
-
-        try {
-            micDataLine.start();
-            System.out.print("Listening for {");
-            for (int i = 0; i < keywords.length; i++) {
-                System.out.println(keywords[i]);
-            }
-            System.out.print(" }\n");
-
-            // buffers for processing audio
-            int frameLength = porcupine.getFrameLength();
-            ByteBuffer captureBuffer = ByteBuffer.allocate(frameLength * 2);
-            captureBuffer.order(ByteOrder.LITTLE_ENDIAN);
-            short[] porcupineBuffer = new short[frameLength];
-
-            int numBytesRead;
-            long totalBytesCaptured = 0;
-
-            while (System.in.available() == 0) {
-
-
-                // read a buffer of audio
-                numBytesRead = micDataLine.read(captureBuffer.array(), 0, captureBuffer.capacity());
-                totalBytesCaptured += numBytesRead;
-
-                // write to output if we're recording
-                if (outputStream != null) {
-                    outputStream.write(captureBuffer.array(), 0, numBytesRead);
-                }
-
-                // don't pass to porcupine if we don't have a full buffer
-                if (numBytesRead != frameLength * 2) {
-                    continue;
-                }
-
-                // copy into 16-bit buffer
-                captureBuffer.asShortBuffer().get(porcupineBuffer);
-
-                // process with porcupine
-                int result = porcupine.process(porcupineBuffer);
-                if (result >= 0) {
-                    System.out.printf("[%s] Detected '%s'\n",
-                            LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
-                            keywords[result]);
-                }
-            }
-        } catch (Exception e) {
-            System.err.println(e.toString());
-        }
-
-    }
-
-
     private static TargetDataLine getAudioDevice(int deviceIndex, DataLine.Info dataLineInfo)
             throws LineUnavailableException {
 
@@ -190,6 +118,78 @@ public class EventLoopRunner
 
         return (TargetDataLine) AudioSystem.getLine(dataLineInfo);
     }
+
+    private void startRecording() {
+
+
+        ByteArrayOutputStream outputStream = new ByteArrayOutputStream(); //for communication purpose
+        AudioFormat format = new AudioFormat(16000f, 16, 1, true, false);
+        DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, format);
+        TargetDataLine micDataLine;
+        try {
+            micDataLine = getAudioDevice(audioDeviceIndex, dataLineInfo);
+            micDataLine.open(format);
+        } catch (LineUnavailableException e) {
+            System.err.println(
+                    "Failed to get a valid capture device. Use --show_audio_devices to " +
+                            "show available capture devices and their indices");
+            System.exit(1);
+            return;
+        }
+
+
+        try {
+            micDataLine.start();
+            System.out.print("Listening for {");
+            for (String keyword : keywords) {
+                System.out.println(keyword);
+            }
+            System.out.print(" }\n");
+
+            // buffers for processing audio
+            int frameLength = porcupine.getFrameLength();
+            ByteBuffer captureBuffer = ByteBuffer.allocate(frameLength * 2);
+            captureBuffer.order(ByteOrder.LITTLE_ENDIAN);
+            short[] porcupineBuffer = new short[frameLength];
+
+            int numBytesRead;
+            long totalBytesCaptured = 0;
+
+            while (System.in.available() == 0) {
+
+
+                // read a buffer of audio
+                numBytesRead = micDataLine.read(captureBuffer.array(), 0, captureBuffer.capacity());
+                totalBytesCaptured += numBytesRead;
+
+                // write to output if we're recording TODO : transmit audio
+                if (outputStream != null) {
+                    outputStream.write(captureBuffer.array(), 0, numBytesRead);
+                }
+
+                // don't pass to porcupine if we don't have a full buffer
+                if (numBytesRead != frameLength * 2) {
+                    continue;
+                }
+
+                // copy into 16-bit buffer
+                captureBuffer.asShortBuffer().get(porcupineBuffer);
+
+                // process with porcupine
+                int result = porcupine.process(porcupineBuffer);
+                if (result >= 0) {
+                    System.out.printf("[%s] Detected '%s'\n",
+                            LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
+                            keywords[result]);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println(e.toString());
+        }
+
+    }
+
+
 
     /* Helper Function */
     public static void showAudioDevices() {
