@@ -10,8 +10,8 @@ public class ArcosApplication
 
     public static void main(String[] args) {
         SpringApplication.run(ArcosApplication.class, args);
-        EventLoopRunner.showAudioDevices();
         EventLoopRunner eventLoopRunner = new EventLoopRunner();
+        eventLoopRunner.EventLoop();
     }
 
 }
