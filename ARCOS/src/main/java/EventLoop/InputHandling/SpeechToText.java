@@ -1,18 +1,15 @@
-package EventLoop;
+package EventLoop.InputHandling;
 
 import io.github.givimad.whisperjni.WhisperJNI;
 import io.github.givimad.whisperjni.WhisperContext;
 import io.github.givimad.whisperjni.WhisperFullParams;
 
-import javax.sound.sampled.AudioFormat;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 
 public class SpeechToText {
     private WhisperJNI whisper;

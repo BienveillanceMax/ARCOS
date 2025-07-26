@@ -1,7 +1,5 @@
 package EventLoop.InputHandling;
 
-import EventLoop.SpeechToText;
-
 import javax.sound.sampled.TargetDataLine;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;

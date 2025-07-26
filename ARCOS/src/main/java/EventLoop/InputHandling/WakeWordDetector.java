@@ -1,6 +1,5 @@
 package EventLoop.InputHandling;
 
-import EventLoop.SpeechToText;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
 import org.springframework.stereotype.Component;
@@ -179,7 +178,6 @@ public class WakeWordDetector {
                         if (!message.isEmpty()) {
                             System.out.println(">>> TRANSCRIBED MESSAGE: " + message);
                             // Here you can process the transcribed message
-                            return message;
                         } else {
                             System.out.println(">>> No speech detected or transcription failed");
                         }
@@ -187,11 +185,13 @@ public class WakeWordDetector {
                         System.err.println("Error during transcription: " + throwable.getMessage());
                         return null;
                     });
+                    return messageFuture.get();
                 }
             }
         } catch (Exception e) {
             System.err.println(e.toString());
         }
+        return "";
     }
 
     public static void showAudioDevices() {

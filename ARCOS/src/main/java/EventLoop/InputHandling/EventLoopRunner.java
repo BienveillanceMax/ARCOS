@@ -18,8 +18,6 @@ public class EventLoopRunner
 
         while (true) {
             String message = this.wakeWordDetector.startRecording();
-            System.out.println(message); //placeholder for processing
-
         }
     }
 }

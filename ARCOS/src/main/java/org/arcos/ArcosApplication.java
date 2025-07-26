@@ -13,8 +13,8 @@ public class ArcosApplication
     public static void main(String[] args) {
         SpringApplication.run(ArcosApplication.class, args);
 
-        EventLoopRunner eventLoopRunner = new EventLoopRunner();
-        eventLoopRunner.run();
+        //EventLoopRunner eventLoopRunner = new EventLoopRunner();
+        //eventLoopRunner.run();
         //WakeWordDetector.showAudioDevices();
     }
 
