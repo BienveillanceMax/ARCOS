@@ -1,4 +1,4 @@
-package EventLoop.InputHandling;
+package com.arcos.service.EventLoop.InputHandling;
 
 import javax.sound.sampled.TargetDataLine;
 import java.nio.ByteBuffer;

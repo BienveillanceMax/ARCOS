@@ -1,21 +1,16 @@
 package org.arcos;
 
-import EventLoop.InputHandling.EventLoopRunner;
+import com.arcos.service.EventLoop.InputHandling.EventLoopRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
 
-import static org.apache.logging.log4j.util.LoaderUtil.getClassLoader;
-
-@SpringBootApplication
-public class ArcosApplication
-{
+@SpringBootApplication(scanBasePackages = "com.arcos.service")
+public class ArcosApplication {
 
     public static void main(String[] args) {
-        SpringApplication.run(ArcosApplication.class, args);
-
-        //EventLoopRunner eventLoopRunner = new EventLoopRunner();
-        //eventLoopRunner.run();
-        //WakeWordDetector.showAudioDevices();
+        ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
+        EventLoopRunner eventLoopRunner = context.getBean(EventLoopRunner.class);
+        eventLoopRunner.run();
     }
-
 }

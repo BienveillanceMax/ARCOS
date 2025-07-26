@@ -1,4 +1,4 @@
-package EventLoop.InputHandling;
+package com.arcos.service.EventLoop.InputHandling;
 
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
