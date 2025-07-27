@@ -1,4 +1,4 @@
-package com.arcos.service.EventLoop.InputHandling;
+package EventLoop.InputHandling.InputHandling;
 
 import io.github.givimad.whisperjni.WhisperJNI;
 import io.github.givimad.whisperjni.WhisperContext;

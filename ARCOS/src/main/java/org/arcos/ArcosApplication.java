@@ -1,6 +1,6 @@
 package org.arcos;
 
-import com.arcos.service.EventLoop.InputHandling.EventLoopRunner;
+import EventLoop.InputHandling.InputHandling.EventLoopRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;

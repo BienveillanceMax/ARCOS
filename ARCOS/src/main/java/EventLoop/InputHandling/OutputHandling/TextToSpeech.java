@@ -1,4 +1,4 @@
-package com.arcos.service.EventLoop.OutputHandling;
+package EventLoop.InputHandling.OutputHandling;
 
 import java.io.BufferedReader;
 import java.io.IOException;

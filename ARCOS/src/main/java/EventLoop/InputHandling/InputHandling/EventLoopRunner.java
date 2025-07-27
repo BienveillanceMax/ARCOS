@@ -1,6 +1,6 @@
-package com.arcos.service.EventLoop.InputHandling;
+package EventLoop.InputHandling.InputHandling;
 
-import com.arcos.service.EventLoop.OutputHandling.TextToSpeech;
+import EventLoop.InputHandling.OutputHandling.TextToSpeech;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
