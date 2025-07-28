@@ -4,6 +4,7 @@ import java.util.List;
 
 
 //Wrapper class
+//A local installation of piper is necessary for the program to work /!\
 
 public class TTSHandler
 {

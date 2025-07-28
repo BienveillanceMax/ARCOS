@@ -468,6 +468,8 @@ public class PiperEmbeddedTTSModule
             command.add(String.valueOf(noiseScale));
             command.add("--noise_scale_w");
             command.add(String.valueOf(noiseScaleW));
+            command.add("--speaker");
+            command.add("1");
 
             ProcessBuilder pb = new ProcessBuilder(command);
             Process process = pb.start();

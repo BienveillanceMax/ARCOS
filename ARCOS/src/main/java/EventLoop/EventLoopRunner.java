@@ -21,9 +21,10 @@ public class EventLoopRunner
     public void run() {
 
         this.ttsHandler.initialize();
+        ttsHandler.speak("Bonjour à tous, je suis la voix par défaut de Arcöss !");
+
         while (true) {
             //String message = this.wakeWordDetector.startRecording();
-            ttsHandler.speak("Bonjour à tous, je suis la voix par défaut de Arcöss !");
         }
     }
 }
