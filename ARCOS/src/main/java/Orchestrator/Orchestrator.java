@@ -1,0 +1,64 @@
+package Orchestrator;
+
+import Exceptions.ResponseParsingException;
+import LLM.LLMResponseParser;
+import LLM.LLMService;
+import Memory.ActionRegistry;
+import Memory.ConversationContext;
+import Memory.Entities.ActionResult;
+import Memory.Entities.Actions.RespondAction;
+import Orchestrator.Entities.ExecutionPlan;
+import Prompts.PromptBuilder;
+import org.springframework.ai.chat.model.ChatModel;
+
+import java.util.Map;
+
+public class Orchestrator
+{
+    private final LLMService llmService;
+    private final PromptBuilder promptBuilder;
+    private final LLMResponseParser responseParser;
+    private final ActionExecutor actionExecutor;
+
+    public Orchestrator() {
+        this.llmService = new LLMService();
+
+        //INITIALISATION DES ACTIONS POSSIBLES
+        ActionRegistry actionRegistry = new ActionRegistry();
+        actionRegistry.registerAction("Répondre", new RespondAction());
+
+        this.promptBuilder = new PromptBuilder(actionRegistry);
+        this.responseParser = new LLMResponseParser(actionRegistry);
+        this.actionExecutor = new ActionExecutor();
+    }
+
+    public String processQuery(String userQuery, ConversationContext context) {
+
+        // 1. Génération du prompt
+        String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
+
+        // 2. Appel à Mistral pour planification
+        String planningResponse = llmService.generatePlanningResponse(planningPrompt);
+
+        // 3. Parsing avec retry spécifique Mistral
+        ExecutionPlan plan = null;
+        try {
+            plan = responseParser.parseWithMistralRetry(planningResponse, 3);
+        } catch (ResponseParsingException e) {
+            throw new RuntimeException(e);
+        }
+
+        // 4. Exécution des actions
+        Map<String, ActionResult> results = actionExecutor.executeActions(plan);    //TODO
+
+        // 5. Prompt de formulation
+        String formulationPrompt = promptBuilder.buildFormulationPrompt(
+                userQuery, plan, results, context
+        );
+
+        // 6. Appel à Mistral pour formulation
+        String finalResponse = llmService.generateFormulationResponse(formulationPrompt);
+
+        return finalResponse;   //SHOULD NOT BE LEFT AS IS, ADDITIONAL PROCESSING IS PROBABLY REQUIRED
+    }
+}
