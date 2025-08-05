@@ -11,10 +11,16 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 
+import Memory.Entities.Actions.RespondAction;
+
 @Component
 public class ActionRegistry {
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public ActionRegistry() {
+        registerAction("Répondre", new RespondAction());
+    }
 
     public void registerAction(String name, Action action) {
         actions.put(name, action);

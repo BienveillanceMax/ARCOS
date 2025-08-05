@@ -18,24 +18,19 @@ import java.util.Map;
 @Component
 public class Orchestrator
 {
-    @Autowired
-    private LLMService llmService;
+    private final LLMService llmService;
     private final PromptBuilder promptBuilder;
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
     private final ConversationContext context;
 
-
-    
-    public Orchestrator() {
-        //INITIALISATION DES ACTIONS POSSIBLES
-        ActionRegistry actionRegistry = new ActionRegistry();
-        actionRegistry.registerAction("Répondre", new RespondAction());
-
-        this.promptBuilder = new PromptBuilder(actionRegistry);
-        this.responseParser = new LLMResponseParser(actionRegistry);
-        this.actionExecutor = new ActionExecutor();
-        this.context = new ConversationContext();
+    @Autowired
+    public Orchestrator(LLMService llmService, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context) {
+        this.llmService = llmService;
+        this.promptBuilder = promptBuilder;
+        this.responseParser = responseParser;
+        this.actionExecutor = actionExecutor;
+        this.context = context;
     }
 
     public String processQuery(String userQuery) {

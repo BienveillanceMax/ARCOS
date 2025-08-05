@@ -8,11 +8,13 @@ import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+@Component
 public class PromptBuilder {
 
     private final ActionRegistry actionRegistry;
