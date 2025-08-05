@@ -10,19 +10,24 @@ import Memory.Entities.Actions.RespondAction;
 import Orchestrator.Entities.ExecutionPlan;
 import Prompts.PromptBuilder;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.util.Map;
 
+@Component
 public class Orchestrator
 {
-    private final LLMService llmService;
+    @Autowired
+    private LLMService llmService;
     private final PromptBuilder promptBuilder;
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
+    private final ConversationContext context;
 
+
+    
     public Orchestrator() {
-        this.llmService = new LLMService();
-
         //INITIALISATION DES ACTIONS POSSIBLES
         ActionRegistry actionRegistry = new ActionRegistry();
         actionRegistry.registerAction("Répondre", new RespondAction());
@@ -30,9 +35,10 @@ public class Orchestrator
         this.promptBuilder = new PromptBuilder(actionRegistry);
         this.responseParser = new LLMResponseParser(actionRegistry);
         this.actionExecutor = new ActionExecutor();
+        this.context = new ConversationContext();
     }
 
-    public String processQuery(String userQuery, ConversationContext context) {
+    public String processQuery(String userQuery) {
 
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
