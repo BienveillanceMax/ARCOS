@@ -234,12 +234,14 @@ public class LLMResponseParser {
         throw new ResponseParsingException("Failed after " + maxRetries + " attempts");
     }
 
+
+    //todo update
     private ExecutionPlan createFallbackPlan(String originalResponse) {
         // Plan de secours si Mistral ne respecte pas le format JSON
         ExecutionPlan fallback = new ExecutionPlan();
         fallback.setReasoning("Réponse directe - format JSON non respecté");
         fallback.setActions(List.of(
-                new ExecutionPlan.PlannedAction("respond_directly",
+                new ExecutionPlan.PlannedAction("Répondre",
                         Map.of("content", originalResponse))
         ));
         return fallback;

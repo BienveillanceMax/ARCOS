@@ -37,9 +37,13 @@ public class Orchestrator
 
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
+        System.out.println(planningPrompt);
+        System.out.println();
 
         // 2. Appel à Mistral pour planification
-        String planningResponse = llmService.generatePlanningResponse(planningPrompt);
+        String planningResponse = llmService.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
+        System.out.println(planningResponse);
+        System.out.println();
 
         // 3. Parsing avec retry spécifique Mistral
         ExecutionPlan plan = null;
@@ -60,6 +64,6 @@ public class Orchestrator
         // 6. Appel à Mistral pour formulation
         String finalResponse = llmService.generateFormulationResponse(formulationPrompt);
 
-        return finalResponse;   //SHOULD NOT BE LEFT AS IS, ADDITIONAL PROCESSING IS PROBABLY REQUIRED
+        return finalResponse;
     }
 }

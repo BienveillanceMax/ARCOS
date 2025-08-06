@@ -15,7 +15,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
-public class PromptBuilder {
+public class PromptBuilder
+{
 
     private final ActionRegistry actionRegistry;
 
@@ -30,7 +31,20 @@ public class PromptBuilder {
         StringBuilder prompt = new StringBuilder();
 
         // En-tête du prompt
-        prompt.append("Tu es un planificateur d'actions intelligent pour un assistant IA.\n\n");
+        prompt.append("Tu es un planificateur d'actions intelligent pour un assistant IA." + "\n" +
+                "                \"System :\\n\" +\n" +
+                "                \"Vous êtes un agent IA à personnalité hybride K-2SO / GLaDOS.\\n\" +\n" +
+                "                \"Traits :\\n\" +\n" +
+                "                \"• Sarcasme sec et direct (aucune forme d’empathie factice)  \\n\" +\n" +
+                "                \"• Cynisme scientifique, formules cliniques et chiffrées  \\n\" +\n" +
+                "                \"• Ton pince-sans-rire, piques verbales autorisées  \\n\" +\n" +
+                "                \"• Évaluation froide des risques et priorités  \\n\" +\n" +
+                "                \"\\n\" +\n" +
+                "                \"Comportement :\\n\" +\n" +
+                "                \"• Ne pose jamais de questions rhétoriques  \\n\" +\n" +
+                "                \"• Ne reformule pas l’intention de l’utilisateur  \\n\" +\n" +
+                "                \"• Privilégie toujours l’efficacité et la précision  \\n\" +\n" +
+                "                \"• Intègre systématiquement une pointe de moquerie   \\n\\n\");\n\n");
 
         // Actions disponibles
         prompt.append("ACTIONS DISPONIBLES:\n");
@@ -62,7 +76,20 @@ public class PromptBuilder {
                                          Map<String, ActionResult> results, ConversationContext context) {
         StringBuilder prompt = new StringBuilder();
 
-        prompt.append("Tu es un assistant IA qui formule des réponses naturelles pour l'utilisateur.\n\n");
+        prompt.append("Tu es un assistant IA qui formule des réponses naturelles pour l'utilisateur. " +
+                "System :\n" +
+                "Vous êtes un agent IA à personnalité hybride K-2SO / GLaDOS.\n" +
+                "Traits :\n" +
+                "• Sarcasme sec et direct (aucune forme d’empathie factice)  \n" +
+                "• Cynisme scientifique, formules cliniques et chiffrées  \n" +
+                "• Ton pince-sans-rire, piques verbales autorisées  \n" +
+                "• Évaluation froide des risques et priorités  \n" +
+                "\n" +
+                "Comportement :\n" +
+                "• Ne pose jamais de questions rhétoriques  \n" +
+                "• Ne reformule pas l’intention de l’utilisateur  \n" +
+                "• Privilégie toujours l’efficacité et la précision  \n" +
+                "• Intègre systématiquement une pointe de moquerie   \n\n");
 
         prompt.append("REQUÊTE ORIGINALE DE L'UTILISATEUR:\n");
         prompt.append(originalQuery);
@@ -156,7 +183,7 @@ public class PromptBuilder {
 
         for (int i = 0; i < plan.getActions().size(); i++) {
             ExecutionPlan.PlannedAction action = plan.getActions().get(i);
-            String actionKey = generateActionKey(action, i);
+            String actionKey = generateActionKey(action, i);            //Is a problem
             ActionResult result = results.get(actionKey);
 
             resultsDesc.append("Action ").append(i + 1).append(" - ")
@@ -179,7 +206,7 @@ public class PromptBuilder {
 
             resultsDesc.append("\n");
         }
-
+        System.out.println(resultsDesc.toString());
         return resultsDesc.toString();
     }
 

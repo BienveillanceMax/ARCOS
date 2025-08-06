@@ -1,6 +1,7 @@
 package Memory;
 
 import Memory.Entities.Actions.Action;
+import Memory.Entities.Actions.SearchAction;
 import Orchestrator.Entities.Parameter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +20,8 @@ public class ActionRegistry {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ActionRegistry() {
-        registerAction("Répondre", new RespondAction());
+        registerAction("Parler", new RespondAction());
+        registerAction("Rechercher sur internet", new SearchAction());
     }
 
     public void registerAction(String name, Action action) {

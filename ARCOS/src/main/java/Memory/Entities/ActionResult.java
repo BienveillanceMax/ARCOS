@@ -18,7 +18,7 @@ public class ActionResult {
     private boolean success;
 
     @JsonProperty("data")
-    private Object data;
+    private List<String> data;
 
     @JsonProperty("message")
     private String message;
@@ -52,7 +52,7 @@ public class ActionResult {
         this.warnings = new ArrayList<>();
     }
 
-    private ActionResult(boolean success, Object data, String message, Exception exception) {
+    private ActionResult(boolean success, List<String> data, String message, Exception exception) {
         this();
         this.success = success;
         this.data = data;
@@ -77,14 +77,14 @@ public class ActionResult {
     /**
      * Crée un résultat de succès avec données
      */
-    public static ActionResult success(Object data) {
+    public static ActionResult success(List<String> data) {
         return new ActionResult(true, data, "Action exécutée avec succès", null);
     }
 
     /**
      * Crée un résultat de succès avec données et message personnalisé
      */
-    public static ActionResult success(Object data, String message) {
+    public static ActionResult success(List<String> data, String message) {
         return new ActionResult(true, data, message, null);
     }
 
@@ -123,7 +123,7 @@ public class ActionResult {
     /**
      * Crée un résultat d'échec avec données partielles
      */
-    public static ActionResult failureWithData(String message, Object partialData, Exception exception) {
+    public static ActionResult failureWithData(String message, List<String>  partialData, Exception exception) {
         ActionResult result = new ActionResult(false, partialData, message, exception);
         result.addWarning("Données partielles disponibles malgré l'échec");
         return result;
@@ -134,7 +134,7 @@ public class ActionResult {
     /**
      * Crée un résultat de succès avec avertissements
      */
-    public static ActionResult successWithWarnings(Object data, String message, List<String> warnings) {
+    public static ActionResult successWithWarnings(List<String>  data, String message, List<String> warnings) {
         ActionResult result = new ActionResult(true, data, message, null);
         result.warnings.addAll(warnings);
         return result;
@@ -268,60 +268,7 @@ public class ActionResult {
         return null;
     }
 
-    /**
-     * Récupère les données sous forme de List
-     */
-    @SuppressWarnings("unchecked")
-    public List<Object> getDataAsList() {
-        if (data instanceof List) {
-            return (List<Object>) data;
-        }
-        return null;
-    }
 
-    /**
-     * Récupère les données sous forme de String
-     */
-    public String getDataAsString() {
-        if (data instanceof String) {
-            return (String) data;
-        }
-        if (data != null) {
-            return data.toString();
-        }
-        return null;
-    }
-
-    /**
-     * Convertit les données en JSON
-     */
-    public String getDataAsJson() {
-        if (data == null) {
-            return null;
-        }
-
-        try {
-            ObjectMapper mapper = new ObjectMapper();
-            return mapper.writeValueAsString(data);
-        } catch (JsonProcessingException e) {
-            addWarning("Impossible de sérialiser les données en JSON: " + e.getMessage());
-            return data.toString();
-        }
-    }
-
-    /**
-     * Crée une copie du résultat avec de nouvelles données
-     */
-    public ActionResult withData(Object newData) {
-        ActionResult copy = new ActionResult(this.success, newData, this.message, this.exception);
-        copy.errorType = this.errorType;
-        copy.errorDetails = this.errorDetails;
-        copy.executionTimeMs = this.executionTimeMs;
-        copy.timestamp = this.timestamp;
-        copy.metadata = new HashMap<>(this.metadata);
-        copy.warnings = new ArrayList<>(this.warnings);
-        return copy;
-    }
 
     /**
      * Crée une copie du résultat avec un nouveau message
@@ -335,35 +282,6 @@ public class ActionResult {
         copy.metadata = new HashMap<>(this.metadata);
         copy.warnings = new ArrayList<>(this.warnings);
         return copy;
-    }
-
-    /**
-     * Combine ce résultat avec un autre (utile pour les actions composées)
-     */
-    public ActionResult combineWith(ActionResult other) {
-        boolean combinedSuccess = this.success && other.success;
-        String combinedMessage = this.message + " | " + other.message;
-
-        ActionResult combined = new ActionResult(combinedSuccess, null, combinedMessage, null);
-
-        // Combine les données
-        Map<String, Object> combinedData = new HashMap<>();
-        combinedData.put("result1", this.data);
-        combinedData.put("result2", other.data);
-        combined.data = combinedData;
-
-        // Combine les métadonnées
-        combined.metadata.putAll(this.metadata);
-        combined.metadata.putAll(other.metadata);
-
-        // Combine les avertissements
-        combined.warnings.addAll(this.warnings);
-        combined.warnings.addAll(other.warnings);
-
-        // Temps d'exécution total
-        combined.executionTimeMs = this.executionTimeMs + other.executionTimeMs;
-
-        return combined;
     }
 
     /**
@@ -446,7 +364,7 @@ public class ActionResult {
     public void setSuccess(boolean success) { this.success = success; }
 
     public Object getData() { return data; }
-    public void setData(Object data) { this.data = data; }
+    public void setData(List<String> data) { this.data = data; }
 
     public String getMessage() { return message; }
     public void setMessage(String message) { this.message = message; }

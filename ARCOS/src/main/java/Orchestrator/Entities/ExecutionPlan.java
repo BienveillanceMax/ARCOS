@@ -26,6 +26,7 @@ public class ExecutionPlan {
     public void setReasoning(String reasoning) { this.reasoning = reasoning; }
 
     public List<PlannedAction> getActions() { return actions; }
+
     public void setActions(List<PlannedAction> actions) { this.actions = actions; }
 
     // Méthodes utilitaires
