@@ -100,7 +100,7 @@ public class SearchAction extends Action
         }
 
         List<String> processedResults = new ArrayList<>();
-        processedResults.add("Recherche : " + result.getQuery() + '\n');
+        processedResults.add("[Instruction : ne précise tes sources que si cela a un vrai intérêt.] Recherche : " + result.getQuery() + '\n');
         processedResults.add("Nombre de résultats : " + (long) result.getItems().size() + '\n');
 
         for (BraveSearchService.SearchResultItem item : result.getItems()) {

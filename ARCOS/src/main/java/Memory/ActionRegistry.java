@@ -1,7 +1,6 @@
 package Memory;
 
-import Memory.Entities.Actions.Action;
-import Memory.Entities.Actions.SearchAction;
+import Memory.Entities.Actions.*;
 import Orchestrator.Entities.Parameter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,16 +11,16 @@ import org.springframework.stereotype.Component;
 import java.util.HashMap;
 import java.util.Map;
 
-import Memory.Entities.Actions.RespondAction;
-
 @Component
 public class ActionRegistry {
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public ActionRegistry() {
-        registerAction("Parler", new RespondAction());
+        //registerAction("Parler", new RespondAction()); As of now of little use and not implemented (the speaking execution part, the rest is fine)
         registerAction("Rechercher sur internet", new SearchAction());
+        registerAction("Action par défaut", new DefaultAction());
+        registerAction("Accéder à la date et l'heure", new TimeAction());
     }
 
     public void registerAction(String name, Action action) {

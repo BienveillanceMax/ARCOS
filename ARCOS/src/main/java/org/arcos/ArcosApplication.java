@@ -17,7 +17,7 @@ public class ArcosApplication
         //eventLoopRunner.run();
         //WakeWordDetector.showAudioDevices();
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
-        System.out.println(orchestrator.processQuery("Bonjour, que peux tu apprendre des ratons laveurs sur internet ?"));
+        System.out.println(orchestrator.processQuery("Donne moi l'heure et fait une recherche internet sur les crapauds"));
     }
 
 }

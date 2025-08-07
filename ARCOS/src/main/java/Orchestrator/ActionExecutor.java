@@ -1,8 +1,7 @@
 package Orchestrator;
 
 import Memory.Entities.ActionResult;
-import Memory.Entities.Actions.Action;
-import Memory.Entities.Actions.SearchAction;
+import Memory.Entities.Actions.*;
 import Orchestrator.Entities.ExecutionPlan;
 import org.springframework.stereotype.Component;
 
@@ -22,6 +21,20 @@ public class ActionExecutor
             SearchAction searchAction = new SearchAction();
             return searchAction.execute(params);
         }
+        if (action.equals("Parler")){
+            RespondAction respondAction = new RespondAction();
+            return respondAction.execute(params);
+        }
+        if (action.equals("Action par défaut")){
+            DefaultAction defaultAction = new DefaultAction();
+            return defaultAction.execute(params);
+        }
+        if (action.equals("Accéder à la date et l'heure"))
+        {
+            TimeAction timeAction = new TimeAction();
+            return timeAction.execute(params);
+        }
+
         return null;
     }
 
@@ -42,7 +55,5 @@ public class ActionExecutor
             i++;
         }
         return finalResponse;
-
-        //TODO
     }
 }
