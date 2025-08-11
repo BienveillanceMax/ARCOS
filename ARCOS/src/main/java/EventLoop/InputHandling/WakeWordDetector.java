@@ -34,7 +34,7 @@ public class WakeWordDetector {
             throw new IllegalArgumentException(String.format("Keyword file at '%s' does not exist", keywordPaths[0]));
         }
         this.keywords = keywordPaths;
-        this.audioDeviceIndex = 6;          //TODO SELECT THE RIGHT INPUT
+        this.audioDeviceIndex = 4;          //TODO SELECT THE RIGHT INPUT
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
         this.speechToText = new SpeechToText(getWhisperModelPath());

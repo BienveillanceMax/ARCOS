@@ -64,6 +64,10 @@ public class Orchestrator
         // 6. Appel à Mistral pour formulation
         String finalResponse = llmService.generateFormulationResponse(formulationPrompt);
 
+        // 7. Ajout à la mémoire à court terme.
+        context.addUserMessage(userQuery);
+        context.addAssistantMessage(finalResponse,plan);
+
         return finalResponse;
     }
 }
