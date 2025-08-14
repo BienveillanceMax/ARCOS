@@ -3,13 +3,13 @@ package Orchestrator;
 import Exceptions.ResponseParsingException;
 import LLM.LLMResponseParser;
 import LLM.LLMService;
-import Memory.ActionRegistry;
 import Memory.ConversationContext;
 import Memory.Entities.ActionResult;
-import Memory.Entities.Actions.RespondAction;
 import Orchestrator.Entities.ExecutionPlan;
 import Prompts.PromptBuilder;
-import org.springframework.ai.chat.model.ChatModel;
+import com.arcos.bus.EventBus;
+import com.arcos.events.QueryTranscribedEvent;
+import com.arcos.events.SpeakEvent;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +23,7 @@ public class Orchestrator
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
     private final ConversationContext context;
+    private final EventBus eventBus;
 
     @Autowired
     public Orchestrator(LLMService llmService, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context) {
@@ -31,9 +32,16 @@ public class Orchestrator
         this.responseParser = responseParser;
         this.actionExecutor = actionExecutor;
         this.context = context;
+        this.eventBus = EventBus.getInstance();
+
+        this.eventBus.subscribe(QueryTranscribedEvent.class, this::handleQuery);
     }
 
-    public String processQuery(String userQuery) {
+    private void handleQuery(QueryTranscribedEvent event) {
+        processQuery(event.getQuery());
+    }
+
+    public void processQuery(String userQuery) {
 
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
@@ -50,11 +58,12 @@ public class Orchestrator
         try {
             plan = responseParser.parseWithMistralRetry(planningResponse, 3);
         } catch (ResponseParsingException e) {
+            //TODO: Handle this exception better
             throw new RuntimeException(e);
         }
 
         // 4. Exécution des actions
-        Map<String, ActionResult> results = actionExecutor.executeActions(plan);    //TODO
+        Map<String, ActionResult> results = actionExecutor.executeActions(plan);
 
         // 5. Prompt de formulation
         String formulationPrompt = promptBuilder.buildFormulationPrompt(
@@ -68,6 +77,7 @@ public class Orchestrator
         context.addUserMessage(userQuery);
         context.addAssistantMessage(finalResponse,plan);
 
-        return finalResponse;
+        // 8. Publish speak event
+        eventBus.publish(new SpeakEvent(finalResponse));
     }
 }

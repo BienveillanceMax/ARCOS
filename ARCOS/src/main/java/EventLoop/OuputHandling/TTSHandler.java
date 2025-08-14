@@ -1,14 +1,13 @@
 package EventLoop.OuputHandling;
 
+import com.arcos.bus.EventBus;
+import com.arcos.events.SpeakEvent;
+
 import java.util.List;
 
-
-//Wrapper class
-//A local installation of piper is necessary for the program to work /!\
-
-public class TTSHandler
-{
-    PiperEmbeddedTTSModule piperEmbeddedTTSModule;
+public class TTSHandler {
+    private final PiperEmbeddedTTSModule piperEmbeddedTTSModule;
+    private final EventBus eventBus;
 
     public TTSHandler() {
         List<PiperEmbeddedTTSModule.EmbeddedModel> available = PiperEmbeddedTTSModule.getAvailableModels();
@@ -16,32 +15,47 @@ public class TTSHandler
         if (available.isEmpty()) {
             System.err.println("Aucun modèle trouvé dans les ressources!");
             System.err.println("Assurez-vous d'avoir inclus les fichiers .onnx dans src/main/resources/models/");
+            this.piperEmbeddedTTSModule = null; // or handle error appropriately
+            this.eventBus = null;
             return;
         }
 
         this.piperEmbeddedTTSModule = new PiperEmbeddedTTSModule(PiperEmbeddedTTSModule.EmbeddedModel.UPMC);
+        this.eventBus = EventBus.getInstance();
+        this.eventBus.subscribe(SpeakEvent.class, this::handleSpeakEvent);
+    }
+
+    private void handleSpeakEvent(SpeakEvent event) {
+        speak(event.getText());
     }
 
     public void initialize() {
-        this.piperEmbeddedTTSModule.initialize();
+        if (this.piperEmbeddedTTSModule != null) {
+            this.piperEmbeddedTTSModule.initialize();
+        }
     }
 
     public void speak(String message) {
-        this.piperEmbeddedTTSModule.speak(message);
+        if (this.piperEmbeddedTTSModule != null) {
+            this.piperEmbeddedTTSModule.speak(message);
+        }
     }
 
     public void stop() {
-        this.piperEmbeddedTTSModule.stop();
+        if (this.piperEmbeddedTTSModule != null) {
+            this.piperEmbeddedTTSModule.stop();
+        }
     }
 
     public void start() {
-        if (!piperEmbeddedTTSModule.initialize()) {
+        if (piperEmbeddedTTSModule != null && !piperEmbeddedTTSModule.initialize()) {
             System.err.println("Impossible d'initialiser le module TTS");
         }
     }
 
     public void shutdown() {
-        this.piperEmbeddedTTSModule.shutdown();
+        if (this.piperEmbeddedTTSModule != null) {
+            this.piperEmbeddedTTSModule.shutdown();
+        }
     }
 }
-
