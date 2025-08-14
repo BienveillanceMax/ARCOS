@@ -12,15 +12,12 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.CompletableFuture;
 
 @Component
 public class WakeWordDetector {
     private Porcupine porcupine;
     private final String[] keywords;
     private final int audioDeviceIndex;
-    private final AudioForwarder audioForwarder;
-    private final SpeechToText speechToText;
     private TargetDataLine micDataLine;
 
     public WakeWordDetector() {
@@ -37,25 +34,6 @@ public class WakeWordDetector {
         this.audioDeviceIndex = 4;          //TODO SELECT THE RIGHT INPUT
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
-        this.speechToText = new SpeechToText(getWhisperModelPath());
-        this.audioForwarder = new AudioForwarder(this.micDataLine, this.speechToText);
-    }
-
-    private String getWhisperModelPath() {
-        // You can either put the model in resources or use an absolute path
-        // For resources: ggml-medium.fr.bin ggml-small.bin
-        URL url = getClass().getClassLoader().getResource("ggml-small.bin");
-        //URL url = getClass().getClassLoader().getResource("ggml-medium.fr.bin");
-
-
-
-        File modelFile = null;
-        try {
-            modelFile = new File(url.toURI());
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-        return modelFile.getAbsolutePath();
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -142,7 +120,7 @@ public class WakeWordDetector {
         }
     }
 
-    public String startRecording() {
+    public void startRecording() {
         try {
             System.out.println("Starting recording ...");
             this.micDataLine.start();
@@ -169,29 +147,16 @@ public class WakeWordDetector {
                     System.out.printf("[%s] Detected '%s'\n",
                             LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                             this.keywords[result]);
-
-                    // Start transcription and wait for the message
-                    CompletableFuture<String> messageFuture = this.audioForwarder.startForwarding();
-
-                    // Handle the result asynchronously
-                    messageFuture.thenAccept(message -> {
-                        if (!message.isEmpty()) {
-                            System.out.println(">>> TRANSCRIBED MESSAGE: " + message);
-                            // Here you can process the transcribed message
-                        } else {
-                            System.out.println(">>> No speech detected or transcription failed");
-                        }
-                    }).exceptionally(throwable -> {
-                        System.err.println("Error during transcription: " + throwable.getMessage());
-                        return null;
-                    });
-                    return messageFuture.get();
+                    return;
                 }
             }
         } catch (Exception e) {
             System.err.println(e.toString());
         }
-        return "";
+    }
+
+    public TargetDataLine getMicDataLine() {
+        return micDataLine;
     }
 
     public static void showAudioDevices() {

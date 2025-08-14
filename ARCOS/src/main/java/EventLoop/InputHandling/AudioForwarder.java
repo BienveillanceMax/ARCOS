@@ -1,13 +1,17 @@
 package EventLoop.InputHandling;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import javax.sound.sampled.TargetDataLine;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.CompletableFuture;
 
+@Component
 public class AudioForwarder extends Thread {
     private TargetDataLine microphone;
-    private SpeechToText speechToText;
+    private final SpeechToText speechToText;
     private boolean isForwarding;
     private CompletableFuture<String> messageCompleteFuture;
 
@@ -22,8 +26,9 @@ public class AudioForwarder extends Thread {
     private boolean hasDetectedSpeech;
     private long recordingStartTime;
 
-    public AudioForwarder(TargetDataLine microphone, SpeechToText speechToText) {
-        this.microphone = microphone;
+    @Autowired
+    public AudioForwarder(WakeWordDetector wakeWordDetector, SpeechToText speechToText) {
+        this.microphone = wakeWordDetector.getMicDataLine();
         this.speechToText = speechToText;
         this.isForwarding = false;
         this.hasDetectedSpeech = false;

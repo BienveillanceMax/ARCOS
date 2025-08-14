@@ -1,38 +1,27 @@
 package EventLoop;
 
 import EventLoop.InputHandling.WakeWordDetector;
-import EventLoop.OuputHandling.PiperEmbeddedTTSModule;
-import EventLoop.OuputHandling.TTSHandler;
-import Orchestrator.ActionExecutor;
-import Orchestrator.Orchestrator;
+import OrchestratorV2.Entities.Event;
+import OrchestratorV2.Entities.EventType;
+import OrchestratorV2.OrchestratorV2;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-
 @Component
-public class EventLoopRunner
-{
-    private WakeWordDetector wakeWordDetector;
-    private TTSHandler ttsHandler;
-    private Orchestrator orchestrator;
+public class EventLoopRunner {
+    private final WakeWordDetector wakeWordDetector;
+    private final OrchestratorV2 orchestratorV2;
 
     @Autowired
-    public EventLoopRunner(Orchestrator orchestrator) {
+    public EventLoopRunner(OrchestratorV2 orchestratorV2) {
         this.wakeWordDetector = new WakeWordDetector();
-        this.ttsHandler = new TTSHandler();
-        this.orchestrator = orchestrator;
+        this.orchestratorV2 = orchestratorV2;
     }
 
     public void run() {
-
-
-
-
         while (true) {
-            this.ttsHandler.initialize();
-            String query = this.wakeWordDetector.startRecording();
-            String answer = orchestrator.processQuery(query);
-            ttsHandler.speak(answer);
+            wakeWordDetector.startRecording();
+            orchestratorV2.publishEvent(new Event<>(EventType.WAKE_WORD_DETECTED, null));
         }
     }
 }
