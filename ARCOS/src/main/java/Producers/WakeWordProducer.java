@@ -7,6 +7,8 @@ import IO.InputHandling.SpeechToText;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 import javax.sound.sampled.*;
@@ -30,6 +32,14 @@ public class WakeWordProducer implements Runnable
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
 
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void startAfterStartup() {
+        Thread thread = new Thread(this);
+        thread.setDaemon(true);
+        thread.start();
+    }
+
     @Autowired
     public WakeWordProducer(EventQueue eventQueue) {
         this.eventQueue = eventQueue;
@@ -43,7 +53,7 @@ public class WakeWordProducer implements Runnable
             throw new IllegalArgumentException(String.format("Keyword file at '%s' does not exist", keywordPaths[0]));
         }
         this.keywords = keywordPaths;
-        this.audioDeviceIndex = 7;          //TODO SELECT THE RIGHT INPUT
+        this.audioDeviceIndex = 10;          //TODO SELECT THE RIGHT INPUT
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
         this.speechToText = new SpeechToText(getWhisperModelPath());

@@ -22,9 +22,7 @@ public class ArcosApplication
         WakeWordProducer.showAudioDevices();
 
         EventQueue queue = context.getBean(EventQueue.class);
-        WakeWordProducer producer = context.getBean(WakeWordProducer.class);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
-        producer.run();
         orchestrator.start();
 
         //System.out.println(orchestrator.processQuery("Je suis ton créateur, quelles actions et fonctionnalités voudrais-tu que je te rajoute ?"));
