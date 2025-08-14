@@ -1,4 +1,4 @@
-package Prompts;
+package LLM.Prompts;
 
 import Memory.ActionRegistry;
 import Memory.ConversationContext;

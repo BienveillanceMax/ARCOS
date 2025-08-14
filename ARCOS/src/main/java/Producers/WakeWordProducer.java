@@ -1,7 +1,12 @@
-package EventLoop.InputHandling;
+package Producers;
 
+import EventBus.EventQueue;
+import EventBus.Events.WakeWordEvent;
+import IO.InputHandling.AudioForwarder;
+import IO.InputHandling.SpeechToText;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import javax.sound.sampled.*;
@@ -15,15 +20,19 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
 @Component
-public class WakeWordDetector {
+public class WakeWordProducer implements Runnable
+{
     private Porcupine porcupine;
     private final String[] keywords;
     private final int audioDeviceIndex;
     private final AudioForwarder audioForwarder;
     private final SpeechToText speechToText;
     private TargetDataLine micDataLine;
+    private final EventQueue eventQueue;
 
-    public WakeWordDetector() {
+    @Autowired
+    public WakeWordProducer(EventQueue eventQueue) {
+        this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
         String porcupineModelName = "porcupine_params_fr.pv";
         String[] keywordPaths = new String[]{getKeywordPath(keywordName)};
@@ -34,7 +43,7 @@ public class WakeWordDetector {
             throw new IllegalArgumentException(String.format("Keyword file at '%s' does not exist", keywordPaths[0]));
         }
         this.keywords = keywordPaths;
-        this.audioDeviceIndex = 4;          //TODO SELECT THE RIGHT INPUT
+        this.audioDeviceIndex = 7;          //TODO SELECT THE RIGHT INPUT
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
         this.speechToText = new SpeechToText(getWhisperModelPath());
@@ -48,7 +57,6 @@ public class WakeWordDetector {
         //URL url = getClass().getClassLoader().getResource("ggml-medium.fr.bin");
 
 
-
         File modelFile = null;
         try {
             modelFile = new File(url.toURI());
@@ -58,7 +66,7 @@ public class WakeWordDetector {
         return modelFile.getAbsolutePath();
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// Porcupine initialization
 
     private String getKeywordPath(String keyword) {
@@ -101,7 +109,7 @@ public class WakeWordDetector {
         }
     }
 
-    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// Audio initialization
 
     private static TargetDataLine getDefaultCaptureDevice(DataLine.Info dataLineInfo) throws LineUnavailableException {
@@ -204,5 +212,17 @@ public class WakeWordDetector {
                 System.out.printf("Device %d: %s\n", i, allMixerInfo[i].getName());
             }
         }
+    }
+
+    @Override
+    public void run() {
+        while (true) {
+            String transcribedMessage = startRecording();
+            if (transcribedMessage != null) {
+                WakeWordEvent event = new WakeWordEvent(transcribedMessage,"default");
+                eventQueue.offer(event);
+            }
+        }
+
     }
 }

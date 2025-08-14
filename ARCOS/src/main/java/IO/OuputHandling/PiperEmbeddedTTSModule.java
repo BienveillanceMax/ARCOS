@@ -1,4 +1,4 @@
-package EventLoop.OuputHandling;
+package IO.OuputHandling;
 
 
 import java.io.*;
@@ -6,13 +6,8 @@ import java.nio.file.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.sound.sampled.*;
-import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
-import java.net.URL;
-import java.util.Enumeration;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 
 /**
  * Module TTS Piper avec modèles intégrés dans les ressources

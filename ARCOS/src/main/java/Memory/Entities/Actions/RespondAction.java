@@ -1,11 +1,8 @@
 package Memory.Entities.Actions;
 
-import EventLoop.OuputHandling.TTSHandler;
 import Memory.Entities.ActionResult;
 import Orchestrator.Entities.Parameter;
-import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;

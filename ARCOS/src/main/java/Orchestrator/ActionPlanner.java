@@ -1,7 +1,7 @@
 package Orchestrator;
 
 import Exceptions.PlanningException;
-import LLM.LLMService;
+import LLM.LLMClient;
 import Memory.ActionRegistry;
 import Memory.ConversationContext;
 import Orchestrator.Entities.ExecutionPlan;
@@ -13,14 +13,14 @@ import org.springframework.stereotype.Service;
 public class ActionPlanner {
 
     @Autowired
-    private LLMService llmService;
+    private LLMClient llmClient;
 
     @Autowired
     private ActionRegistry actionRegistry;
 
     public ExecutionPlan planActions(String userQuery, ConversationContext context) {
         String prompt = buildPlanningPrompt(userQuery, context);
-        String llmResponse = llmService.generatePlanningResponse(prompt);
+        String llmResponse = llmClient.generatePlanningResponse(prompt);
         return parsePlanFromLLMResponse(llmResponse);
     }
 

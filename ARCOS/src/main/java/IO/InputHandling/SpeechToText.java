@@ -1,4 +1,4 @@
-package EventLoop.InputHandling;
+package IO.InputHandling;
 
 import io.github.givimad.whisperjni.WhisperJNI;
 import io.github.givimad.whisperjni.WhisperContext;

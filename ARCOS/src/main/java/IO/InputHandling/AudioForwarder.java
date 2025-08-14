@@ -1,4 +1,4 @@
-package EventLoop.InputHandling;
+package IO.InputHandling;
 
 import javax.sound.sampled.TargetDataLine;
 import java.nio.ByteBuffer;

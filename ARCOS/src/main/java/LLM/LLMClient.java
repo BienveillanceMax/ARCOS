@@ -1,20 +1,15 @@
 package LLM;
 
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
-public class LLMService
+public class LLMClient
 {
 
     private final ChatClient chatClient;
 
-    public LLMService(ChatClient.Builder chatClientBuilder) {
+    public LLMClient(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
     }
 

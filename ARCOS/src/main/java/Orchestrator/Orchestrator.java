@@ -1,39 +1,69 @@
 package Orchestrator;
 
+import EventBus.EventQueue;
+import EventBus.Events.Event;
+import EventBus.Events.EventType;
 import Exceptions.ResponseParsingException;
+import IO.OuputHandling.TTSHandler;
 import LLM.LLMResponseParser;
-import LLM.LLMService;
-import Memory.ActionRegistry;
+import LLM.LLMClient;
 import Memory.ConversationContext;
 import Memory.Entities.ActionResult;
-import Memory.Entities.Actions.RespondAction;
 import Orchestrator.Entities.ExecutionPlan;
-import Prompts.PromptBuilder;
-import org.springframework.ai.chat.model.ChatModel;
+import LLM.Prompts.PromptBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import javax.sound.midi.SysexMessage;
 import java.util.Map;
 
 @Component
 public class Orchestrator
 {
-    private final LLMService llmService;
+    private final EventQueue eventQueue;
+    private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
     private final ConversationContext context;
 
     @Autowired
-    public Orchestrator(LLMService llmService, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context) {
-        this.llmService = llmService;
+    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context) {
+        this.eventQueue = evenQueue;
+        this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
         this.responseParser = responseParser;
         this.actionExecutor = actionExecutor;
         this.context = context;
     }
 
-    public String processQuery(String userQuery) {
+
+    private void dispatch(Event<?> event)
+    {
+        if (event.getType() == EventType.WAKEWORD)
+        {
+
+            //todo change
+            processQuery((String)event.getPayload());
+            TTSHandler ttsHandler = new TTSHandler();
+            ttsHandler.initialize();
+            System.out.println("starting processing");
+            ttsHandler.speak( processQuery((String)event.getPayload()));
+        }
+    }
+
+    public void start() {
+        while (true) {
+            try {
+               Event<?> event = eventQueue.take();
+               dispatch(event);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    private String processQuery(String userQuery) {
 
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
@@ -41,7 +71,7 @@ public class Orchestrator
         System.out.println();
 
         // 2. Appel à Mistral pour planification
-        String planningResponse = llmService.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
+        String planningResponse = llmClient.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
         System.out.println(planningResponse);
         System.out.println();
 
@@ -62,7 +92,7 @@ public class Orchestrator
         );
 
         // 6. Appel à Mistral pour formulation
-        String finalResponse = llmService.generateFormulationResponse(formulationPrompt);
+        String finalResponse = llmClient.generateFormulationResponse(formulationPrompt);
 
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
