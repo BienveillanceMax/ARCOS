@@ -1,6 +1,6 @@
 package Memory;
 
-import Memory.Entities.ActionResult;
+import Memory.Actions.Entities.ActionResult;
 import Orchestrator.Entities.ExecutionPlan;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

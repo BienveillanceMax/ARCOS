@@ -1,9 +1,9 @@
 package LLM.Prompts;
 
-import Memory.ActionRegistry;
+import Memory.Actions.ActionRegistry;
 import Memory.ConversationContext;
-import Memory.Entities.ActionResult;
-import Memory.Entities.Actions.Action;
+import Memory.Actions.Entities.ActionResult;
+import Memory.Actions.Entities.Actions.Action;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
 import com.fasterxml.jackson.core.JsonProcessingException;

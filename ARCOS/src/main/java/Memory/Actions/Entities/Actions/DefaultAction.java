@@ -1,10 +1,8 @@
-package Memory.Entities.Actions;
+package Memory.Actions.Entities.Actions;
 
-import Memory.Entities.ActionResult;
-import Orchestrator.ActionExecutor;
+import Memory.Actions.Entities.ActionResult;
 import Orchestrator.Entities.Parameter;
 
-import java.time.Instant;
 import java.util.*;
 
 public class DefaultAction extends Action

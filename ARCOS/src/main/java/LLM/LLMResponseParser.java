@@ -1,8 +1,8 @@
 package LLM;
 
 import Exceptions.ResponseParsingException;
-import Memory.ActionRegistry;
-import Memory.Entities.Actions.Action;
+import Memory.Actions.ActionRegistry;
+import Memory.Actions.Entities.Actions.Action;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
 import com.fasterxml.jackson.core.JsonProcessingException;

@@ -1,6 +1,9 @@
-package Memory;
+package Memory.Actions;
 
-import Memory.Entities.Actions.*;
+import Memory.Actions.Entities.Actions.Action;
+import Memory.Actions.Entities.Actions.DefaultAction;
+import Memory.Actions.Entities.Actions.SearchAction;
+import Memory.Actions.Entities.Actions.TimeAction;
 import Orchestrator.Entities.Parameter;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

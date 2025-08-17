@@ -8,13 +8,12 @@ import IO.OuputHandling.TTSHandler;
 import LLM.LLMResponseParser;
 import LLM.LLMClient;
 import Memory.ConversationContext;
-import Memory.Entities.ActionResult;
+import Memory.Actions.Entities.ActionResult;
 import Orchestrator.Entities.ExecutionPlan;
 import LLM.Prompts.PromptBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import javax.sound.midi.SysexMessage;
 import java.util.Map;
 
 @Component

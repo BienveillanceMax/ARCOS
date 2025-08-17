@@ -1,6 +1,6 @@
-package Memory.Entities.Actions;
+package Memory.Actions.Entities.Actions;
 
-import Memory.Entities.ActionResult;
+import Memory.Actions.Entities.ActionResult;
 import Orchestrator.Entities.Parameter;
 
 import java.util.Collections;
