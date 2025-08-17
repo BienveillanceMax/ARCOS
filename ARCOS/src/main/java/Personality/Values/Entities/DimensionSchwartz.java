@@ -1,4 +1,4 @@
-package Personality.Values;
+package Personality.Values.Entities;
 
 public enum DimensionSchwartz {
     OPENNESS_TO_CHANGE,

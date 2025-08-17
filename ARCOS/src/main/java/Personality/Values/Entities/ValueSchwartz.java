@@ -1,11 +1,12 @@
-package Personality.Values;
+package Personality.Values.Entities;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
 public enum ValueSchwartz
-{SELF_DIRECTION_THOUGHT("Autodétermination de la pensée", "Liberté de cultiver ses propres idées et capacités", DimensionSchwartz.OPENNESS_TO_CHANGE),
+{
+    SELF_DIRECTION_THOUGHT("Autodétermination de la pensée", "Liberté de cultiver ses propres idées et capacités", DimensionSchwartz.OPENNESS_TO_CHANGE),
     SELF_DIRECTION_ACTION("Autodétermination des actions", "Liberté de déterminer ses propres actions", DimensionSchwartz.OPENNESS_TO_CHANGE),
     STIMULATION("Stimulation", "Excitation, nouveauté et changement", DimensionSchwartz.OPENNESS_TO_CHANGE),
     HEDONISM("Hédonisme", "Plaisir et gratification sensuelle", DimensionSchwartz.OPENNESS_TO_CHANGE),
@@ -36,10 +37,21 @@ public enum ValueSchwartz
         this.dimension = dimension;
     }
 
-    public String getLabel() { return label; }
-    public String getDescription() { return description; }
-    public DimensionSchwartz getDimension() { return dimension; }
-    public List<ValueSchwartz> getAntagonists() { return antagonists; }
+    public String getLabel() {
+        return label;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public DimensionSchwartz getDimension() {
+        return dimension;
+    }
+
+    public List<ValueSchwartz> getAntagonists() {
+        return antagonists;
+    }
 
     public static List<ValueSchwartz> valuesOfDimension(DimensionSchwartz d) {
         return Arrays.stream(values()).filter(v -> v.dimension == d).collect(Collectors.toList());

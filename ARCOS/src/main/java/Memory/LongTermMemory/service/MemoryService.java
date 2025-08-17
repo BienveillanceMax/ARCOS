@@ -2,6 +2,7 @@ package Memory.LongTermMemory.service;
 
 
 import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Models.SearchResult;
 import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
@@ -19,6 +20,7 @@ public class MemoryService
     // Noms des collections
     public static final String MEMORIES_COLLECTION = "Memories";
     public static final String SUMMARIES_COLLECTION = "Summaries";
+    public static final String OPINIONS_COLLECTION = "Opinions";
 
     // Configuration par défaut
     private static final int DEFAULT_EMBEDDING_DIMENSION = 768;
@@ -69,8 +71,9 @@ public class MemoryService
 
         boolean memoriesOk = initializeCollection(MEMORIES_COLLECTION);
         boolean summariesOk = initializeCollection(SUMMARIES_COLLECTION);
+        boolean opinionsOk = initializeCollection(OPINIONS_COLLECTION);
 
-        if (memoriesOk && summariesOk) {
+        if (memoriesOk && summariesOk && opinionsOk) {
             System.out.println("Toutes les collections ont été initialisées avec succès");
             return true;
         } else {
@@ -91,20 +94,48 @@ public class MemoryService
      * Enregistre un souvenir dans la collection Memories.
      */
     public boolean storeMemory(String content, Subject subject, double satisfaction) {
-        return storeEntry(MEMORIES_COLLECTION, content, subject, satisfaction);
+        return storeMemoryEntry(MEMORIES_COLLECTION, content, subject, satisfaction);
     }
 
     /**
      * Enregistre un résumé dans la collection Summaries.
      */
     public boolean storeSummary(String content, Subject subject, double satisfaction) {
-        return storeEntry(SUMMARIES_COLLECTION, content, subject, satisfaction);
+
+        return storeMemoryEntry(SUMMARIES_COLLECTION, content, subject, satisfaction);
     }
 
+    public boolean storeOpinion(OpinionEntry opinionEntry) {
+
+        return storeOpinionEntry(OPINIONS_COLLECTION,opinionEntry);
+    }
+
+
     /**
-     * Méthode privée pour enregistrer une entrée dans une collection donnée.
+     * Méthode privée pour enregistrer une entrée de mémoire dans une collection donnée.
      */
-    private boolean storeEntry(String collectionName, String content, Subject subject, double satisfaction) {
+    private boolean storeOpinionEntry(String collectionName, OpinionEntry opinionEntry) {
+        try {
+
+            // Génération de l'embedding
+            float[] embedding = embeddingGenerator.generateEmbedding(opinionEntry.getSummary());
+            opinionEntry.setEmbedding(embedding);
+
+            // Stockage dans Qdrant
+
+            return qdrantClient.upsertPoint(collectionName, opinionEntry);
+
+        } catch (Exception e) {
+            System.out.println("Erreur de persistance de la collection " + collectionName);
+            return false;
+        }
+    }
+
+
+    /**
+     * Méthode privée pour enregistrer une entrée de mémoire dans une collection donnée.
+     */
+    private boolean storeMemoryEntry(String collectionName, String content, Subject subject, double satisfaction) {
         try {
             // Création de l'entrée mémoire
             MemoryEntry entry = new MemoryEntry(content, subject, satisfaction);

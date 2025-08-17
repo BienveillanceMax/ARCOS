@@ -1,5 +1,8 @@
 package Personality.Values;
 
+import Personality.Values.Entities.DimensionSchwartz;
+import Personality.Values.Entities.ValueSchwartz;
+
 import java.util.EnumMap;
 import java.util.*;
 import java.util.stream.Collectors;

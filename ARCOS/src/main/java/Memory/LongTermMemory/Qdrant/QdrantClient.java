@@ -2,6 +2,7 @@ package Memory.LongTermMemory.Qdrant;
 
 
 import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Models.SearchResult;
 import Memory.LongTermMemory.Models.Subject;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -110,6 +111,84 @@ public class QdrantClient {
             return false;
         }
     }
+
+
+    /**
+     * Insère ou met à jour une entrée mémoire dans la collection spécifiée.
+     */
+    public boolean upsertPoint(String collectionName, OpinionEntry opinionEntry) {
+        try {
+            ObjectNode requestBody = objectMapper.createObjectNode();
+            ArrayNode points = objectMapper.createArrayNode();
+
+            ObjectNode point = objectMapper.createObjectNode();
+            point.put("id", opinionEntry.getId());
+
+            // Conversion de l'embedding en ArrayNode
+            ArrayNode vectorArray = objectMapper.createArrayNode();
+            for (float value : opinionEntry.getEmbedding()) {
+                vectorArray.add(value);
+            }
+            point.set("vector", vectorArray);
+
+            // Ajout des métadonnées (payload)
+            ObjectNode payload = objectMapper.createObjectNode();
+            payload.put("subject", opinionEntry.getSubject());
+            payload.put("summary", opinionEntry.getSummary());
+            payload.put("narrative", opinionEntry.getNarrative());
+            payload.put("polarity", opinionEntry.getPolarity());
+            payload.put("confidence", opinionEntry.getConfidence());
+            payload.put("stability", opinionEntry.getStability());
+
+            // Conversion de la liste associatedMemories
+            ArrayNode memoriesArray = objectMapper.createArrayNode();
+            if (opinionEntry.getAssociatedMemories() != null) {
+                for (String mem : opinionEntry.getAssociatedMemories()) {
+                    memoriesArray.add(mem);
+                }
+            }
+            payload.set("associatedMemories", memoriesArray);
+
+            // Sérialisation des timestamps (ISO 8601)
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+            if (opinionEntry.getCreatedAt() != null) {
+                payload.put("createdAt", opinionEntry.getCreatedAt().format(TIMESTAMP_FORMATTER));
+            }
+            if (opinionEntry.getUpdatedAt() != null) {
+                payload.put("updatedAt", opinionEntry.getUpdatedAt().format(TIMESTAMP_FORMATTER));
+            }
+
+            point.set("payload", payload);
+
+            points.add(point);
+            requestBody.set("points", points);
+
+            String json = objectMapper.writeValueAsString(requestBody);
+
+            RequestBody body = RequestBody.create(json, JSON);
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/collections/" + collectionName + "/points")
+                    .put(body)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    logger.debug("Point d'opinion inséré avec succès dans '{}': {}", collectionName, opinionEntry.getId());
+                    return true;
+                } else {
+                    String responseBody = response.body() != null ? response.body().string() : "";
+                    logger.error("Erreur lors de l'insertion du point d'opinion dans '{}': {} - {}",
+                            collectionName, response.code(), responseBody);
+                    return false;
+                }
+            }
+
+        } catch (Exception e) {
+            logger.error("Exception lors de l'insertion du point dans '{}'", collectionName, e);
+            return false;
+        }
+    }
+
 
     /**
      * Insère ou met à jour une entrée mémoire dans la collection spécifiée.
