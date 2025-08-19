@@ -6,11 +6,18 @@ package Memory.LongTermMemory.Models;
 public class SearchResult {
 
     private final MemoryEntry memoryEntry;
+    private final OpinionEntry opinionEntry;
     private final double similarityScore;
 
-    public SearchResult(MemoryEntry memoryEntry, double similarityScore) {
+    public SearchResult(MemoryEntry memoryEntry, OpinionEntry opinionEntry, double similarityScore) {
         this.memoryEntry = memoryEntry;
+        this.opinionEntry = opinionEntry;
         this.similarityScore = similarityScore;
+
+    }
+
+    public OpinionEntry getOpinionEntry() {
+        return opinionEntry;
     }
 
     public MemoryEntry getMemoryEntry() {

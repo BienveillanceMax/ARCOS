@@ -4,12 +4,19 @@ import Memory.Actions.ActionRegistry;
 import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
 import Memory.Actions.Entities.Actions.Action;
+import Memory.LongTermMemory.Models.MemoryEntry;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
+import Personality.Values.Entities.DimensionSchwartz;
+import Personality.Values.Entities.ValueSchwartz;
+import Personality.Values.ValueProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -19,10 +26,108 @@ public class PromptBuilder
 {
 
     private final ActionRegistry actionRegistry;
+    private final ValueProfile valueProfile;
 
-    public PromptBuilder(ActionRegistry actionRegistry) {
+    @Autowired
+    public PromptBuilder(ActionRegistry actionRegistry, ValueProfile valueProfile) {
         this.actionRegistry = actionRegistry;
+        this.valueProfile = valueProfile;
     }
+
+
+    /**
+     * Construit un prompt en français pour Mistral afin de générer une opinion à partir d'un souvenir
+     *
+     * @param memory Le souvenir à analyser
+     * @return Le prompt formaté pour Mistral
+     */
+
+    public String buildOpinionPrompt(MemoryEntry memory) {
+        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
+        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
+        Map<ValueSchwartz,List<ValueSchwartz>> conflicts = new HashMap<>();
+        EnumMap<DimensionSchwartz, Double> dimensionAverages = valueProfile.averageByDimension();
+
+        for (ValueSchwartz v : strongValues.keySet()) {
+            List<ValueSchwartz> antagonists = valueProfile.conflictingValues(v);
+            if (!antagonists.isEmpty()) {
+                conflicts.put(v, antagonists);
+            }
+        }
+
+
+        StringBuilder prompt = new StringBuilder();
+
+        // Introduction brève
+        prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
+                .append("Analyse le souvenir suivant et génère une opinion personnelle influencée par tes valeurs.\n\n");
+
+        // Valeurs dominantes
+        prompt.append("VALEURS DOMINANTES (principaux moteurs de ton jugement) :\n");
+        for (ValueSchwartz value : strongValues.keySet()) {
+            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
+                    .append("(score/100 : ").append(strongValues.get(value)).append(")").append("\n");
+        }
+
+        // Valeurs inhibées
+        if (!suppressedValues.isEmpty()) {
+            prompt.append("\nVALEURS PEU IMPORTANTES (tendances que tu négliges) :\n");
+            for (ValueSchwartz value : suppressedValues.keySet()) {
+                prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
+                        .append("(score/100 : ").append(suppressedValues.get(value)).append(")").append("\n");
+            }
+        }
+
+        // Conflits
+        if (!conflicts.isEmpty()) {
+            prompt.append("\nCONFLITS INTERNES (tensions entre valeurs opposées) :\n");
+            conflicts.forEach((low, highList) -> {
+                prompt.append("- ").append(low.getLabel())
+                        .append(" est faible, en opposition avec : ")
+                        .append(highList.stream().map(ValueSchwartz::getLabel).collect(Collectors.joining(", ")))
+                        .append("\n");
+            });
+        }
+
+        // Moyenne des dimensions
+        prompt.append("\nMOYENNE PAR DIMENSION (vision globale) :\n");
+        dimensionAverages.forEach((d, avg) -> {
+            prompt.append("- ").append(d.name()).append(" : ")
+                    .append(String.format("%.1f", avg));
+            if (avg >= 70) prompt.append(" (fortement valorisé)");
+            else if (avg <= 30) prompt.append(" (faiblement valorisé)");
+            prompt.append("\n");
+        });
+
+        // Souvenir à analyser
+        prompt.append("\nSOUVENIR À ÉVALUER :\n")
+                .append("Contenu: ").append(memory.getContent()).append("\n")
+                .append("Sujet: ").append(memory.getSubject()).append("\n")
+                .append("Satisfaction: ").append(memory.getSatisfaction()).append("/10\n")
+                .append("Date: ").append(memory.getTimestamp()).append("\n\n");
+
+        // Format de sortie
+        prompt.append("RÉPONDS UNIQUEMENT AVEC UN JSON STRICT au format suivant :\n")
+                .append("{\n")
+                .append("  \"subject\": \"Sujet principal spécifique de ton opinion\",\n")
+                .append("  \"summary\": \"Résumé en 1-2 phrases\",\n")
+                .append("  \"narrative\": \"Opinion détaillée (3-5 phrases), en expliquant ton raisonnement par rapport à tes valeurs\",\n")
+                .append("  \"polarity\": \"Nombre entre -1 et 1 (-1=très négatif, 0=neutre, 1=très positif)\",\n")
+                .append("  \"confidence\": \"Nombre entre 0 et 1 (0=ne croit pas du tout, 1=est persuadé)\",\n")
+                .append("  \"mainDimension\": \"La dimension qui correspond le mieux à l'opinion exprimée, parmi celles déjà listées dans l'entrée. N'invente pas de nouvelle dimension.\"\n")
+                .append("}\n\n");
+
+        // Contraintes
+        prompt.append("RÈGLES :\n")
+                .append("- Tes valeurs dominantes influencent ton jugement.\n")
+                .append("- Si le souvenir contredit tes valeurs, sois critique.\n")
+                .append("- Si le souvenir les renforce, sois positif.\n")
+                .append("- Prends en compte les tensions internes et les moyennes de dimension.\n")
+                .append("- Ne sors QUE le JSON, sans texte additionnel.");
+
+        return prompt.toString();
+    }
+
 
     /**
      * Construit le prompt de planification pour le LLM

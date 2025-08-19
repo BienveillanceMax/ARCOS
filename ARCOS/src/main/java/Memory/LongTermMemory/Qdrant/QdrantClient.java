@@ -5,6 +5,7 @@ import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Models.SearchResult;
 import Memory.LongTermMemory.Models.Subject;
+import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -24,7 +25,8 @@ import java.util.concurrent.TimeUnit;
  * Client pour communiquer avec Qdrant via son API REST.
  * Gère les opérations CRUD et la recherche vectorielle.
  */
-public class QdrantClient {
+public class QdrantClient
+{
 
     private static final Logger logger = LoggerFactory.getLogger(QdrantClient.class);
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
@@ -96,6 +98,7 @@ public class QdrantClient {
     /**
      * Vérifie si une collection existe.
      */
+
     public boolean collectionExists(String collectionName) {
         try {
             Request request = new Request.Builder()
@@ -116,6 +119,7 @@ public class QdrantClient {
     /**
      * Insère ou met à jour une entrée mémoire dans la collection spécifiée.
      */
+
     public boolean upsertPoint(String collectionName, OpinionEntry opinionEntry) {
         try {
             ObjectNode requestBody = objectMapper.createObjectNode();
@@ -275,7 +279,7 @@ public class QdrantClient {
                     String responseBody = response.body().string();
                     JsonNode responseJson = objectMapper.readTree(responseBody);
 
-                    return parseSearchResults(responseJson);
+                    return parseSearchResults(responseJson, collectionName);
                 } else {
                     String responseBody = response.body() != null ? response.body().string() : "";
                     logger.error("Erreur lors de la recherche dans '{}': {} - {}",
@@ -290,10 +294,80 @@ public class QdrantClient {
         }
     }
 
+    private SearchResult parseMemoryEntry(JsonNode payloadNode, String id, double score) {
+        String content = payloadNode.get("content").asText();
+        String subjectStr = payloadNode.get("subject").asText();
+        double satisfaction = payloadNode.get("satisfaction").asDouble();
+        String timestampStr = payloadNode.get("timestamp").asText();
+
+        LocalDateTime timestamp = LocalDateTime.parse(timestampStr, TIMESTAMP_FORMATTER);
+
+        MemoryEntry entry = new MemoryEntry();
+        entry.setId(id);
+        entry.setContent(content);
+        entry.setSubject(Subject.fromString(subjectStr));
+        entry.setSatisfaction(satisfaction);
+        entry.setTimestamp(timestamp);
+        return new SearchResult(entry, null, score);
+    }
+
+    private SearchResult parseOpinionEntry(JsonNode payloadNode, String id, double score) {
+
+        String subject = payloadNode.get("subject").asText();
+        String summary = payloadNode.get("summary").asText();
+        String narrative = payloadNode.get("narrative").asText();
+        double polarity = payloadNode.get("polarity").asDouble();
+        double confidence = payloadNode.get("confidence").asDouble();
+        double stability = payloadNode.get("stability").asDouble();
+        String createdAtStr = payloadNode.get("createdAt").asText();
+        String updatedAtStr = payloadNode.get("updatedAt").asText();
+
+        // Parsing des timestamps
+        LocalDateTime createdAt = LocalDateTime.parse(createdAtStr, TIMESTAMP_FORMATTER);
+        LocalDateTime updatedAt = LocalDateTime.parse(updatedAtStr, TIMESTAMP_FORMATTER);
+
+        // Parsing de la liste des mémoires associées (optionnel)
+        List<String> associatedMemories = new ArrayList<>();
+        JsonNode associatedMemoriesNode = payloadNode.get("associatedMemories");
+        if (associatedMemoriesNode != null && associatedMemoriesNode.isArray()) {
+            for (JsonNode memoryIdNode : associatedMemoriesNode) {
+                associatedMemories.add(memoryIdNode.asText());
+            }
+        }
+
+        // Parsing de la dimension Schwartz (optionnel)
+        DimensionSchwartz mainDimension = null;
+        JsonNode mainDimensionNode = payloadNode.get("mainDimension");
+        if (mainDimensionNode != null && !mainDimensionNode.isNull()) {
+            try {
+                mainDimension = DimensionSchwartz.valueOf(mainDimensionNode.asText());
+            } catch (IllegalArgumentException e) {
+                // Si la valeur n'est pas valide, on laisse null
+                System.out.println("Dimension Schwartz invalide: " + mainDimensionNode.asText());
+            }
+        }
+
+        OpinionEntry entry = new OpinionEntry();
+        entry.setId(id);
+        entry.setSubject(subject);
+        entry.setSummary(summary);
+        entry.setNarrative(narrative);
+        entry.setPolarity(polarity);
+        entry.setConfidence(confidence);
+        entry.setStability(stability);
+        entry.setAssociatedMemories(associatedMemories);
+        entry.setCreatedAt(createdAt);
+        entry.setUpdatedAt(updatedAt);
+        entry.setMainDimension(mainDimension);
+
+        return new SearchResult(null, entry, score);
+
+    }
+
     /**
      * Parse les résultats de recherche depuis la réponse JSON de Qdrant.
      */
-    private List<SearchResult> parseSearchResults(JsonNode responseJson) throws IOException {
+    private List<SearchResult> parseSearchResults(JsonNode responseJson, String collectionName) throws IOException {
         List<SearchResult> results = new ArrayList<>();
 
         JsonNode resultArray = responseJson.get("result");
@@ -304,21 +378,17 @@ public class QdrantClient {
                 JsonNode payloadNode = resultNode.get("payload");
 
                 if (payloadNode != null) {
-                    String content = payloadNode.get("content").asText();
-                    String subjectStr = payloadNode.get("subject").asText();
-                    double satisfaction = payloadNode.get("satisfaction").asDouble();
-                    String timestampStr = payloadNode.get("timestamp").asText();
 
-                    LocalDateTime timestamp = LocalDateTime.parse(timestampStr, TIMESTAMP_FORMATTER);
 
-                    MemoryEntry entry = new MemoryEntry();
-                    entry.setId(id);
-                    entry.setContent(content);
-                    entry.setSubject(Subject.fromString(subjectStr));
-                    entry.setSatisfaction(satisfaction);
-                    entry.setTimestamp(timestamp);
+                    if (collectionName.equals("opinions")) {
 
-                    results.add(new SearchResult(entry, score));
+
+                        results.add(parseOpinionEntry(payloadNode, id, score));
+
+                    } else if (collectionName.equals("memories")) {
+
+                        results.add(parseMemoryEntry(payloadNode, id, score));
+                    }
                 }
             }
         }

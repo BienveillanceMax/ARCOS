@@ -3,15 +3,21 @@ package LLM;
 import Exceptions.ResponseParsingException;
 import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.Actions.Action;
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
+import Personality.Values.Entities.DimensionSchwartz;
+import Personality.Values.Entities.ValueSchwartz;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class LLMResponseParser {
@@ -247,5 +253,83 @@ public class LLMResponseParser {
         return fallback;
     }
 
+/// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Opinion parsing
+
+    /**
+     * Parse la réponse de Mistral et crée une OpinionEntry incomplète
+     *
+     * @param mistralResponse La réponse JSON de Mistral
+     * @param sourceMemory Le souvenir source
+     * @return Une OpinionEntry avec les champs requis remplis
+     * @throws Exception Si le parsing échoue
+     */
+    public OpinionEntry parseOpinionFromResponse(String mistralResponse, MemoryEntry sourceMemory) throws Exception {
+        try {
+            // Nettoyer la réponse si elle contient du texte supplémentaire
+            String cleanedResponse = extractJsonFromResponse(mistralResponse);
+
+            // Parser le JSON
+            JsonNode jsonNode = objectMapper.readTree(cleanedResponse);
+
+            // Créer l'OpinionEntry
+            OpinionEntry opinion = new OpinionEntry();
+
+            // Champs requis à remplir
+            opinion.setSubject(jsonNode.get("subject").asText());
+            opinion.setSummary(jsonNode.get("summary").asText());
+            opinion.setNarrative(jsonNode.get("narrative").asText());
+            opinion.setPolarity(jsonNode.get("polarity").asDouble());
+            opinion.setConfidence(jsonNode.get("confidence").asDouble());
+            try {
+                opinion.setMainDimension(DimensionSchwartz.valueOf(jsonNode.get("mainDimension").asText()));    //todo : may break
+            }
+            catch (Exception e) {
+                System.err.println("\n\n\n N'a pas pu parser la dimension principale : " + e.getMessage() + "\n\n\n");
+                opinion.setMainDimension(null);
+            }
+
+            // Associer le souvenir source
+            opinion.setAssociatedMemories(List.of(sourceMemory.getId()));
+
+            // Les autres champs restent null/par défaut et seront remplis ailleurs :
+            // - id : sera généré lors de la sauvegarde
+            // - confidence : sera calculé séparément
+            // - stability : sera calculé séparément
+            // - embedding : sera généré séparément
+            // - createdAt/updatedAt : seront définis lors de la sauvegarde
+
+            return opinion;
+
+        } catch (Exception e) {
+            throw new Exception("Erreur lors du parsing de la réponse Mistral: " + e.getMessage() +
+                    "\nRéponse originale: " + mistralResponse, e);
+        }
+    }
+
+    /**
+     * Extrait le JSON de la réponse en cas de texte supplémentaire
+     */
+    private String extractJsonFromResponse(String response) {
+        // Chercher le premier '{' et le dernier '}'
+        int firstBrace = response.indexOf('{');
+        int lastBrace = response.lastIndexOf('}');
+
+        if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
+            return response.substring(firstBrace, lastBrace + 1);
+        }
+
+        return response.trim();
+    }
+
+    /**
+     * Méthode utilitaire pour filtrer les valeurs dominantes
+     */
+    public static List<ValueSchwartz> getDominantValues(Map<ValueSchwartz, Double> valueScores, double threshold) {
+        return valueScores.entrySet().stream()
+                .filter(entry -> entry.getValue() >= threshold)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+    }
 
 }

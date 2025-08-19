@@ -2,14 +2,20 @@ package Personality.Values;
 
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.Entities.ValueSchwartz;
+import org.springframework.stereotype.Component;
 
 import java.util.EnumMap;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Component
 public class ValueProfile
 {
-    private final EnumMap<ValueSchwartz, Double> scores = new EnumMap<>(ValueSchwartz.class);
+
+    private static final double SUPPRESSED_THRESHOLD = 30.0;
+    private static final double STRONG_THRESHOLD = 70.0;
+
+    private EnumMap<ValueSchwartz, Double> scores = new EnumMap<>(ValueSchwartz.class);
 
     public ValueProfile() {
         for (ValueSchwartz v : ValueSchwartz.values()) scores.put(v, 50.0); //TODO CHANGE FOR PERSONALISED
@@ -42,10 +48,27 @@ public class ValueProfile
         return scores.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue() / sum, (a, b) -> a, () -> new EnumMap<>(ValueSchwartz.class)));
     }
 
+
     public List<ValueSchwartz> conflictingValues(ValueSchwartz value) {
         List<ValueSchwartz> antagonists = value.getAntagonists();
-        if (antagonists == null) return List.of();
-        return antagonists.stream().filter(v -> getScore(v) > 60).collect(Collectors.toList());
+        if (antagonists == null) {
+            return List.of();
+        }
+        return antagonists.stream().filter(v -> getScore(v) > STRONG_THRESHOLD).toList();
+    }
+
+    public Map<ValueSchwartz, Double> getSuppressedValues() {
+        return scores.entrySet().stream()
+                .filter(entry -> entry.getValue() < SUPPRESSED_THRESHOLD)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a,
+                        () -> new EnumMap<>(ValueSchwartz.class)));
+    }
+
+    public Map<ValueSchwartz, Double> getStrongValues() {
+        return scores.entrySet().stream()
+                .filter(entry -> entry.getValue() > STRONG_THRESHOLD)
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (a, b) -> a,
+                        () -> new EnumMap<>(ValueSchwartz.class)));
     }
 
     @Override
@@ -58,5 +81,6 @@ public class ValueProfile
         averageByDimension().forEach((d, m) -> sb.append(String.format("%-25s : %6.2f\n", d.name(), m)));
         return sb.toString();
     }
+
 }
 

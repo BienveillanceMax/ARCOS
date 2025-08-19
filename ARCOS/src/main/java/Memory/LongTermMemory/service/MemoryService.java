@@ -105,18 +105,14 @@ public class MemoryService
         return storeMemoryEntry(SUMMARIES_COLLECTION, content, subject, satisfaction);
     }
 
-    public boolean storeOpinion(OpinionEntry opinionEntry) {
-
-        return storeOpinionEntry(OPINIONS_COLLECTION,opinionEntry);
-    }
-
 
     /**
      * Méthode privée pour enregistrer une entrée de mémoire dans une collection donnée.
      */
-    private boolean storeOpinionEntry(String collectionName, OpinionEntry opinionEntry) {
-        try {
+    public boolean storeOpinion( OpinionEntry opinionEntry) {
 
+        String collectionName = OPINIONS_COLLECTION;
+        try {
             // Génération de l'embedding
             float[] embedding = embeddingGenerator.generateEmbedding(opinionEntry.getSummary());
             opinionEntry.setEmbedding(embedding);
@@ -153,6 +149,18 @@ public class MemoryService
             return false;
         }
     }
+
+    /**
+     * Effectue une recherche vectorielle dans la collection Opinions.
+     */
+    public List<SearchResult> searchOpinions(String query) {
+        return searchOpinions(query, DEFAULT_TOP_K);
+    }
+
+    public List<SearchResult> searchOpinions(String query, int topK) {
+        return searchInCollection(OPINIONS_COLLECTION, query, topK);
+    }
+
 
     /**
      * Effectue une recherche vectorielle dans la collection Memories.

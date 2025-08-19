@@ -1,7 +1,9 @@
 package Memory.LongTermMemory.Models;
 
+import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.Entities.ValueSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.NoArgsConstructor;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -43,18 +45,18 @@ public class OpinionEntry
     @JsonProperty("updatedAt")
     private LocalDateTime updatedAt;
 
+    @JsonProperty("mainDimension")
+    private DimensionSchwartz mainDimension;
 
-    public OpinionEntry(String subject, String summary, String narrative, double polarity, double confidence, double stability, List<String> associatedMemories, float[] embedding, LocalDateTime createdAt, LocalDateTime updatedAt) {
-        this.subject = subject;
-        this.summary = summary;
-        this.narrative = narrative;
-        this.polarity = polarity;
-        this.confidence = confidence;
-        this.stability = stability;
-        this.associatedMemories = associatedMemories;
-        this.embedding = embedding;
-        this.createdAt = createdAt;
-        this.updatedAt = updatedAt;
+    public OpinionEntry() {
+    }
+
+    public DimensionSchwartz getMainDimension() {
+        return mainDimension;
+    }
+
+    public void setMainDimension(DimensionSchwartz mainDimension) {
+        this.mainDimension = mainDimension;
     }
 
     public String getId() {

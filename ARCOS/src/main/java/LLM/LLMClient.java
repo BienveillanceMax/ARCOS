@@ -25,6 +25,12 @@ public class LLMClient
                 .content();
     }
 
+    public String generateOpinionResponse(String prompt) {
+        return chatClient.prompt(prompt)
+                .call()
+                .content();
+    }
+
     public reactor.core.publisher.Flux<String> generateStreamingResponse(String prompt) {
         return chatClient.prompt(prompt)
                 .stream()
