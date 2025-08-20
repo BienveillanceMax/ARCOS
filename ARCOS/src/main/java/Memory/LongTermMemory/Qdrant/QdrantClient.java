@@ -316,7 +316,7 @@ public class QdrantClient
         String subject = payloadNode.get("subject").asText();
         String summary = payloadNode.get("summary").asText();
         String narrative = payloadNode.get("narrative").asText();
-        double polarity = payloadNode.get("polarity").asDouble();
+        double intensity = payloadNode.get("intensity").asDouble();
         double confidence = payloadNode.get("confidence").asDouble();
         double stability = payloadNode.get("stability").asDouble();
         String createdAtStr = payloadNode.get("createdAt").asText();
@@ -352,7 +352,7 @@ public class QdrantClient
         entry.setSubject(subject);
         entry.setSummary(summary);
         entry.setNarrative(narrative);
-        entry.setPolarity(polarity);
+        entry.setPolarity(intensity);
         entry.setConfidence(confidence);
         entry.setStability(stability);
         entry.setAssociatedMemories(associatedMemories);

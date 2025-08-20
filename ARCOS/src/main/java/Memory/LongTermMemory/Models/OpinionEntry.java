@@ -1,14 +1,10 @@
 package Memory.LongTermMemory.Models;
 
 import Personality.Values.Entities.DimensionSchwartz;
-import Personality.Values.Entities.ValueSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.NoArgsConstructor;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.UUID;
 
 public class OpinionEntry
 {

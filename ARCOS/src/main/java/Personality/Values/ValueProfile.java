@@ -34,6 +34,15 @@ public class ValueProfile
         return ValueSchwartz.valuesOfDimension(dimension).stream().mapToDouble(this::getScore).average().orElse(0.0);
     }
 
+    public double dimensionAverage()
+    {
+        return scores.values()
+            .stream()
+            .mapToInt(Double::intValue)
+            .average()
+            .orElse(50);
+    }
+
     public EnumMap<DimensionSchwartz, Double> averageByDimension() {
         EnumMap<DimensionSchwartz, Double> res = new EnumMap<>(DimensionSchwartz.class);
         for (DimensionSchwartz d : DimensionSchwartz.values()) res.put(d, averageByDimension(d));
