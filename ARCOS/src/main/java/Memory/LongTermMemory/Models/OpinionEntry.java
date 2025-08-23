@@ -32,6 +32,9 @@ public class OpinionEntry
     @JsonProperty("associatedMemories")
     private List<String> associatedMemories; // IDs des souvenirs liés
 
+    @JsonProperty("associatedDesire")
+    private String associatedDesire;
+
     @JsonProperty("embedding")
     private float[] embedding;      // Pour recherche vectorielle
 
@@ -141,6 +144,14 @@ public class OpinionEntry
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public String getAssociatedDesire() {
+        return associatedDesire;
+    }
+
+    public void setAssociatedDesire(String associatedDesire) {
+        this.associatedDesire = associatedDesire;
     }
 }
 

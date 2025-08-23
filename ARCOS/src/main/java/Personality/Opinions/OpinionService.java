@@ -13,6 +13,7 @@ import Personality.Values.ValueProfile;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -103,10 +104,11 @@ public class OpinionService
      * @param memory Le souvenir source
      */
 
-    public void processInteraction(MemoryEntry memory) {
+    public List<OpinionEntry> processInteraction(MemoryEntry memory) {
         OpinionEntry opinionEntry = getOpinionFromMemoryEntry(memory);
+        List<OpinionEntry> opinionEntries = new ArrayList<>();
         if (opinionEntry == null) {
-            return;
+            return null;    //no opinion to process
         }
 
         // Logique de tri d'opinion
@@ -117,12 +119,13 @@ public class OpinionService
 
             if (searchResult.getSimilarityScore() >= 0.85) {            //TODO HANDLE LESSER SIMILARITY ? HANDLE SUBJECT DIFFERENTIATION
                 similarOpinionsFound = true;
-                updateOpinion(searchResult, opinionEntry);
+                opinionEntries.add(updateOpinion(searchResult, opinionEntry));
             }
         }
         if (!similarOpinionsFound) {
-            addOpinion(opinionEntry, memory);
+            opinionEntries.add(addOpinion(opinionEntry, memory));
         }
+        return opinionEntries;
     }
 
     private double calculateDeltaC(OpinionEntry opinionEntry, double networkConsistency, double imp, int sOld, int sExp) {
@@ -191,7 +194,7 @@ public class OpinionService
         return normVp * newOpinionEntry.getPolarity();
     }
 
-    private void updateOpinion(SearchResult searchResult, OpinionEntry newOpinion) {
+    private OpinionEntry updateOpinion(SearchResult searchResult, OpinionEntry newOpinion) {
         OpinionEntry opinionEntry = searchResult.getOpinionEntry();
 
         double networkConsistencyScore = getNetworkConsistencyScore(newOpinion);
@@ -201,13 +204,14 @@ public class OpinionService
         opinionEntry.setStability(updateStabilityScore(opinionEntry, networkConsistencyScore, newOpinionImportance, newOpinion));
         if (opinionEntry.getStability() <= 0) {
             memoryService.deleteOpinion(opinionEntry.getId());
-            return;
+            return null; //Opinion deleted -> nothing more to do
         }
         opinionEntry.setConfidence(updateConfidenceScore(opinionEntry, networkConsistencyScore, newOpinionImportance));
         opinionEntry.setPolarity(updatePolarityScore(opinionEntry, networkConsistencyScore, coherency));
 
 
         memoryService.storeOpinion(opinionEntry);
+        return opinionEntry;
     }
 
 
@@ -220,7 +224,7 @@ public class OpinionService
 
     }
 
-    private void addOpinion(OpinionEntry opinionEntry, MemoryEntry associatedMemoryEntry) {
+    private OpinionEntry addOpinion(OpinionEntry opinionEntry, MemoryEntry associatedMemoryEntry) {
         opinionEntry.setId(UUID.randomUUID().toString());
         opinionEntry.setStability(calculateStabilityScore(opinionEntry));
         opinionEntry.setAssociatedMemories(List.of(associatedMemoryEntry.getId()));
@@ -229,6 +233,7 @@ public class OpinionService
         opinionEntry.setUpdatedAt(LocalDateTime.now());
 
         memoryService.storeOpinion(opinionEntry);
+        return opinionEntry;
 
     }
 }
