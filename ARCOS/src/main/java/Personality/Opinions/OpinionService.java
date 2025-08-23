@@ -97,6 +97,11 @@ public class OpinionService
         return opinionEntry;
     }
 
+    /**
+     * Prend en paramètre un souvenir et gère la création/l'update d'opinion
+     *
+     * @param memory Le souvenir source
+     */
 
     public void processInteraction(MemoryEntry memory) {
         OpinionEntry opinionEntry = getOpinionFromMemoryEntry(memory);
@@ -193,9 +198,14 @@ public class OpinionService
         double newOpinionImportance = valueProfile.averageByDimension(opinionEntry.getMainDimension());
         double coherency = (valueProfile.averageByDimension(opinionEntry.getMainDimension()) - valueProfile.dimensionAverage()) / 100;
 
-        opinionEntry.setStability(updateStabilityScore(opinionEntry, networkConsistencyScore,newOpinionImportance,newOpinion));
+        opinionEntry.setStability(updateStabilityScore(opinionEntry, networkConsistencyScore, newOpinionImportance, newOpinion));
+        if (opinionEntry.getStability() <= 0) {
+            memoryService.deleteOpinion(opinionEntry.getId());
+            return;
+        }
         opinionEntry.setConfidence(updateConfidenceScore(opinionEntry, networkConsistencyScore, newOpinionImportance));
         opinionEntry.setPolarity(updatePolarityScore(opinionEntry, networkConsistencyScore, coherency));
+
 
         memoryService.storeOpinion(opinionEntry);
     }
@@ -220,8 +230,5 @@ public class OpinionService
 
         memoryService.storeOpinion(opinionEntry);
 
-
     }
-
-
 }

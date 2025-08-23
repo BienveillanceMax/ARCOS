@@ -230,6 +230,13 @@ public class MemoryService
     }
 
     /**
+     * Supprime une entrée de la collection Opinions.
+     */
+    public boolean deleteOpinion(String opinionId) {
+        return qdrantClient.deletePoint(OPINIONS_COLLECTION, opinionId);
+    }
+
+    /**
      * Supprime un résumé de la collection Summaries.
      */
     public boolean deleteSummary(String summaryId) {
