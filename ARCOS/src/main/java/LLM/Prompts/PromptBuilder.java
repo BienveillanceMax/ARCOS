@@ -4,7 +4,9 @@ import Memory.Actions.ActionRegistry;
 import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
 import Memory.Actions.Entities.Actions.Action;
+import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
 import Personality.Values.Entities.DimensionSchwartz;
@@ -34,6 +36,11 @@ public class PromptBuilder
         this.valueProfile = valueProfile;
     }
 
+
+    public String buildDesirePrompt(OpinionEntry opinionEntry) {
+
+
+    }
 
     /**
      * Construit un prompt en français pour Mistral afin de générer une opinion à partir d'un souvenir

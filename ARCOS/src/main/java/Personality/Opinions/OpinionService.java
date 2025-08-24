@@ -24,13 +24,13 @@ public class OpinionService
 {
 
     private final ValueProfile valueProfile;
-    int BATCH_SIZE = 10;
     private final PromptBuilder promptBuilder;
     private final MemoryService memoryService;
     private final LLMClient llmClient;
     private final LLMResponseParser llmResponseParser;
 
-    // ---- Hyperparamètres (ajuste les valeurs si besoin) ----
+
+    // ---- Hyperparamètres ----
     private static final double W_EXPERIENCE = 0.70;   // poids experience dans polarity
     private static final double W_COHERENCE = 0.30;    // poids coherence valeur -> polarity
 

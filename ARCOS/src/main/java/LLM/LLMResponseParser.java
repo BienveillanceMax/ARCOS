@@ -3,6 +3,7 @@ package LLM;
 import Exceptions.ResponseParsingException;
 import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.Actions.Action;
+import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Orchestrator.Entities.ExecutionPlan;
@@ -264,7 +265,7 @@ public class LLMResponseParser {
      * @return Une OpinionEntry avec les champs requis remplis
      * @throws Exception Si le parsing échoue
      */
-    public OpinionEntry parseOpinionFromResponse(String mistralResponse, MemoryEntry sourceMemory) throws Exception {
+    public OpinionEntry parseOpinionFromResponse(String mistralResponse, MemoryEntry sourceMemory) throws ResponseParsingException {
         try {
             // Nettoyer la réponse si elle contient du texte supplémentaire
             String cleanedResponse = extractJsonFromResponse(mistralResponse);
@@ -302,7 +303,7 @@ public class LLMResponseParser {
             return opinion;
 
         } catch (Exception e) {
-            throw new Exception("Erreur lors du parsing de la réponse Mistral: " + e.getMessage() +
+            throw new ResponseParsingException("Erreur lors du parsing de la réponse Mistral: " + e.getMessage() +
                     "\nRéponse originale: " + mistralResponse, e);
         }
     }
@@ -322,14 +323,13 @@ public class LLMResponseParser {
         return response.trim();
     }
 
-    /**
-     * Méthode utilitaire pour filtrer les valeurs dominantes
-     */
-    public static List<ValueSchwartz> getDominantValues(Map<ValueSchwartz, Double> valueScores, double threshold) {
-        return valueScores.entrySet().stream()
-                .filter(entry -> entry.getValue() >= threshold)
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toList());
+
+
+    /// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Desire Parsing
+
+    public DesireEntry parseDesireFromResponse(String response) throws ResponseParsingException {
+        //todo
     }
 
 }

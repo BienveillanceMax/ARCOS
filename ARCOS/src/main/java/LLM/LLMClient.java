@@ -1,5 +1,6 @@
 package LLM;
 
+import Memory.LongTermMemory.Models.OpinionEntry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
@@ -31,9 +32,17 @@ public class LLMClient
                 .content();
     }
 
+    public String generateDesireResponse(String prompt) {
+        return chatClient.prompt(prompt)
+                .call()
+                .content();
+    }
+
     public reactor.core.publisher.Flux<String> generateStreamingResponse(String prompt) {
         return chatClient.prompt(prompt)
                 .stream()
                 .content();
     }
+
+
 }
