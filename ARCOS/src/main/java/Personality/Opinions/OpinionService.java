@@ -5,10 +5,9 @@ import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult;
+import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.Entities.DimensionSchwartz;
-import Personality.Values.Entities.ValueSchwartz;
 import Personality.Values.ValueProfile;
 import org.springframework.stereotype.Service;
 

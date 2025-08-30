@@ -37,9 +37,99 @@ public class PromptBuilder
     }
 
 
-    public String buildDesirePrompt(OpinionEntry opinionEntry) {
+    /**
+     * Génère une prompt en français pour Mistral pour créer un désir
+     * à partir d'une opinion avec intensité élevée et des valeurs personnelles
+     *
+     * @param opinion L'opinion source
+     * @param intensity L'intensité calculée de l'opinion
+     * @return La prompt formatée pour Mistral
+     */
+    public String buildDesirePrompt(OpinionEntry opinion, double intensity) {
+        // Vérification de l'intensité de l'opinion
 
 
+        StringBuilder prompt = new StringBuilder();
+
+        prompt.append("# Génération de Désir à partir d'une Opinion\n\n");
+
+        prompt.append("Tu es un expert en psychologie cognitive spécialisé dans la transformation des opinions en désirs motivants. ");
+        prompt.append("À partir de l'opinion et du profil de valeurs fournis, génère un désir cohérent et motivant.\n\n");
+
+        // Contexte de l'opinion
+        prompt.append("## Opinion Source\n");
+        prompt.append("**Sujet :** ").append(opinion.getSubject()).append("\n");
+        prompt.append("**Résumé :** ").append(opinion.getSummary()).append("\n");
+        prompt.append("**Narrative :** ").append(opinion.getNarrative()).append("\n");
+        prompt.append("**Polarité :** ").append(String.format("%.2f", opinion.getPolarity()));
+        prompt.append(opinion.getPolarity() > 0 ? " (positive)" : " (négative)").append("\n");
+        prompt.append("**Confiance :** ").append(String.format("%.2f", opinion.getConfidence())).append("\n");
+        prompt.append("**Stabilité :** ").append(String.format("%.2f", opinion.getStability())).append("\n");
+        prompt.append("**Intensité calculée :** ").append(String.format("%.2f", intensity)).append("\n\n");
+
+        // Profil de valeurs
+        prompt.append("## Profil de Valeurs\n");
+
+        // Valeurs fortes
+        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
+        if (!strongValues.isEmpty()) {
+            prompt.append("**Valeurs dominantes (>70) :**\n");
+            strongValues.forEach((value, score) ->
+                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
+            );
+            prompt.append("\n");
+        }
+
+        // Valeurs supprimées
+        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
+        if (!suppressedValues.isEmpty()) {
+            prompt.append("**Valeurs supprimées (<30) :**\n");
+            suppressedValues.forEach((value, score) ->
+                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
+            );
+            prompt.append("\n");
+        }
+
+        // Dimension principale de l'opinion
+        if (opinion.getMainDimension() != null) {
+            double dimensionAverage = valueProfile.averageByDimension(opinion.getMainDimension());
+            prompt.append("**Dimension principale de l'opinion :** ").append(opinion.getMainDimension().name());
+            prompt.append(" (moyenne: ").append(String.format("%.1f", dimensionAverage)).append(")\n\n");
+        }
+
+        // Instructions pour la génération
+        prompt.append("## Instructions\n\n");
+        prompt.append("Génère un désir qui :\n");
+        prompt.append("1. **Découle naturellement** de cette opinion intense\n");
+        prompt.append("2. **S'aligne** avec les valeurs dominantes de la personne\n");
+        prompt.append("3. **Évite les conflits** avec les valeurs supprimées\n");
+        prompt.append("4. **Maintient la polarité** de l'opinion source\n");
+        prompt.append("5. **Reflète l'intensité émotionnelle** de l'opinion\n\n");
+
+        // Format de réponse
+        prompt.append("## Format de Réponse Attendu\n\n");
+        prompt.append("Réponds uniquement avec un objet JSON contenant :\n");
+        prompt.append("```json\n");
+        prompt.append("{\n");
+        prompt.append("  \"label\": \"[Titre court et accrocheur du désir]\",\n");
+        prompt.append("  \"description\": \"[Description détaillée expliquant pourquoi ce désir découle de l'opinion et comment il s'aligne avec les valeurs]\",\n");
+        prompt.append("  \"intensity\": [Valeur entre 0.0 et 1.0 représentant l'intensité du désir],\n");
+        prompt.append("  \"reasoning\": \"[Explication du raisonnement reliant opinion, valeurs et désir généré]\"\n");
+        prompt.append("}\n");
+        prompt.append("```\n\n");
+
+        // Exemples contextuels
+        prompt.append("## Considérations Importantes\n");
+        prompt.append("- Un désir doit être **actionnable** et **motivant**\n");
+        prompt.append("- L'intensité du désir doit être proportionnelle à celle de l'opinion (≥0.6)\n");
+        prompt.append("- Le désir doit respecter la **cohérence psychologique** entre opinions et valeurs\n");
+        prompt.append("- Privilégier des formulations **orientées action**\n");
+
+        if (opinion.getPolarity() < 0) {
+            prompt.append("- Attention : l'opinion est négative, le désir peut viser à **corriger** ou **éviter** la situation\n");
+        }
+
+        return prompt.toString();
     }
 
     /**

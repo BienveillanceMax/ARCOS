@@ -16,12 +16,15 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
-public class LLMResponseParser {
+public class LLMResponseParser
+{
 
     private final ObjectMapper objectMapper;
     private final ActionRegistry actionRegistry;
@@ -255,13 +258,13 @@ public class LLMResponseParser {
     }
 
 /// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /// Opinion parsing
+/// Opinion parsing
 
     /**
      * Parse la réponse de Mistral et crée une OpinionEntry incomplète
      *
      * @param mistralResponse La réponse JSON de Mistral
-     * @param sourceMemory Le souvenir source
+     * @param sourceMemory    Le souvenir source
      * @return Une OpinionEntry avec les champs requis remplis
      * @throws Exception Si le parsing échoue
      */
@@ -284,8 +287,7 @@ public class LLMResponseParser {
             opinion.setConfidence(jsonNode.get("confidence").asDouble());
             try {
                 opinion.setMainDimension(DimensionSchwartz.valueOf(jsonNode.get("mainDimension").asText()));    //todo : may break
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.err.println("\n\n\n N'a pas pu parser la dimension principale : " + e.getMessage() + "\n\n\n");
                 opinion.setMainDimension(null);
             }
@@ -324,12 +326,76 @@ public class LLMResponseParser {
     }
 
 
-
     /// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// Desire Parsing
 
-    public DesireEntry parseDesireFromResponse(String response) throws ResponseParsingException {
-        //todo
+
+    /**
+     * Parse la réponse JSON de Mistral et crée un DesireEntry correspondant
+     *
+     * @param jsonResponse La réponse brute de Mistral (peut contenir du texte avant/après le JSON)
+     * @return Un DesireEntry complet
+     * @throws ResponseParsingException Si le parsing échoue
+     */
+    public DesireEntry parseDesireFromResponse(String jsonResponse, String opinionId) throws ResponseParsingException {
+        try {
+            // Extraire le JSON de la réponse (au cas où il y aurait du texte autour)
+            String cleanJson = extractJsonFromResponse(jsonResponse);
+
+            // Parser la réponse JSON
+            DesireEntry response = objectMapper.readValue(cleanJson, DesireEntry.class);
+
+            // Valider la réponse
+            validateMistralResponse(response);
+
+            // Créer et remplir l'objet DesireEntry
+            DesireEntry desire = new DesireEntry();
+            desire.setId(UUID.randomUUID().toString());
+            desire.setOpinionId(opinionId);
+            desire.setLabel(response.getLabel());
+            desire.setDescription(response.getDescription());
+            desire.setIntensity(response.getIntensity());
+            desire.setStatus(DesireEntry.Status.PENDING);
+
+            LocalDateTime now = LocalDateTime.now();
+            desire.setCreatedAt(now);
+            desire.setLastUpdated(now);
+
+            return desire;
+
+        } catch (JsonProcessingException e) {
+            throw new ResponseParsingException("Erreur lors du parsing JSON de la réponse Mistral", e);
+        } catch (IllegalArgumentException e) {
+            throw new ResponseParsingException("Données invalides dans la réponse Mistral: " + e.getMessage(), e);
+        }
+    }
+
+
+    /**
+     * Valide que la réponse de Mistral contient tous les champs requis avec des valeurs valides
+     */
+    private static void validateMistralResponse(DesireEntry response) throws IllegalArgumentException {
+        if (response.getLabel() == null || response.getLabel().trim().isEmpty()) {
+            throw new IllegalArgumentException("Le label du désir ne peut pas être vide");
+        }
+
+        if (response.getDescription() == null || response.getDescription().trim().isEmpty()) {
+            throw new IllegalArgumentException("La description du désir ne peut pas être vide");
+        }
+
+        if (response.getIntensity() < 0.0 || response.getIntensity() > 1.0) {
+            throw new IllegalArgumentException("L'intensité doit être entre 0.0 et 1.0, reçu: " + response.getIntensity());
+        }
+
+
+        // Validation supplémentaire sur les longueurs
+        if (response.getLabel().length() > 200) {
+            throw new IllegalArgumentException("Le label du désir ne peut pas dépasser 200 caractères");
+        }
+
+        if (response.getDescription().length() > 2000) {
+            throw new IllegalArgumentException("La description du désir ne peut pas dépasser 2000 caractères");
+        }
     }
 
 }

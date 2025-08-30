@@ -1,10 +1,9 @@
 package Memory.LongTermMemory.service;
 
 
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult;
-import Memory.LongTermMemory.Models.Subject;
+import Memory.LongTermMemory.Models.*;
+import Memory.LongTermMemory.Models.SearchResult.DesireSearchResult;
+import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 
 import java.util.List;
@@ -13,6 +12,7 @@ import java.util.List;
  * Service principal pour la gestion de la mémoire à long terme.
  * Orchestre les interactions entre le client Qdrant et le générateur d'embeddings.
  */
+
 public class MemoryService
 {
 
@@ -21,6 +21,7 @@ public class MemoryService
     public static final String MEMORIES_COLLECTION = "Memories";
     public static final String SUMMARIES_COLLECTION = "Summaries";
     public static final String OPINIONS_COLLECTION = "Opinions";
+    public static final String DESIRES_COLLECTION = "Desires";
 
     // Configuration par défaut
     private static final int DEFAULT_EMBEDDING_DIMENSION = 768;
@@ -72,8 +73,9 @@ public class MemoryService
         boolean memoriesOk = initializeCollection(MEMORIES_COLLECTION);
         boolean summariesOk = initializeCollection(SUMMARIES_COLLECTION);
         boolean opinionsOk = initializeCollection(OPINIONS_COLLECTION);
+        boolean desiresOk = initializeCollection(DESIRES_COLLECTION);
 
-        if (memoriesOk && summariesOk && opinionsOk) {
+        if (memoriesOk && summariesOk && opinionsOk && desiresOk) {
             System.out.println("Toutes les collections ont été initialisées avec succès");
             return true;
         } else {
@@ -97,21 +99,43 @@ public class MemoryService
         return storeMemoryEntry(MEMORIES_COLLECTION, content, subject, satisfaction);
     }
 
+
+    public boolean storeDesire(DesireEntry createdDesire) {
+        try {
+            // Génération de l'embedding
+            float[] embedding = embeddingGenerator.generateEmbedding(createdDesire.getLabel());
+            createdDesire.setEmbedding(embedding);
+
+            // Stockage dans Qdrant
+
+            return qdrantClient.upsertPoint(DESIRES_COLLECTION, createdDesire);
+
+        } catch (Exception e) {
+            System.out.println("Erreur de persistance de la collection desires");
+            return false;
+        }
+    }
+
+
+    public DesireEntry getDesire(String associatedDesireId) {
+        return qdrantClient.getDesirePoint(associatedDesireId);
+    }
+
+
     /**
      * Enregistre un résumé dans la collection Summaries.
      */
     public boolean storeSummary(String content, Subject subject, double satisfaction) {
 
-        return storeMemoryEntry(SUMMARIES_COLLECTION, content, subject, satisfaction);
+        return storeMemoryEntry(MemoryService.SUMMARIES_COLLECTION, content, subject, satisfaction);
     }
 
 
     /**
      * Méthode privée pour enregistrer une entrée de mémoire dans une collection donnée.
      */
-    public boolean storeOpinion( OpinionEntry opinionEntry) {
+    public boolean storeOpinion(OpinionEntry opinionEntry) {
 
-        String collectionName = OPINIONS_COLLECTION;
         try {
             // Génération de l'embedding
             float[] embedding = embeddingGenerator.generateEmbedding(opinionEntry.getSummary());
@@ -119,10 +143,10 @@ public class MemoryService
 
             // Stockage dans Qdrant
 
-            return qdrantClient.upsertPoint(collectionName, opinionEntry);
+            return qdrantClient.upsertPoint(OPINIONS_COLLECTION, opinionEntry);
 
         } catch (Exception e) {
-            System.out.println("Erreur de persistance de la collection " + collectionName);
+            System.out.println("Erreur de persistance de la collection " + OPINIONS_COLLECTION);
             return false;
         }
     }
@@ -161,6 +185,12 @@ public class MemoryService
         return searchInCollection(OPINIONS_COLLECTION, query, topK);
     }
 
+    public List<DesireSearchResult> searchDesires(String query) {
+        return searchInDesires(query, DEFAULT_TOP_K);
+    }
+
+
+
 
     /**
      * Effectue une recherche vectorielle dans la collection Memories.
@@ -190,6 +220,7 @@ public class MemoryService
         return searchInCollection(SUMMARIES_COLLECTION, query, topK);
     }
 
+
     /**
      * Méthode privée pour effectuer une recherche dans une collection donnée.
      */
@@ -199,11 +230,32 @@ public class MemoryService
             float[] queryEmbedding = embeddingGenerator.generateEmbedding(query);
 
             // Recherche vectorielle
+
             List<SearchResult> results = qdrantClient.searchVector(collectionName, queryEmbedding, topK);
             return results;
 
         } catch (Exception e) {
             System.out.println("Exception lors de la recherche dans la collection " + collectionName + " : " + e.getMessage());
+            return List.of();
+        }
+    }
+
+
+    /**
+     * Méthode privée pour effectuer une recherche dans une collection donnée.
+     */
+    private List<DesireSearchResult> searchInDesires(String query, int topK) {
+        try {
+            // Génération de l'embedding pour la requête
+            float[] queryEmbedding = embeddingGenerator.generateEmbedding(query);
+
+            // Recherche vectorielle
+
+            List<DesireSearchResult> results = qdrantClient.searchDesireVector("desires", queryEmbedding, topK);
+            return results;
+
+        } catch (Exception e) {
+            System.out.println("Exception lors de la recherche dans la collection desires : " + e.getMessage());
             return List.of();
         }
     }
@@ -273,6 +325,8 @@ public class MemoryService
     public int getEmbeddingDimension() {
         return embeddingDimension;
     }
+
+
 
     /**
      * Classe interne pour encapsuler les résultats de recherche combinés.

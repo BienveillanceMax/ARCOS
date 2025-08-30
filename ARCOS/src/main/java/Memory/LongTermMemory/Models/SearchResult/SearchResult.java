@@ -1,7 +1,11 @@
-package Memory.LongTermMemory.Models;
+package Memory.LongTermMemory.Models.SearchResult;
+
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
 
 /**
  * Représente le résultat d'une recherche vectorielle avec le score de similarité.
+ * Par pitié prendre le temps de refacto ça un jour et de séparer opinion et memory
  */
 public class SearchResult {
 

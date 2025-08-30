@@ -11,14 +11,22 @@ public class DesireEntry
 
     private String id;
     private String opinionId;      // link to opinion
-    private String label;
+    private String label;       // title of the desire
     private String description;
     private double intensity;    // 0..1
+    private String reasoning;
     private Status status;
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
-    private List<String> evidences;
     private float[] embedding;
+
+    public String getReasoning() {
+        return reasoning;
+    }
+
+    public void setReasoning(String reasoning) {
+        this.reasoning = reasoning;
+    }
 
     public String getId() {
         return id;
@@ -82,14 +90,6 @@ public class DesireEntry
 
     public void setLastUpdated(LocalDateTime lastUpdated) {
         this.lastUpdated = lastUpdated;
-    }
-
-    public List<String> getEvidences() {
-        return evidences;
-    }
-
-    public void setEvidences(List<String> evidences) {
-        this.evidences = evidences;
     }
 
     public float[] getEmbedding() {

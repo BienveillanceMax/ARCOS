@@ -1,10 +1,9 @@
 package Memory.LongTermMemory.Qdrant;
 
 
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult;
-import Memory.LongTermMemory.Models.Subject;
+import Memory.LongTermMemory.Models.*;
+import Memory.LongTermMemory.Models.SearchResult.DesireSearchResult;
+import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -117,7 +116,7 @@ public class QdrantClient
 
 
     /**
-     * Insère ou met à jour une entrée mémoire dans la collection spécifiée.
+     * Insère ou met à jour une entrée opinion dans la collection spécifiée.
      */
 
     public boolean upsertPoint(String collectionName, OpinionEntry opinionEntry) {
@@ -182,6 +181,73 @@ public class QdrantClient
                 } else {
                     String responseBody = response.body() != null ? response.body().string() : "";
                     logger.error("Erreur lors de l'insertion du point d'opinion dans '{}': {} - {}",
+                            collectionName, response.code(), responseBody);
+                    return false;
+                }
+            }
+
+        } catch (Exception e) {
+            logger.error("Exception lors de l'insertion du point dans '{}'", collectionName, e);
+            return false;
+        }
+    }
+
+    /**
+     * Insère ou met à jour une entrée opinion dans la collection spécifiée.
+     */
+
+    public boolean upsertPoint(String collectionName, DesireEntry desireEntry) {
+        try {
+            ObjectNode requestBody = objectMapper.createObjectNode();
+            ArrayNode points = objectMapper.createArrayNode();
+
+            ObjectNode point = objectMapper.createObjectNode();
+            point.put("id", desireEntry.getId());
+
+            // Conversion de l'embedding en ArrayNode
+            ArrayNode vectorArray = objectMapper.createArrayNode();
+            for (float value : desireEntry.getEmbedding()) {
+                vectorArray.add(value);
+            }
+            point.set("vector", vectorArray);
+
+            // Ajout des métadonnées (payload)
+            ObjectNode payload = objectMapper.createObjectNode();
+            payload.put("label", desireEntry.getLabel());
+            payload.put("description", desireEntry.getDescription());
+            payload.put("reasoning", desireEntry.getReasoning());
+            payload.put("intensity", desireEntry.getIntensity());
+            payload.put("opinionId", desireEntry.getOpinionId());
+
+            // Sérialisation des timestamps (ISO 8601)
+            DateTimeFormatter formatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+            if (desireEntry.getCreatedAt() != null) {
+                payload.put("createdAt", desireEntry.getCreatedAt().format(TIMESTAMP_FORMATTER));
+            }
+            if (desireEntry.getLastUpdated() != null) {
+                payload.put("lastUpdated", desireEntry.getLastUpdated().format(TIMESTAMP_FORMATTER));
+            }
+
+            point.set("payload", payload);
+
+            points.add(point);
+            requestBody.set("points", points);
+
+            String json = objectMapper.writeValueAsString(requestBody);
+
+            RequestBody body = RequestBody.create(json, JSON);
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/collections/" + collectionName + "/points")
+                    .put(body)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    logger.debug("Point de désir inséré avec succès dans '{}': {}", collectionName, desireEntry.getId());
+                    return true;
+                } else {
+                    String responseBody = response.body() != null ? response.body().string() : "";
+                    logger.error("Erreur lors de l'insertion du point de désir dans '{}': {} - {}",
                             collectionName, response.code(), responseBody);
                     return false;
                 }
@@ -278,8 +344,47 @@ public class QdrantClient
                 if (response.isSuccessful()) {
                     String responseBody = response.body().string();
                     JsonNode responseJson = objectMapper.readTree(responseBody);
-
                     return parseSearchResults(responseJson, collectionName);
+                } else {
+                    String responseBody = response.body() != null ? response.body().string() : "";
+                    logger.error("Erreur lors de la recherche dans '{}': {} - {}",
+                            collectionName, response.code(), responseBody);
+                    return new ArrayList<>();
+                }
+            }
+
+        } catch (Exception e) {
+            logger.error("Exception lors de la recherche dans '{}'", collectionName, e);
+            return new ArrayList<>();
+        }
+    }
+    public List<DesireSearchResult> searchDesireVector(String collectionName, float[] queryVector, int topK) {
+        try {
+            ObjectNode requestBody = objectMapper.createObjectNode();
+
+            // Conversion du vecteur de requête
+            ArrayNode vectorArray = objectMapper.createArrayNode();
+            for (float value : queryVector) {
+                vectorArray.add(value);
+            }
+            requestBody.set("vector", vectorArray);
+            requestBody.put("limit", topK);
+            requestBody.put("with_payload", true);
+            requestBody.put("with_vector", false);
+
+            String json = objectMapper.writeValueAsString(requestBody);
+
+            RequestBody body = RequestBody.create(json, JSON);
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/collections/" + collectionName + "/points/search")
+                    .post(body)
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
+                    JsonNode responseJson = objectMapper.readTree(responseBody);
+                    return parseDesireSearchResults(responseJson);
                 } else {
                     String responseBody = response.body() != null ? response.body().string() : "";
                     logger.error("Erreur lors de la recherche dans '{}': {} - {}",
@@ -309,6 +414,32 @@ public class QdrantClient
         entry.setSatisfaction(satisfaction);
         entry.setTimestamp(timestamp);
         return new SearchResult(entry, null, score);
+    }
+
+    private DesireSearchResult parseDesireEntry(JsonNode payloadNode, String id, double score) {
+        String label = payloadNode.get("label").asText();
+        String description = payloadNode.get("description").asText();
+        String reasoning = payloadNode.get("reasoning").asText();
+        double intensity = payloadNode.get("intensity").asDouble();
+        String opinionId = payloadNode.get("opinionId").asText();
+
+        String createdAtStr = payloadNode.get("createdAt").asText();
+        String lastUpdatedStr = payloadNode.get("lastUpdated").asText();
+
+        LocalDateTime createdAt = LocalDateTime.parse(createdAtStr, TIMESTAMP_FORMATTER);
+        LocalDateTime lastUpdated = LocalDateTime.parse(lastUpdatedStr, TIMESTAMP_FORMATTER);
+
+        DesireEntry entry = new DesireEntry();
+        entry.setId(id);
+        entry.setLabel(label);
+        entry.setDescription(description);
+        entry.setReasoning(reasoning);
+        entry.setIntensity(intensity);
+        entry.setOpinionId(opinionId);
+        entry.setCreatedAt(createdAt);
+        entry.setLastUpdated(lastUpdated);
+
+        return new DesireSearchResult(entry,  score);
     }
 
     private SearchResult parseOpinionEntry(JsonNode payloadNode, String id, double score) {
@@ -397,6 +528,27 @@ public class QdrantClient
     }
 
     /**
+     * Parse les résultats de recherche depuis la réponse JSON de Qdrant.
+     */
+    private List<DesireSearchResult> parseDesireSearchResults(JsonNode responseJson) throws IOException {
+        List<DesireSearchResult> results = new ArrayList<>();
+
+        JsonNode resultArray = responseJson.get("result");
+        if (resultArray != null && resultArray.isArray()) {
+            for (JsonNode resultNode : resultArray) {
+                String id = resultNode.get("id").asText();
+                double score = resultNode.get("score").asDouble();
+                JsonNode payloadNode = resultNode.get("payload");
+
+                if (payloadNode != null) {
+                    results.add(parseDesireEntry(payloadNode, id, score));
+                }
+            }
+        }
+        return results;
+    }
+
+    /**
      * Récupère une entrée par son ID.
      */
     public MemoryEntry getPoint(String collectionName, String pointId) {
@@ -426,6 +578,39 @@ public class QdrantClient
 
         return null;
     }
+    /**
+     * Récupère une entrée par son ID.
+     */
+    public DesireEntry getDesirePoint(String pointId) {
+        try {
+            Request request = new Request.Builder()
+                    .url(baseUrl + "/collections/" + "desires" + "/points/" + pointId)
+                    .get()
+                    .build();
+
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (response.isSuccessful()) {
+                    String responseBody = response.body().string();
+                    JsonNode responseJson = objectMapper.readTree(responseBody);
+
+                    JsonNode resultNode = responseJson.get("result");
+
+                    if (resultNode != null) {
+                        double score = resultNode.get("score").asDouble();
+                        return parseDesireEntry(resultNode,pointId,score).getEntry();           //c'est du scotch todo : refacto
+                    }
+                } else {
+                    logger.error("Erreur lors de la récupération du point '{}' dans '{}': {}",
+                            pointId, "desires", response.code());
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Exception lors de la récupération du point '{}' dans '{}'", pointId, "desires", e);
+        }
+
+        return null;
+    }
+
 
     private MemoryEntry parseMemoryEntryFromPoint(JsonNode pointNode) {
         String id = pointNode.get("id").asText();
