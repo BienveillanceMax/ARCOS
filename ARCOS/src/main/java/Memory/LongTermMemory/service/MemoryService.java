@@ -249,8 +249,8 @@ public class MemoryService
      * Recherche dans les deux collections simultanément et combine les résultats.
      */
     public CombinedSearchResults searchAll(String query, int topKPerCollection) {
-        List<SearchResult> memories = searchMemories(query, topKPerCollection);
-        List<SearchResult> summaries = searchSummaries(query, topKPerCollection);
+        List<SearchResult<MemoryEntry>> memories = searchMemories(query, topKPerCollection);
+        List<SearchResult<MemoryEntry>> summaries = searchSummaries(query, topKPerCollection);
 
         return new CombinedSearchResults(memories, summaries);
     }
@@ -282,19 +282,19 @@ public class MemoryService
      */
     public static class CombinedSearchResults
     {
-        private final List<SearchResult> memories;
-        private final List<SearchResult> summaries;
+        private final List<SearchResult<MemoryEntry>> memories;
+        private final List<SearchResult<MemoryEntry>> summaries;
 
-        public CombinedSearchResults(List<SearchResult> memories, List<SearchResult> summaries) {
+        public CombinedSearchResults(List<SearchResult<MemoryEntry>> memories, List<SearchResult<MemoryEntry>> summaries) {
             this.memories = memories;
             this.summaries = summaries;
         }
 
-        public List<SearchResult> getMemories() {
+        public List<SearchResult<MemoryEntry>> getMemories() {
             return memories;
         }
 
-        public List<SearchResult> getSummaries() {
+        public List<SearchResult<MemoryEntry>> getSummaries() {
             return summaries;
         }
 

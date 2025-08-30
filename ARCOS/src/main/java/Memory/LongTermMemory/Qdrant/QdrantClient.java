@@ -2,7 +2,6 @@ package Memory.LongTermMemory.Qdrant;
 
 
 import Memory.LongTermMemory.Models.*;
-import Memory.LongTermMemory.Models.SearchResult.DesireSearchResult;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,6 +18,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Client pour communiquer avec Qdrant via son API REST.
@@ -165,7 +165,6 @@ public class QdrantClient
         }
     }
 
-import java.util.function.Function;
     /**
      * Effectue une recherche vectorielle dans la collection spécifiée.
      */

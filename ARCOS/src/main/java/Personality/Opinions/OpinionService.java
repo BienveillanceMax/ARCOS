@@ -111,10 +111,10 @@ public class OpinionService
         }
 
         // Logique de tri d'opinion
-        List<SearchResult> similarOpinions = memoryService.searchOpinions(opinionEntry.getSubject());
+        List<SearchResult<OpinionEntry>> similarOpinions = memoryService.searchOpinions(opinionEntry.getSubject());
         boolean similarOpinionsFound = false;
 
-        for (SearchResult searchResult : similarOpinions) {
+        for (SearchResult<OpinionEntry> searchResult : similarOpinions) {
 
             if (searchResult.getSimilarityScore() >= 0.85) {            //TODO HANDLE LESSER SIMILARITY ? HANDLE SUBJECT DIFFERENTIATION
                 similarOpinionsFound = true;
@@ -193,8 +193,8 @@ public class OpinionService
         return normVp * newOpinionEntry.getPolarity();
     }
 
-    private OpinionEntry updateOpinion(SearchResult searchResult, OpinionEntry newOpinion) {
-        OpinionEntry opinionEntry = searchResult.getOpinionEntry();
+    private OpinionEntry updateOpinion(SearchResult<OpinionEntry> searchResult, OpinionEntry newOpinion) {
+        OpinionEntry opinionEntry = searchResult.getEntry();
 
         double networkConsistencyScore = getNetworkConsistencyScore(newOpinion);
         double newOpinionImportance = valueProfile.averageByDimension(opinionEntry.getMainDimension());
