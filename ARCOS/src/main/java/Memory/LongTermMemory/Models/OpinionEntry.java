@@ -2,12 +2,18 @@ package Memory.LongTermMemory.Models;
 
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
-public class OpinionEntry
+public class OpinionEntry implements QdrantEntry
 {
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
     @JsonProperty("id")
     private String id;
 
@@ -152,6 +158,35 @@ public class OpinionEntry
 
     public void setAssociatedDesire(String associatedDesire) {
         this.associatedDesire = associatedDesire;
+    }
+
+    @Override
+    public ObjectNode getPayload() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("subject", this.getSubject());
+        payload.put("summary", this.getSummary());
+        payload.put("narrative", this.getNarrative());
+        payload.put("polarity", this.getPolarity());
+        payload.put("confidence", this.getConfidence());
+        payload.put("stability", this.getStability());
+
+        ArrayNode memoriesArray = objectMapper.createArrayNode();
+        if (this.getAssociatedMemories() != null) {
+            for (String mem : this.getAssociatedMemories()) {
+                memoriesArray.add(mem);
+            }
+        }
+        payload.set("associatedMemories", memoriesArray);
+
+        if (this.getCreatedAt() != null) {
+            payload.put("createdAt", this.getCreatedAt().format(TIMESTAMP_FORMATTER));
+        }
+        if (this.getUpdatedAt() != null) {
+            payload.put("updatedAt", this.getUpdatedAt().format(TIMESTAMP_FORMATTER));
+        }
+
+        return payload;
     }
 }
 

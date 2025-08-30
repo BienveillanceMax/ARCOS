@@ -1,31 +1,21 @@
 package Memory.LongTermMemory.Models.SearchResult;
 
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-
 /**
  * Représente le résultat d'une recherche vectorielle avec le score de similarité.
- * Par pitié prendre le temps de refacto ça un jour et de séparer opinion et memory
+ * @param <T> Le type de l'entrée retournée par la recherche.
  */
-public class SearchResult {
+public class SearchResult<T> {
 
-    private final MemoryEntry memoryEntry;
-    private final OpinionEntry opinionEntry;
+    private final T entry;
     private final double similarityScore;
 
-    public SearchResult(MemoryEntry memoryEntry, OpinionEntry opinionEntry, double similarityScore) {
-        this.memoryEntry = memoryEntry;
-        this.opinionEntry = opinionEntry;
+    public SearchResult(T entry, double similarityScore) {
+        this.entry = entry;
         this.similarityScore = similarityScore;
-
     }
 
-    public OpinionEntry getOpinionEntry() {
-        return opinionEntry;
-    }
-
-    public MemoryEntry getMemoryEntry() {
-        return memoryEntry;
+    public T getEntry() {
+        return entry;
     }
 
     public double getSimilarityScore() {
@@ -34,6 +24,6 @@ public class SearchResult {
 
     @Override
     public String toString() {
-        return String.format("SearchResult{score=%.4f, entry=%s}", similarityScore, memoryEntry);
+        return String.format("SearchResult{score=%.4f, entry=%s}", similarityScore, entry.toString());
     }
 }

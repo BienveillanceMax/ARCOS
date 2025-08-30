@@ -1,11 +1,17 @@
 package Memory.LongTermMemory.Models;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
 
-public class DesireEntry
+public class DesireEntry implements QdrantEntry
 {
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
     public enum Status
     {PENDING, ACTIVE, SATISFIED, ABANDONED}
 
@@ -98,6 +104,26 @@ public class DesireEntry
 
     public void setEmbedding(float[] embedding) {
         this.embedding = embedding;
+    }
+
+    @Override
+    public ObjectNode getPayload() {
+        ObjectMapper objectMapper = new ObjectMapper();
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.put("label", this.getLabel());
+        payload.put("description", this.getDescription());
+        payload.put("reasoning", this.getReasoning());
+        payload.put("intensity", this.getIntensity());
+        payload.put("opinionId", this.getOpinionId());
+
+        if (this.getCreatedAt() != null) {
+            payload.put("createdAt", this.getCreatedAt().format(TIMESTAMP_FORMATTER));
+        }
+        if (this.getLastUpdated() != null) {
+            payload.put("lastUpdated", this.getLastUpdated().format(TIMESTAMP_FORMATTER));
+        }
+
+        return payload;
     }
 }
 

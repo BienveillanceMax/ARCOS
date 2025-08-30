@@ -2,11 +2,11 @@ package Memory.LongTermMemory.service;
 
 
 import Memory.LongTermMemory.Models.*;
-import Memory.LongTermMemory.Models.SearchResult.DesireSearchResult;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 
 import java.util.List;
+import java.util.function.Function;
 
 /**
  * Service principal pour la gestion de la mémoire à long terme.
@@ -96,29 +96,18 @@ public class MemoryService
      * Enregistre un souvenir dans la collection Memories.
      */
     public boolean storeMemory(String content, Subject subject, double satisfaction) {
-        return storeMemoryEntry(MEMORIES_COLLECTION, content, subject, satisfaction);
+        MemoryEntry entry = new MemoryEntry(content, subject, satisfaction);
+        return storeEntry(MEMORIES_COLLECTION, entry, content);
     }
 
 
     public boolean storeDesire(DesireEntry createdDesire) {
-        try {
-            // Génération de l'embedding
-            float[] embedding = embeddingGenerator.generateEmbedding(createdDesire.getLabel());
-            createdDesire.setEmbedding(embedding);
-
-            // Stockage dans Qdrant
-
-            return qdrantClient.upsertPoint(DESIRES_COLLECTION, createdDesire);
-
-        } catch (Exception e) {
-            System.out.println("Erreur de persistance de la collection desires");
-            return false;
-        }
+        return storeEntry(DESIRES_COLLECTION, createdDesire, createdDesire.getLabel());
     }
 
 
     public DesireEntry getDesire(String associatedDesireId) {
-        return qdrantClient.getDesirePoint(associatedDesireId);
+        return qdrantClient.getPoint(DESIRES_COLLECTION, associatedDesireId, (jsonNode) -> qdrantClient.parseDesireEntry(jsonNode).getEntry());
     }
 
 
@@ -126,8 +115,8 @@ public class MemoryService
      * Enregistre un résumé dans la collection Summaries.
      */
     public boolean storeSummary(String content, Subject subject, double satisfaction) {
-
-        return storeMemoryEntry(MemoryService.SUMMARIES_COLLECTION, content, subject, satisfaction);
+        MemoryEntry entry = new MemoryEntry(content, subject, satisfaction);
+        return storeEntry(SUMMARIES_COLLECTION, entry, content);
     }
 
 
@@ -135,37 +124,17 @@ public class MemoryService
      * Méthode privée pour enregistrer une entrée de mémoire dans une collection donnée.
      */
     public boolean storeOpinion(OpinionEntry opinionEntry) {
-
-        try {
-            // Génération de l'embedding
-            float[] embedding = embeddingGenerator.generateEmbedding(opinionEntry.getSummary());
-            opinionEntry.setEmbedding(embedding);
-
-            // Stockage dans Qdrant
-
-            return qdrantClient.upsertPoint(OPINIONS_COLLECTION, opinionEntry);
-
-        } catch (Exception e) {
-            System.out.println("Erreur de persistance de la collection " + OPINIONS_COLLECTION);
-            return false;
-        }
+        return storeEntry(OPINIONS_COLLECTION, opinionEntry, opinionEntry.getSummary());
     }
 
 
-    /**
-     * Méthode privée pour enregistrer une entrée de mémoire dans une collection donnée.
-     */
-    private boolean storeMemoryEntry(String collectionName, String content, Subject subject, double satisfaction) {
+    private <T extends QdrantEntry> boolean storeEntry(String collectionName, T entry, String textToEmbed) {
         try {
-            // Création de l'entrée mémoire
-            MemoryEntry entry = new MemoryEntry(content, subject, satisfaction);
-
             // Génération de l'embedding
-            float[] embedding = embeddingGenerator.generateEmbedding(content);
+            float[] embedding = embeddingGenerator.generateEmbedding(textToEmbed);
             entry.setEmbedding(embedding);
 
             // Stockage dans Qdrant
-
             return qdrantClient.upsertPoint(collectionName, entry);
 
         } catch (Exception e) {
@@ -177,85 +146,65 @@ public class MemoryService
     /**
      * Effectue une recherche vectorielle dans la collection Opinions.
      */
-    public List<SearchResult> searchOpinions(String query) {
+    public List<SearchResult<OpinionEntry>> searchOpinions(String query) {
         return searchOpinions(query, DEFAULT_TOP_K);
     }
 
-    public List<SearchResult> searchOpinions(String query, int topK) {
-        return searchInCollection(OPINIONS_COLLECTION, query, topK);
+    public List<SearchResult<OpinionEntry>> searchOpinions(String query, int topK) {
+        return searchInCollection(OPINIONS_COLLECTION, query, topK, qdrantClient::parseOpinionEntry);
     }
 
-    public List<DesireSearchResult> searchDesires(String query) {
-        return searchInDesires(query, DEFAULT_TOP_K);
+    public List<SearchResult<DesireEntry>> searchDesires(String query) {
+        return searchDesires(query, DEFAULT_TOP_K);
     }
 
-
+    public List<SearchResult<DesireEntry>> searchDesires(String query, int topK) {
+        return searchInCollection(DESIRES_COLLECTION, query, topK, qdrantClient::parseDesireEntry);
+    }
 
 
     /**
      * Effectue une recherche vectorielle dans la collection Memories.
      */
-    public List<SearchResult> searchMemories(String query) {
+    public List<SearchResult<MemoryEntry>> searchMemories(String query) {
         return searchMemories(query, DEFAULT_TOP_K);
     }
 
     /**
      * Effectue une recherche vectorielle dans la collection Memories avec un nombre de résultats personnalisé.
      */
-    public List<SearchResult> searchMemories(String query, int topK) {
-        return searchInCollection(MEMORIES_COLLECTION, query, topK);
+    public List<SearchResult<MemoryEntry>> searchMemories(String query, int topK) {
+        return searchInCollection(MEMORIES_COLLECTION, query, topK, qdrantClient::parseMemoryEntry);
     }
 
     /**
      * Effectue une recherche vectorielle dans la collection Summaries.
      */
-    public List<SearchResult> searchSummaries(String query) {
+    public List<SearchResult<MemoryEntry>> searchSummaries(String query) {
         return searchSummaries(query, DEFAULT_TOP_K);
     }
 
     /**
      * Effectue une recherche vectorielle dans la collection Summaries avec un nombre de résultats personnalisé.
      */
-    public List<SearchResult> searchSummaries(String query, int topK) {
-        return searchInCollection(SUMMARIES_COLLECTION, query, topK);
+    public List<SearchResult<MemoryEntry>> searchSummaries(String query, int topK) {
+        return searchInCollection(SUMMARIES_COLLECTION, query, topK, qdrantClient::parseMemoryEntry);
     }
 
 
     /**
      * Méthode privée pour effectuer une recherche dans une collection donnée.
      */
-    private List<SearchResult> searchInCollection(String collectionName, String query, int topK) {
+    private <T> List<SearchResult<T>> searchInCollection(String collectionName, String query, int topK, Function<com.fasterxml.jackson.databind.JsonNode, SearchResult<T>> parser) {
         try {
             // Génération de l'embedding pour la requête
             float[] queryEmbedding = embeddingGenerator.generateEmbedding(query);
 
             // Recherche vectorielle
-
-            List<SearchResult> results = qdrantClient.searchVector(collectionName, queryEmbedding, topK);
-            return results;
+            return qdrantClient.search(collectionName, queryEmbedding, topK, parser);
 
         } catch (Exception e) {
             System.out.println("Exception lors de la recherche dans la collection " + collectionName + " : " + e.getMessage());
-            return List.of();
-        }
-    }
-
-
-    /**
-     * Méthode privée pour effectuer une recherche dans une collection donnée.
-     */
-    private List<DesireSearchResult> searchInDesires(String query, int topK) {
-        try {
-            // Génération de l'embedding pour la requête
-            float[] queryEmbedding = embeddingGenerator.generateEmbedding(query);
-
-            // Recherche vectorielle
-
-            List<DesireSearchResult> results = qdrantClient.searchDesireVector("desires", queryEmbedding, topK);
-            return results;
-
-        } catch (Exception e) {
-            System.out.println("Exception lors de la recherche dans la collection desires : " + e.getMessage());
             return List.of();
         }
     }
@@ -264,14 +213,14 @@ public class MemoryService
      * Récupère une entrée spécifique par son ID dans la collection Memories.
      */
     public MemoryEntry getMemory(String memoryId) {
-        return qdrantClient.getPoint(MEMORIES_COLLECTION, memoryId);
+        return qdrantClient.getPoint(MEMORIES_COLLECTION, memoryId, (jsonNode) -> qdrantClient.parseMemoryEntry(jsonNode).getEntry());
     }
 
     /**
      * Récupère un résumé spécifique par son ID dans la collection Summaries.
      */
     public MemoryEntry getSummary(String summaryId) {
-        return qdrantClient.getPoint(SUMMARIES_COLLECTION, summaryId);
+        return qdrantClient.getPoint(SUMMARIES_COLLECTION, summaryId, (jsonNode) -> qdrantClient.parseMemoryEntry(jsonNode).getEntry());
     }
 
     /**
