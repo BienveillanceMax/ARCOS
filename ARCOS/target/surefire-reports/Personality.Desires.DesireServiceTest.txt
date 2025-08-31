@@ -1,0 +1,4 @@
+-------------------------------------------------------------------------------
+Test set: Personality.Desires.DesireServiceTest
+-------------------------------------------------------------------------------
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.937 s -- in Personality.Desires.DesireServiceTest
