@@ -226,6 +226,68 @@ public class PromptBuilder
     }
 
 
+
+    /**
+     * Construit un prompt strict à envoyer à Mistral pour analyser un contexte conversationnel
+     * fourni sous forme de string (messages + auteurs) et retourner UN JSON décrivant le "souvenir".
+     *
+     */
+    public String buildMemoryPrompt(String conversationContext) {
+        StringBuilder prompt = new StringBuilder();
+        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
+        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
+
+        prompt.append("Tu es un assistant chargé d'extraire UN SOUVENIR structuré à partir du contexte")
+                .append(" conversationnel fourni et de tes valeurs. Analyse attentivement les messages et les auteurs, identifie")
+                .append(" l'événement/interaction principal(e), les acteurs, le ton, et si cela mérite d'être")
+                .append(" conservé comme souvenir long-terme.\n\n");
+
+        prompt.append("VALEURS DOMINANTES (principaux moteurs de ton jugement) :\n");
+        for (ValueSchwartz value : strongValues.keySet()) {
+            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
+                    .append("(score/100 : ").append(strongValues.get(value)).append(")").append("\n");
+        }
+
+        // Valeurs inhibées
+        if (!suppressedValues.isEmpty()) {
+            prompt.append("\nVALEURS PEU IMPORTANTES (tendances que tu négliges) :\n");
+            for (ValueSchwartz value : suppressedValues.keySet()) {
+                prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
+                        .append("(score/100 : ").append(suppressedValues.get(value)).append(")").append("\n");
+            }
+        }
+
+        prompt.append("CONTEXTE CONVERSATIONNEL (format libre, messages + auteurs) :\n");
+        prompt.append(conversationContext).append("\n\n");
+
+        prompt.append("OBJECTIF :\n")
+                .append("- Produis UN UNIQUE OBJET JSON strict (aucun texte hors du JSON).\n")
+                .append("- Le JSON doit être compact, prêt à être stocké et embarqué (embedding).\n\n");
+
+        prompt.append("FORMAT DE SORTIE (RÉPONDS UNIQUEMENT AVEC CE JSON EXACT) :\n")
+                .append("{\n")
+                .append("  \"content\": \"Texte du souvenir (1-3 phrases, < 300 caractères) - résumé factuel prêt pour embedding\",\n")
+                .append("  \"subject\": \"SELF|CREATOR|WORLD|OTHER\",   // Choisis une des 4 valeurs EXACTES \n")
+                .append("  \"summary\": \"Résumé en 1-2 phrases (objectif)\",\n")
+                .append("  \"satisfaction\": 0.0,         // nombre entre 0 et 10 (indique sentiment global lié à l'événement)\n")
+                .append("  \"importance\": 0.0,           // nombre entre 0.0 et 1.0: importance/priority du souvenir\n")
+                .append("}\n\n");
+
+        prompt.append("RÈGLES / CONTRAINTIONS :\n")
+                .append("- N'invente pas d'autres clés JSON. Respecte uniquement les champs listés.\n")
+                .append("- Le champ 'content' doit être factuel, utile pour une vectorisation (éviter discours trop long).\n")
+                .append("- Choisis 'subject' parmi les 4 valeurs (si doute, renvoie OTHER).\n")
+                .append("- Si la date n'est pas identifiable avec précision, pose une date approximative ISO_LOCAL_DATE_TIME.\n")
+                .append("- 'satisfaction' est l'évaluation sentimentale liée à l'événement (0 = très négatif, 10 = très positif).\n")
+                .append("- 'importance' reflète l'impact à long terme (0.0 faible, 1.0 critique).\n")
+                .append("- Ne fournis AUCUNE explication hors du JSON ; retourne uniquement le JSON exact.\n");
+
+        return prompt.toString();
+    }
+
+
+
+
     /**
      * Construit le prompt de planification pour le LLM
      */

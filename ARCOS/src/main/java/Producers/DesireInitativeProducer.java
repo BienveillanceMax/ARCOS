@@ -4,7 +4,7 @@ import Memory.LongTermMemory.Models.DesireEntry;
 
 public class DesireInitativeProducer
 {
-    public void initDesireInitiative(DesireEntry createdDesire) {
-
+    public DesireEntry.Status initDesireInitiative(DesireEntry createdDesire) {
+        return DesireEntry.Status.SATISFIED;
     }
 }

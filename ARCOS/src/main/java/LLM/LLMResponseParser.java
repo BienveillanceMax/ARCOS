@@ -6,6 +6,7 @@ import Memory.Actions.Entities.Actions.Action;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
+import Memory.LongTermMemory.Models.Subject;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
 import Personality.Values.Entities.DimensionSchwartz;
@@ -17,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -397,5 +399,94 @@ public class LLMResponseParser
             throw new IllegalArgumentException("La description du désir ne peut pas dépasser 2000 caractères");
         }
     }
+
+    /// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// Memory Parsing
+
+
+    /**
+     * Parse la réponse JSON de Mistral (ou du model) et construit un MemoryEntry partiel.
+     *
+     * Cette fonction est indépendante — peut être collée dans une classe de parsing.
+     *
+     * Remarques :
+     * - Utilise Subject.fromString(...) pour mapper le champ "subject".
+     * - Si "timestamp" invalide ou absent : LocalDateTime.now() est utilisé.
+     * - Si "satisfaction" absent : 0.0.
+     * - L'id reste null (ou généré si vous préférez) ; embedding laissé à null.
+     *
+     * @param mistralResponse string (potentiellement entourée de texte) renvoyée par le modèle
+     * @return MemoryEntry partiel
+     * @throws ResponseParsingException si parsing totalement impossible
+     */
+    public MemoryEntry parseMemoryFromMistralResponse(String mistralResponse) throws ResponseParsingException {
+        ObjectMapper objectMapper = new ObjectMapper();
+        try {
+            String cleaned = extractJsonFromResponse(mistralResponse);
+            JsonNode root = objectMapper.readTree(cleaned);
+
+            MemoryEntry mem = new MemoryEntry();
+
+            // id : on laisse null (ou générer : UUID.randomUUID().toString())
+            mem.setId(null);
+
+            // content (obligatoire idéalement)
+            if (root.has("content") && !root.get("content").isNull()) {
+                mem.setContent(root.get("content").asText().trim());
+            } else if (root.has("summary")) {
+                // fallback : utiliser le résumé si pas de content
+                mem.setContent(root.get("summary").asText().trim());
+            } else {
+                mem.setContent(""); // vide si rien
+            }
+
+            // subject
+            if (root.has("subject") && !root.get("subject").isNull()) {
+                String subjStr = root.get("subject").asText();
+                // try Subject.fromString (gère labels FR), sinon try enum name
+                try {
+                    mem.setSubject(Subject.fromString(subjStr));
+                } catch (Exception e) {
+                    // fallback : essayer d'utiliser le nom d'énumération
+                    try {
+                        mem.setSubject(Subject.valueOf(subjStr.toUpperCase()));
+                    } catch (Exception ex) {
+                        mem.setSubject(Subject.OTHER);
+                    }
+                }
+            } else {
+                mem.setSubject(Subject.OTHER);
+            }
+
+            // satisfaction (0-10)
+            double satisfaction = 0.0;
+            if (root.has("satisfaction") && !root.get("satisfaction").isNull()) {
+                satisfaction = root.get("satisfaction").asDouble(0.0);
+            } else if (root.has("importance") && !root.get("importance").isNull()) {
+                // heuristique : transformer importance [0..1] en satisfaction centré (optionnel)
+                double importance = root.get("importance").asDouble(0.0);
+                satisfaction = Math.max(0.0, Math.min(10.0, importance * 10.0));
+            }
+            // clamp
+            satisfaction = Math.max(0.0, Math.min(10.0, satisfaction));
+            mem.setSatisfaction(satisfaction);
+
+            // timestamp
+            LocalDateTime ts = LocalDateTime.now();
+            mem.setTimestamp(ts);
+
+            // embedding : laissé null (sera calculé séparément)
+            mem.setEmbedding(null);
+
+            return mem;
+
+        } catch (Exception e) {
+            throw new ResponseParsingException("Erreur lors du parsing de la réponse Mistral: " + e.getMessage()
+                    + "\nRéponse originale: " + mistralResponse, e);
+        }
+    }
+
+
+
 
 }

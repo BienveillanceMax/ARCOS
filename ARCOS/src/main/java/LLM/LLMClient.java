@@ -26,6 +26,12 @@ public class LLMClient
                 .content();
     }
 
+    public String generateMemoryResponse(String prompt) {
+        return chatClient.prompt(prompt)
+                .call()
+                .content();
+    }
+
     public String generateOpinionResponse(String prompt) {
         return chatClient.prompt(prompt)
                 .call()

@@ -80,6 +80,32 @@ public class ValueProfile
                         () -> new EnumMap<>(ValueSchwartz.class)));
     }
 
+    public double calculateValueAlignment(DimensionSchwartz dimension) {
+        // Get current dimension average
+        double dimensionScore = averageByDimension(dimension);
+
+        // Check for conflicting strong values that might reduce desire intensity
+        Map<ValueSchwartz, Double> strongValues = getStrongValues();
+        double conflictPenalty = 1.0;
+
+        for (ValueSchwartz strongValue : strongValues.keySet()) {
+            if (strongValue.getDimension() != dimension) {
+                // Check if this strong value conflicts with the desire's dimension
+                List<ValueSchwartz> antagonists = strongValue.getAntagonists();
+                if (antagonists != null) {
+                    boolean hasConflict = antagonists.stream()
+                            .anyMatch(antagonist -> antagonist.getDimension() == dimension);
+                    if (hasConflict) {
+                        conflictPenalty *= 0.8; // Reduce intensity due to value conflict
+                    }
+                }
+            }
+        }
+
+        // Normalize dimension score and apply conflict penalty
+        return (dimensionScore / 100.0) * conflictPenalty;
+    }
+
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("Value Profile:\n");

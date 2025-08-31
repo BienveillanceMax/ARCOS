@@ -13,22 +13,22 @@ public enum Subject {
     /**
      * Souvenirs concernant l'IA elle-même (auto-réflexion, apprentissages personnels)
      */
-    SELF("self"),
+    SELF("Moi-même"),
 
     /**
      * Souvenirs concernant l'utilisateur (préférences, habitudes, conversations)
      */
-    USER("user"),
+    CREATOR("Créateur"),
 
     /**
      * Souvenirs concernant le monde extérieur (actualités, faits, connaissances générales)
      */
-    WORLD("world"),
+    WORLD("Monde"),
 
     /**
      * Autres souvenirs qui ne rentrent pas dans les catégories précédentes
      */
-    OTHER("other");
+    OTHER("Autre");
 
     private final String value;
 

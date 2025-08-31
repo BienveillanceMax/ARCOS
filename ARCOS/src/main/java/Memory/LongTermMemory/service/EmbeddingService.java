@@ -14,9 +14,10 @@ import java.util.Random;
  * Générateur d'embeddings pour les textes utilisant Mistral AI via Spring AI.
  * Supporte un mode fallback avec embeddings mock en cas d'indisponibilité de l'API.
  */
-public class EmbeddingGenerator {
+public class EmbeddingService
+{
 
-    private static final Logger logger = LoggerFactory.getLogger(EmbeddingGenerator.class);
+    private static final Logger logger = LoggerFactory.getLogger(EmbeddingService.class);
 
     private final int embeddingDimension;
     private final EmbeddingModel embeddingModel;
@@ -26,14 +27,14 @@ public class EmbeddingGenerator {
     /**
      * Constructeur avec modèle Mistral AI.
      */
-    public EmbeddingGenerator(int embeddingDimension, EmbeddingModel embeddingModel) {
+    public EmbeddingService(int embeddingDimension, EmbeddingModel embeddingModel) {
         this(embeddingDimension, embeddingModel, true);
     }
 
     /**
      * Constructeur complet avec option de fallback.
      */
-    public EmbeddingGenerator(int embeddingDimension, EmbeddingModel embeddingModel, boolean fallbackToMock) {
+    public EmbeddingService(int embeddingDimension, EmbeddingModel embeddingModel, boolean fallbackToMock) {
         this.embeddingDimension = embeddingDimension;
         this.embeddingModel = embeddingModel;
         this.fallbackToMock = fallbackToMock;
@@ -46,7 +47,7 @@ public class EmbeddingGenerator {
     /**
      * Constructeur pour mode mock uniquement (compatibilité descendante).
      */
-    public EmbeddingGenerator(int embeddingDimension) {
+    public EmbeddingService(int embeddingDimension) {
         this.embeddingDimension = embeddingDimension;
         this.embeddingModel = null;
         this.fallbackToMock = true;

@@ -11,6 +11,7 @@ import Personality.Values.ValueProfile;
 import Producers.DesireInitativeProducer;
 import org.springframework.stereotype.Service;
 
+
 @Service
 public class DesireService
 {
@@ -23,21 +24,33 @@ public class DesireService
     double D_CREATE_THRESHOLD = 0.5;
     double D_UPDATE_THRESHOLD = 0.2;
 
-    public void processOpinion(OpinionEntry opinionEntry) {
+    public DesireEntry processOpinion(OpinionEntry opinionEntry) {
 
+        DesireEntry createdDesire;
         if (opinionEntry.getAssociatedDesire() == null) {
 
             double opinionIntensity = calculateOpinionIntensity(opinionEntry);
 
             if (opinionIntensity >= D_CREATE_THRESHOLD) {
-                DesireEntry createdDesire = createDesire(opinionEntry, opinionIntensity);
+                createdDesire = createDesire(opinionEntry, opinionIntensity);
+                if (createdDesire == null) {
+                    return null;
+                }
                 memoryService.storeDesire(createdDesire);
+                opinionEntry.setAssociatedDesire(createdDesire.getId());
+                memoryService.storeOpinion(opinionEntry);
+                return createdDesire;
 
             }
         } else {
 
-            updateDesire(opinionEntry);
+            createdDesire = updateDesire(opinionEntry);
+            opinionEntry.setAssociatedDesire(createdDesire.getId());
+            memoryService.storeOpinion(opinionEntry);
+            return createdDesire;
         }
+
+        return null;
     }
 
     private double calculateOpinionIntensity(OpinionEntry opinionEntry) {
@@ -48,26 +61,82 @@ public class DesireService
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) {
         String prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
         DesireEntry createdDesire;
-        try {
-            createdDesire =  llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
-        } catch (ResponseParsingException e) {
-            throw new RuntimeException(e);
+
+        int retries = 3;            //bit of a magic number, todo move retry logic to orchestator
+        for(int i = 0; i < retries; i++) {
+            try {
+                createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
+                return createdDesire;
+            } catch (ResponseParsingException e) {
+                System.out.println(e.getMessage());
+            }
+
         }
-        return createdDesire;
+        return null;
     }
 
 
-    private void updateDesire(OpinionEntry opinionEntry) {
+    private DesireEntry updateDesire(OpinionEntry opinionEntry) {
         DesireEntry desireEntry = memoryService.getDesire(opinionEntry.getAssociatedDesire());
 
         if (desireEntry.getIntensity() < D_UPDATE_THRESHOLD) {
-            desireInitativeProducer.initDesireInitiative(desireEntry);
+            desireEntry.setStatus(desireInitativeProducer.initDesireInitiative(desireEntry));
+            memoryService.storeDesire(desireEntry);
+            return desireEntry;
+
         }
         else
         {
-            //TODO
+           desireEntry = updateStats(desireEntry, opinionEntry);
+           memoryService.storeDesire(desireEntry);
+           return desireEntry;
         }
     }
+
+    private DesireEntry updateStats(DesireEntry desireEntry, OpinionEntry opinionEntry) {
+
+        if (opinionEntry != null) {
+            // Recalculate intensity based on current opinion and agent's values
+            double newIntensity = calculateDesireIntensityUpdate(opinionEntry, desireEntry);
+
+            // Apply smoothing to prevent dramatic changes - weighted average of old and new
+            double smoothingFactor = 0.7; // Adjust this value between 0-1 for more/less sensitivity
+            double updatedIntensity = (smoothingFactor * desireEntry.getIntensity()) +
+                    ((1 - smoothingFactor) * newIntensity);
+
+            // Ensure intensity stays within bounds [0, 1]
+            updatedIntensity = Math.max(0.0, Math.min(1.0, updatedIntensity));
+
+            desireEntry.setIntensity(updatedIntensity);
+            desireEntry.setLastUpdated(java.time.LocalDateTime.now());
+
+            // Update status based on new intensity if needed
+            if (updatedIntensity < D_UPDATE_THRESHOLD &&
+                    desireEntry.getStatus() != DesireEntry.Status.SATISFIED &&
+                    desireEntry.getStatus() != DesireEntry.Status.ABANDONED) {
+                desireEntry.setStatus(DesireEntry.Status.PENDING);
+            }
+        }
+        return desireEntry;
+    }
+
+    private double calculateDesireIntensityUpdate(OpinionEntry opinionEntry, DesireEntry desireEntry) {
+        // Base calculation similar to opinion intensity but adapted for desire updates
+        double absPolarity = Math.abs(opinionEntry.getPolarity());
+        double stabilityFactor = opinionEntry.getStability();
+        double valueDimensionAverage = valueProfile.averageByDimension(opinionEntry.getMainDimension()) / 100.0;
+
+        // Consider how aligned the desire is with current strong values
+        double valueAlignment = valueProfile.calculateValueAlignment(opinionEntry.getMainDimension());
+
+        // Calculate new intensity considering current opinion state and value alignment
+        double baseIntensity = absPolarity * stabilityFactor * valueDimensionAverage;
+        double adjustedIntensity = baseIntensity * valueAlignment;
+
+        return Math.max(0.0, Math.min(1.0, adjustedIntensity));
+    }
+
+
 }
 
 

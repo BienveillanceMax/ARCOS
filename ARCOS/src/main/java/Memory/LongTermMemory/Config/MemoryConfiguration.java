@@ -1,6 +1,9 @@
 package Memory.LongTermMemory.Config;
 
-import Memory.LongTermMemory.service.EmbeddingGenerator;
+import LLM.LLMClient;
+import LLM.LLMResponseParser;
+import LLM.Prompts.PromptBuilder;
+import Memory.LongTermMemory.service.EmbeddingService;
 import Memory.LongTermMemory.service.MemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,12 +34,12 @@ public class MemoryConfiguration {
      * Bean pour le générateur d'embeddings avec Mistral AI.
      */
     @Bean
-    public EmbeddingGenerator embeddingGenerator(EmbeddingModel embeddingModel) {
+    public EmbeddingService embeddingGenerator(EmbeddingModel embeddingModel) {
         logger.info("Configuration du générateur d'embeddings Mistral AI");
         logger.info("  - Dimension configurée: {}", embeddingDimension);
 
         try {
-            EmbeddingGenerator generator = new EmbeddingGenerator(embeddingDimension, embeddingModel, true);
+            EmbeddingService generator = new EmbeddingService(embeddingDimension, embeddingModel, true);
 
             // Test de connectivité au démarrage
             if (generator.testConnection()) {
@@ -50,7 +53,7 @@ public class MemoryConfiguration {
         } catch (Exception e) {
             logger.error("Erreur lors de la configuration de Mistral AI: {}", e.getMessage());
             logger.info("Initialisation en mode mock uniquement");
-            return new EmbeddingGenerator(embeddingDimension);
+            return new EmbeddingService(embeddingDimension);
         }
     }
 
@@ -58,12 +61,12 @@ public class MemoryConfiguration {
      * Bean pour le service principal de mémoire.
      */
     @Bean
-    public MemoryService memoryService(EmbeddingGenerator embeddingGenerator) {
+    public MemoryService memoryService(EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
         logger.info("Configuration du service de mémoire");
         logger.info("  - Qdrant: {}:{}", qdrantHost, qdrantPort);
         logger.info("  - Dimension embeddings: {}", embeddingDimension);
 
-        MemoryService memoryService = new MemoryService(qdrantHost, qdrantPort, embeddingGenerator);
+        MemoryService memoryService = new MemoryService(qdrantHost, qdrantPort, embeddingService, llmClient, promptBuilder, llmResponseParser);
 
         // Initialisation des collections au démarrage
         try {

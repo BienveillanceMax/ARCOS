@@ -1,9 +1,14 @@
 package Memory.LongTermMemory.service;
 
 
+import Exceptions.ResponseParsingException;
+import LLM.LLMClient;
+import LLM.LLMResponseParser;
+import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.*;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
+import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
 import java.util.function.Function;
@@ -28,36 +33,45 @@ public class MemoryService
     private static final int DEFAULT_TOP_K = 10;
 
     private final QdrantClient qdrantClient;
-    private final EmbeddingGenerator embeddingGenerator;
+    private final EmbeddingService embeddingService;
+    private final LLMClient llmClient;
+    private final PromptBuilder promptBuilder;
+    private final LLMResponseParser llmResponseParser;
+
     private final int embeddingDimension;
 
     /**
      * Constructeur avec configuration par défaut.
      */
-    public MemoryService(String qdrantHost, int qdrantPort) {
-        this(qdrantHost, qdrantPort, DEFAULT_EMBEDDING_DIMENSION);
+    public MemoryService(String qdrantHost, int qdrantPort,LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+        this(qdrantHost, qdrantPort, DEFAULT_EMBEDDING_DIMENSION, llmClient, promptBuilder, llmResponseParser);
     }
 
     /**
      * Constructeur avec dimension d'embedding personnalisée (compatible descendante).
      */
-    public MemoryService(String qdrantHost, int qdrantPort, int embeddingDimension) {
+    public MemoryService(String qdrantHost, int qdrantPort, int embeddingDimension, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
         this.embeddingDimension = embeddingDimension;
         this.qdrantClient = new QdrantClient(qdrantHost, qdrantPort);
-        this.embeddingGenerator = new EmbeddingGenerator(embeddingDimension);
+        this.embeddingService = new EmbeddingService(embeddingDimension);
+        this.llmClient = llmClient;
+        this.promptBuilder = promptBuilder;
+        this.llmResponseParser = llmResponseParser;
     }
 
     /**
      * Constructeur avec générateur d'embeddings personnalisé (recommandé avec Spring AI).
      */
-    public MemoryService(String qdrantHost, int qdrantPort, EmbeddingGenerator embeddingGenerator) {
-        this.embeddingDimension = embeddingGenerator.getEmbeddingDimension();
+    public MemoryService(String qdrantHost, int qdrantPort, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+        this.embeddingDimension = embeddingService.getEmbeddingDimension();
         this.qdrantClient = new QdrantClient(qdrantHost, qdrantPort);
-        this.embeddingGenerator = embeddingGenerator;
-
+        this.embeddingService = embeddingService;
+        this.llmClient = llmClient;
+        this.promptBuilder = promptBuilder;
+        this.llmResponseParser = llmResponseParser;
 
         // Log du type d'embedding utilisé
-        if (embeddingGenerator.isMistralAvailable()) {
+        if (embeddingService.isMistralAvailable()) {
             System.out.println("Utilisation des embeddings Mistral AI (haute qualité sémantique)");
         } else {
             System.out.println("Utilisation des embeddings mock (développement/test)");
@@ -95,9 +109,8 @@ public class MemoryService
     /**
      * Enregistre un souvenir dans la collection Memories.
      */
-    public boolean storeMemory(String content, Subject subject, double satisfaction) {
-        MemoryEntry entry = new MemoryEntry(content, subject, satisfaction);
-        return storeEntry(MEMORIES_COLLECTION, entry, content);
+    public boolean storeMemory(MemoryEntry memoryEntry) {
+        return storeEntry(MEMORIES_COLLECTION, memoryEntry, memoryEntry.getContent());
     }
 
 
@@ -131,7 +144,7 @@ public class MemoryService
     private <T extends QdrantEntry> boolean storeEntry(String collectionName, T entry, String textToEmbed) {
         try {
             // Génération de l'embedding
-            float[] embedding = embeddingGenerator.generateEmbedding(textToEmbed);
+            float[] embedding = embeddingService.generateEmbedding(textToEmbed);
             entry.setEmbedding(embedding);
 
             // Stockage dans Qdrant
@@ -198,7 +211,7 @@ public class MemoryService
     private <T> List<SearchResult<T>> searchInCollection(String collectionName, String query, int topK, Function<com.fasterxml.jackson.databind.JsonNode, SearchResult<T>> parser) {
         try {
             // Génération de l'embedding pour la requête
-            float[] queryEmbedding = embeddingGenerator.generateEmbedding(query);
+            float[] queryEmbedding = embeddingService.generateEmbedding(query);
 
             // Recherche vectorielle
             return qdrantClient.search(collectionName, queryEmbedding, topK, parser);
@@ -275,6 +288,13 @@ public class MemoryService
         return embeddingDimension;
     }
 
+    public MemoryEntry memorizeConversation(String conversation) throws ResponseParsingException {
+
+        MemoryEntry memoryEntry = llmResponseParser.parseMemoryFromMistralResponse(llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation)));
+        memoryEntry.setEmbedding(embeddingService.generateEmbedding(memoryEntry.getContent()));
+        storeMemory(memoryEntry);
+        return memoryEntry;
+    }
 
 
     /**
