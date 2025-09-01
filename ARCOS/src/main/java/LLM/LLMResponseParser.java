@@ -316,15 +316,25 @@ public class LLMResponseParser
      * Extrait le JSON de la réponse en cas de texte supplémentaire
      */
     private String extractJsonFromResponse(String response) {
-        // Chercher le premier '{' et le dernier '}'
-        int firstBrace = response.indexOf('{');
-        int lastBrace = response.lastIndexOf('}');
-
-        if (firstBrace != -1 && lastBrace != -1 && firstBrace < lastBrace) {
-            return response.substring(firstBrace, lastBrace + 1);
+        if (response == null || response.trim().isEmpty()) {
+            return "";
         }
 
-        return response.trim();
+        // Retire les blocs markdown
+        response = response.replaceAll("```json\\s*", "").replaceAll("```", "");
+
+        // Retire les espaces en début/fin
+        response = response.trim();
+
+        // Extrait le JSON si du texte l'entoure
+        int start = response.indexOf('{');
+        int end = response.lastIndexOf('}');
+
+        if (start == -1 || end == -1 || end <= start) {
+            return response; //
+        }
+
+        return response.substring(start, end + 1);
     }
 
 
@@ -428,7 +438,7 @@ public class LLMResponseParser
             MemoryEntry mem = new MemoryEntry();
 
             // id : on laisse null (ou générer : UUID.randomUUID().toString())
-            mem.setId(null);
+            mem.setId(UUID.randomUUID().toString());
 
             // content (obligatoire idéalement)
             if (root.has("content") && !root.get("content").isNull()) {
