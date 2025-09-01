@@ -11,6 +11,7 @@ import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.Entities.ValueSchwartz;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -37,6 +38,7 @@ public class LLMResponseParser
         this.objectMapper = new ObjectMapper();
         this.objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         this.objectMapper.configure(DeserializationFeature.ACCEPT_EMPTY_STRING_AS_NULL_OBJECT, true);
+        this.objectMapper.getFactory().configure(JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
     }
 
     /**
