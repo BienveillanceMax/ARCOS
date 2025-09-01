@@ -72,12 +72,17 @@ public class DesireService
 
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) {
         String prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
+
         DesireEntry createdDesire;
 
-        int retries = 3;            //bit of a magic number, todo move retry logic to orchestator
+
+        int retries = 3;            //bit of a magic number, todo move retry logic to orchestator to use max retries hyperparameters
         for(int i = 0; i < retries; i++) {
             try {
-                createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
+                String llmResponse = llmClient.generateDesireResponse(prompt);
+                System.out.println("Desire Response : " + llmResponse);
+                createdDesire = llmResponseParser.parseDesireFromResponse(llmResponse, opinionEntry.getId());
+
                 return createdDesire;
             } catch (ResponseParsingException e) {
                 System.out.println(e.getMessage());

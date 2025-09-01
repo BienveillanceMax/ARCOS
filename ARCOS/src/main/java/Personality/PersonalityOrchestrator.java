@@ -10,6 +10,9 @@ import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
 
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 public class PersonalityOrchestrator
 {
@@ -17,6 +20,7 @@ public class PersonalityOrchestrator
     private final OpinionService opinionService;
     private final DesireService desireService;
     private final ValueProfile valueProfile;
+    private final Executor executor;
 
     private final int ALLOWED_RETRIES = 3;
 
@@ -25,20 +29,32 @@ public class PersonalityOrchestrator
         this.opinionService = opinionService;
         this.desireService = desireService;
         this.valueProfile = valueProfile;
+        this.executor = Executors.newCachedThreadPool();
+    }
+
+    // Constructor overload to allow custom executor
+    public PersonalityOrchestrator(MemoryService memoryService, OpinionService opinionService, DesireService desireService, ValueProfile valueProfile, Executor executor) {
+        this.memoryService = memoryService;
+        this.opinionService = opinionService;
+        this.desireService = desireService;
+        this.valueProfile = valueProfile;
+        this.executor = executor;
     }
 
     public void processMemory(String conversation) {
-        MemoryEntry memoryEntry = tryMemorizing(conversation);
-        if (memoryEntry == null) {
-            return;
-        }
-        List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
-        if (opinionEntries == null) {
-            return;
-        }
-        for (OpinionEntry opinionEntry : opinionEntries) {
-            tryFormingDesire(opinionEntry);
-        }
+        CompletableFuture.runAsync(() -> {
+            MemoryEntry memoryEntry = tryMemorizing(conversation);
+            if (memoryEntry == null) {
+                return;
+            }
+            List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
+            if (opinionEntries == null) {
+                return;
+            }
+            for (OpinionEntry opinionEntry : opinionEntries) {
+                tryFormingDesire(opinionEntry);
+            }
+        }, executor);
     }
 
     private MemoryEntry tryMemorizing(String conversation) {
@@ -72,8 +88,13 @@ public class PersonalityOrchestrator
     }
 
     private DesireEntry tryFormingDesire(OpinionEntry opinionEntry) {
-
-         return desireService.processOpinion(opinionEntry);
+        return desireService.processOpinion(opinionEntry);
     }
 
+    // Method to shutdown the executor when the orchestrator is no longer needed
+    public void shutdown() {
+        if (executor instanceof java.util.concurrent.ExecutorService) {
+            ((java.util.concurrent.ExecutorService) executor).shutdown();
+        }
+    }
 }

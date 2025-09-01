@@ -290,7 +290,9 @@ public class MemoryService
 
     public MemoryEntry memorizeConversation(String conversation) throws ResponseParsingException {
 
-        MemoryEntry memoryEntry = llmResponseParser.parseMemoryFromMistralResponse(llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation)));
+        String llmResponse = llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation));
+        System.out.println("Memory Response : " + llmResponse);
+        MemoryEntry memoryEntry = llmResponseParser.parseMemoryFromMistralResponse(llmResponse);
         memoryEntry.setEmbedding(embeddingService.generateEmbedding(memoryEntry.getContent()));
         storeMemory(memoryEntry);
         return memoryEntry;

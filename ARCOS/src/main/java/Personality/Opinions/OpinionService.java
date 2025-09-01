@@ -89,7 +89,11 @@ public class OpinionService
         OpinionEntry opinionEntry;
         String prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
-            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry);
+            String llmResponse = llmClient.generateOpinionResponse(prompt);
+            System.out.println("Opinion Response : " + llmResponse);
+
+            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmResponse, memoryEntry);
+
         } catch (Exception e) {
             System.out.println("Erreur de parsing d'opinion : " + e.getMessage());
             return null;
