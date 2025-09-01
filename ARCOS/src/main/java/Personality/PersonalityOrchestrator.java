@@ -9,18 +9,23 @@ import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
 
-import java.io.Console;
 import java.util.List;
 
 public class PersonalityOrchestrator
 {
-    MemoryService memoryService;
-    OpinionService opinionService;
-    DesireService desireService;
-    ValueProfile valueProfile;
+    private final MemoryService memoryService;
+    private final OpinionService opinionService;
+    private final DesireService desireService;
+    private final ValueProfile valueProfile;
 
+    private final int ALLOWED_RETRIES = 3;
 
-    int ALLOWED_RETRIES = 3;
+    public PersonalityOrchestrator(MemoryService memoryService, OpinionService opinionService, DesireService desireService, ValueProfile valueProfile) {
+        this.memoryService = memoryService;
+        this.opinionService = opinionService;
+        this.desireService = desireService;
+        this.valueProfile = valueProfile;
+    }
 
     public void processMemory(String conversation) {
         MemoryEntry memoryEntry = tryMemorizing(conversation);

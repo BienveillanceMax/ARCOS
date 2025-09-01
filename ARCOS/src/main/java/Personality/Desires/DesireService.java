@@ -12,17 +12,29 @@ import Producers.DesireInitativeProducer;
 import org.springframework.stereotype.Service;
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+
 @Service
 public class DesireService
 {
-    DesireInitativeProducer desireInitativeProducer;
-    PromptBuilder promptBuilder;
-    ValueProfile valueProfile;
-    MemoryService memoryService;
-    LLMClient llmClient;
-    LLMResponseParser llmResponseParser;
-    double D_CREATE_THRESHOLD = 0.5;
-    double D_UPDATE_THRESHOLD = 0.2;
+    private final DesireInitativeProducer desireInitativeProducer;
+    private final PromptBuilder promptBuilder;
+    private final ValueProfile valueProfile;
+    private final MemoryService memoryService;
+    private final LLMClient llmClient;
+    private final LLMResponseParser llmResponseParser;
+    public static final double D_CREATE_THRESHOLD = 0.5;
+    public static final double D_UPDATE_THRESHOLD = 0.2;
+
+    @Autowired
+    public DesireService(DesireInitativeProducer desireInitativeProducer, PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
+        this.desireInitativeProducer = desireInitativeProducer;
+        this.promptBuilder = promptBuilder;
+        this.valueProfile = valueProfile;
+        this.memoryService = memoryService;
+        this.llmClient = llmClient;
+        this.llmResponseParser = llmResponseParser;
+    }
 
     public DesireEntry processOpinion(OpinionEntry opinionEntry) {
 

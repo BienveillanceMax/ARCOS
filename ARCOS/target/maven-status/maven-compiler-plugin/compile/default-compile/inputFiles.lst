@@ -31,7 +31,7 @@
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/SearchResult/SearchResult.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/Subject.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Qdrant/QdrantClient.java
-/app/ARCOS/src/main/java/Memory/LongTermMemory/service/EmbeddingGenerator.java
+/app/ARCOS/src/main/java/Memory/LongTermMemory/service/EmbeddingService.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/service/MemoryService.java
 /app/ARCOS/src/main/java/Orchestrator/ActionExecutor.java
 /app/ARCOS/src/main/java/Orchestrator/ActionPlanner.java
@@ -40,6 +40,7 @@
 /app/ARCOS/src/main/java/Orchestrator/Orchestrator.java
 /app/ARCOS/src/main/java/Personality/Desires/DesireService.java
 /app/ARCOS/src/main/java/Personality/Opinions/OpinionService.java
+/app/ARCOS/src/main/java/Personality/PersonalityOrchestrator.java
 /app/ARCOS/src/main/java/Personality/Values/Entities/DimensionSchwartz.java
 /app/ARCOS/src/main/java/Personality/Values/Entities/ValueSchwartz.java
 /app/ARCOS/src/main/java/Personality/Values/ValueProfile.java

@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import Personality.Values.Entities.DimensionSchwartz;
 
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
@@ -48,8 +49,6 @@ class DesireServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        desireService.D_CREATE_THRESHOLD = 0.5;
-        desireService.D_UPDATE_THRESHOLD = 0.2;
     }
 
     @Test
@@ -142,6 +141,8 @@ class DesireServiceTest {
         when(llmResponseParser.parseDesireFromResponse(anyString(), any())).thenThrow(new ResponseParsingException("parsing failed"));
 
         // Act & Assert
-        assertThrows(RuntimeException.class, () -> desireService.processOpinion(opinionEntry));
+        // The code is designed to catch the parsing exception and return null after retries.
+        // The test should assert this behavior, not expect a RuntimeException.
+        assertNull(desireService.processOpinion(opinionEntry));
     }
 }

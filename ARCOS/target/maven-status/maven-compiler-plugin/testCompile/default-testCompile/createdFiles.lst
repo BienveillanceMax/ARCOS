@@ -1,3 +1,4 @@
-Personality/Opinions/OpinionServiceTest.class
 Personality/Values/ValueProfileTest.class
 Personality/Desires/DesireServiceTest.class
+Personality/Opinions/OpinionServiceTest.class
+Personality/PersonalityOrchestratorIT.class
