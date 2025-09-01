@@ -23,6 +23,9 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.mistralai.MistralAiChatModel;
 import org.springframework.ai.mistralai.MistralAiChatOptions;
 import org.springframework.ai.mistralai.api.MistralAiApi;
+import org.springframework.ai.model.tool.DefaultToolCallingManager;
+import org.springframework.ai.tool.execution.DefaultToolExecutionExceptionProcessor;
+import org.springframework.ai.tool.resolution.DelegatingToolCallbackResolver;
 import org.springframework.retry.support.RetryTemplate;
 
 import java.util.List;
@@ -62,8 +65,8 @@ public class PersonalityOrchestratorIT {
     // Configuration
     private static final String QDRANT_HOST = "localhost";
     private static final int QDRANT_PORT = 6333;
-    private static final int EMBEDDING_DIMENSION = 768;
-    private static final String MISTRAL_API_KEY = System.getenv("MISTRAL_API_KEY");
+    private static final int EMBEDDING_DIMENSION = 1024;
+    private static final String MISTRAL_API_KEY = System.getenv("MISTRALAI_API_KEY");
 
 
     @BeforeEach
@@ -78,17 +81,25 @@ public class PersonalityOrchestratorIT {
         llmResponseParser = new LLMResponseParser(actionRegistry);
         promptBuilder = new PromptBuilder(actionRegistry, valueProfile);
 
+        DefaultToolCallingManager toolCallingManager = new DefaultToolCallingManager(
+                ObservationRegistry.NOOP,
+                new DelegatingToolCallbackResolver(List.of()),
+                DefaultToolExecutionExceptionProcessor.builder().build()
+        );
+
         // Setup for LLMClient using Spring AI
         MistralAiApi mistralAiApi = new MistralAiApi(MISTRAL_API_KEY);
-        // Use the more complex constructor for MistralAiChatModel providing default/null values
-        MistralAiChatModel mistralAiChatModel = new MistralAiChatModel(
-                mistralAiApi,
-                MistralAiChatOptions.builder().build(),
-                null, // ToolCallingManager - can be null
-                new RetryTemplate(),
-                ObservationRegistry.NOOP,
-                null // ToolExecutionEligibilityPredicate - can be null
-        );
+
+        MistralAiChatModel mistralAiChatModel = MistralAiChatModel.builder()
+                .mistralAiApi(mistralAiApi)
+                .defaultOptions(MistralAiChatOptions.builder()
+                        .model("mistral-large-latest")   // or "mistral-medium", "mistral-large-latest"
+                        .build())
+                .toolCallingManager(toolCallingManager)
+                .retryTemplate(new RetryTemplate())
+                .observationRegistry(ObservationRegistry.NOOP)
+                .build();
+
         ChatClient.Builder chatClientBuilder = ChatClient.builder(mistralAiChatModel);
         llmClient = new LLMClient(chatClientBuilder);
 
@@ -112,7 +123,7 @@ public class PersonalityOrchestratorIT {
     @Test
     void testFullPersonalityFlow() throws InterruptedException {
         // 1. Define a sample conversation
-        String conversation = "User: I just got a new puppy, a golden retriever. It's my first dog and I'm so excited!";
+        String conversation = "Créateur: Je suis si fatigué, la fin de mes dernières vacances d'été approche et j'ai du mal à accepter de devoir tourner cette page, de dire adieu à tant de choses." ;
         String memoryKeyword = "puppy";
         String opinionSubject = "dogs"; // The LLM is likely to generalize "puppy" to "dogs"
 
@@ -121,7 +132,7 @@ public class PersonalityOrchestratorIT {
 
         // 3. Wait a moment to allow for processing and persistence
         // In a real-world scenario, a more robust solution like Awaitility would be better.
-        TimeUnit.SECONDS.sleep(5);
+        TimeUnit.SECONDS.sleep(1);
 
         // 4. Verify Memory Creation
         List<SearchResult<MemoryEntry>> memoryResults = memoryService.searchMemories(memoryKeyword, 1);
