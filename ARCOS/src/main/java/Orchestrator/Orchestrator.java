@@ -11,9 +11,12 @@ import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
 import Orchestrator.Entities.ExecutionPlan;
 import LLM.Prompts.PromptBuilder;
+import Personality.PersonalityOrchestrator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.Map;
 
 @Component
@@ -25,15 +28,17 @@ public class Orchestrator
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
     private final ConversationContext context;
+    private final PersonalityOrchestrator personalityOrchestrator;
 
     @Autowired
-    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context) {
+    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, PersonalityOrchestrator personalityOrchestrator) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
         this.responseParser = responseParser;
         this.actionExecutor = actionExecutor;
         this.context = context;
+        this.personalityOrchestrator = personalityOrchestrator;
     }
 
 
@@ -64,6 +69,13 @@ public class Orchestrator
 
     private String processQuery(String userQuery) {
 
+        LocalDateTime lastInteraction = context.getLastUpdated();
+        if (lastInteraction != null && Duration.between(lastInteraction, LocalDateTime.now()).toMinutes() > 15) {
+            String conversation = context.getFullConversation();
+            if (conversation != null && !conversation.isEmpty()) {
+                personalityOrchestrator.processMemory(conversation);
+            }
+        }
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
         System.out.println(planningPrompt);

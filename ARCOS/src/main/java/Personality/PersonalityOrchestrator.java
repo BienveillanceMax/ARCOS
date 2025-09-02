@@ -8,9 +8,12 @@ import Memory.LongTermMemory.service.MemoryService;
 import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 
+@Component
 public class PersonalityOrchestrator
 {
     private final MemoryService memoryService;
@@ -20,6 +23,7 @@ public class PersonalityOrchestrator
 
     private final int ALLOWED_RETRIES = 3;
 
+    @Autowired
     public PersonalityOrchestrator(MemoryService memoryService, OpinionService opinionService, DesireService desireService, ValueProfile valueProfile) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;

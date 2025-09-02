@@ -133,6 +133,17 @@ public class ConversationContext {
                 .collect(Collectors.toList());
     }
 
+    public String getFullConversation() {
+        StringBuilder sb = new StringBuilder();
+        for (ConversationMessage message : messageHistory) {
+            sb.append(message.getType().name())
+                    .append(": ")
+                    .append(message.getContent())
+                    .append("\n");
+        }
+        return sb.toString();
+    }
+
     /**
      * Génère un résumé de la conversation pour le contexte
      */
