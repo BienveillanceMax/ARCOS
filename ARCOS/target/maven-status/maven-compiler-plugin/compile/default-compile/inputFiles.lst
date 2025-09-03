@@ -37,6 +37,7 @@
 /app/ARCOS/src/main/java/Orchestrator/ActionPlanner.java
 /app/ARCOS/src/main/java/Orchestrator/Entities/ExecutionPlan.java
 /app/ARCOS/src/main/java/Orchestrator/Entities/Parameter.java
+/app/ARCOS/src/main/java/Orchestrator/InitiativeService.java
 /app/ARCOS/src/main/java/Orchestrator/Orchestrator.java
 /app/ARCOS/src/main/java/Personality/Desires/DesireService.java
 /app/ARCOS/src/main/java/Personality/Opinions/OpinionService.java
@@ -44,7 +45,7 @@
 /app/ARCOS/src/main/java/Personality/Values/Entities/DimensionSchwartz.java
 /app/ARCOS/src/main/java/Personality/Values/Entities/ValueSchwartz.java
 /app/ARCOS/src/main/java/Personality/Values/ValueProfile.java
-/app/ARCOS/src/main/java/Producers/DesireInitativeProducer.java
+/app/ARCOS/src/main/java/Producers/DesireInitiativeProducer.java
 /app/ARCOS/src/main/java/Producers/SpeechToTextProducer.java
 /app/ARCOS/src/main/java/Producers/WakeWordProducer.java
 /app/ARCOS/src/main/java/Tools/SearchTool/BraveSearchService.java

@@ -1,4 +1,8 @@
+Producers/DesireInitiativeProducerTest.class
 Personality/Values/ValueProfileTest.class
 Personality/Desires/DesireServiceTest.class
-Personality/Opinions/OpinionServiceTest.class
+Orchestrator/InitiativeServiceTest.class
+Memory/MemoryServiceTests.class
 Personality/PersonalityOrchestratorIT.class
+Personality/Opinions/OpinionServiceTest.class
+Orchestrator/OrchestratorTests.class

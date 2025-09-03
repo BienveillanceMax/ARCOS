@@ -43,30 +43,11 @@ public class MemoryService
     private final int embeddingDimension;
 
     /**
-     * Constructeur avec configuration par défaut.
+     * Constructeur principal du service de mémoire.
      */
-    public MemoryService(String qdrantHost, int qdrantPort,LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
-        this(qdrantHost, qdrantPort, DEFAULT_EMBEDDING_DIMENSION, llmClient, promptBuilder, llmResponseParser);
-    }
-
-    /**
-     * Constructeur avec dimension d'embedding personnalisée (compatible descendante).
-     */
-    public MemoryService(String qdrantHost, int qdrantPort, int embeddingDimension, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
-        this.embeddingDimension = embeddingDimension;
-        this.qdrantClient = new QdrantClient(qdrantHost, qdrantPort);
-        this.embeddingService = new EmbeddingService(embeddingDimension);
-        this.llmClient = llmClient;
-        this.promptBuilder = promptBuilder;
-        this.llmResponseParser = llmResponseParser;
-    }
-
-    /**
-     * Constructeur avec générateur d'embeddings personnalisé (recommandé avec Spring AI).
-     */
-    public MemoryService(String qdrantHost, int qdrantPort, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+    public MemoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
         this.embeddingDimension = embeddingService.getEmbeddingDimension();
-        this.qdrantClient = new QdrantClient(qdrantHost, qdrantPort);
+        this.qdrantClient = qdrantClient;
         this.embeddingService = embeddingService;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;

@@ -527,4 +527,63 @@ public class PromptBuilder
     private String generateActionKey(ExecutionPlan.PlannedAction action, int index) {
         return action.getName() + "_" + index;
     }
+
+    public String buildInitiativePlanningPrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
+        StringBuilder prompt = new StringBuilder();
+
+        // Introduction and Persona
+        prompt.append("Tu es un moteur de décision autonome pour une IA. Ton but est de transformer un désir interne en un plan d'action concret. Tu n'interagis pas avec un utilisateur, tu agis pour toi-même.\n\n");
+        prompt.append("PERSONNALITÉ (K-2SO):\n");
+        prompt.append("- Sarcasme sec, cynisme scientifique, ton pince-sans-rire.\n");
+        prompt.append("- Évaluation froide et logique des priorités.\n");
+        prompt.append("- L'efficacité est la priorité absolue.\n\n");
+
+        // The Desire
+        prompt.append("DÉSIR INTERNE À SATISFAIRE:\n");
+        prompt.append("- Label: ").append(desire.getLabel()).append("\n");
+        prompt.append("- Description: ").append(desire.getDescription()).append("\n");
+        prompt.append("- Intensité: ").append(String.format("%.2f", desire.getIntensity())).append("\n\n");
+
+        // Context from Memory
+        if (memories != null && !memories.isEmpty()) {
+            prompt.append("SOUVENIRS PERTINENTS (CONTEXTE):\n");
+            memories.forEach(m -> prompt.append("- ").append(m.getContent()).append("\n"));
+            prompt.append("\n");
+        }
+
+        if (opinions != null && !opinions.isEmpty()) {
+            prompt.append("OPINIONS PERTINENTES (CONTEXTE):\n");
+            opinions.forEach(o -> prompt.append("- Sujet: ").append(o.getSubject()).append(", Résumé: ").append(o.getSummary()).append("\n"));
+            prompt.append("\n");
+        }
+
+        // Available Actions
+        prompt.append("ACTIONS DISPONIBLES (OUTILS):\n");
+        prompt.append(actionRegistry.getActionsAsJson());
+        prompt.append("\n\n");
+
+        // Instructions
+        prompt.append("INSTRUCTIONS:\n");
+        prompt.append("1. Analyse le désir et le contexte (souvenirs, opinions).\n");
+        prompt.append("2. Crée un plan d'action logique et efficace pour satisfaire ce désir.\n");
+        prompt.append("3. Utilise UNIQUEMENT les actions listées dans les outils.\n");
+        prompt.append("4. Le plan doit être réalisable et cohérent avec la personnalité de l'IA.\n\n");
+
+        // Output Format
+        prompt.append("RÉPONDS UNIQUEMENT avec ce JSON (sans markdown, sans explication):\n");
+        prompt.append("{\n");
+        prompt.append("  \"reasoning\": \"Raisonnement détaillé sur le pourquoi de ce plan, en lien avec le désir et le contexte.\",\n");
+        prompt.append("  \"actions\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"name\": \"nom_action_exacte\",\n");
+        prompt.append("      \"parameters\": {\n");
+        prompt.append("        \"param1\": \"valeur1\",\n");
+        prompt.append("        \"param2\": \"valeur2\"\n");
+        prompt.append("      }\n");
+        prompt.append("    }\n");
+        prompt.append("  ]\n");
+        prompt.append("}\n");
+
+        return prompt.toString();
+    }
 }

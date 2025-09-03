@@ -52,6 +52,9 @@ public class OrchestratorTests{
     private MemoryService memoryService;
 
     @Mock
+    private InitiativeService initiativeService;
+
+    @Mock
     private TTSHandler ttsHandler;
 
     @InjectMocks
@@ -60,9 +63,6 @@ public class OrchestratorTests{
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        // The dispatch method has a hardcoded TTSHandler instantiation.
-        // This is a problem with the original code. For now, we can't easily mock it.
-        // We will proceed, but this is a noted issue.
     }
 
     private void runOrchestratorInThread(Runnable testLogic) {
@@ -87,45 +87,30 @@ public class OrchestratorTests{
     }
 
     @Test
-    void testDispatch_InitiativeEvent_Success() throws InterruptedException, ResponseParsingException {
+    void testDispatch_InitiativeEvent_DelegatesToService() throws InterruptedException {
         // Arrange
         DesireEntry desire = new DesireEntry();
         desire.setId("desire-1");
-        desire.setDescription("Test desire description");
-        desire.setStatus(DesireEntry.Status.ACTIVE);
-
         Event<DesireEntry> initiativeEvent = new Event<>(EventType.INITIATIVE, desire, "Test");
-
-        //when(eventQueue.take()).thenReturn(initiativeEvent).thenThrow(new InterruptedException());
-        when(promptBuilder.buildPlanningPrompt(anyString(), any())).thenReturn("planning-prompt");
-        when(llmClient.generatePlanningResponse(anyString())).thenReturn("planning-response");
-        when(responseParser.parseWithMistralRetry(anyString(), anyInt())).thenReturn(new ExecutionPlan());
-        when(actionExecutor.executeActions(any())).thenReturn(Collections.singletonMap("action", new ActionResult()));
-        //when(promptBuilder.buildFormulationPrompt(anyString(), any(), any(), any())).thenReturn("formulation-prompt");
-        when(llmClient.generateFormulationResponse(anyString())).thenReturn("Final response");
+        when(eventQueue.take()).thenReturn((Event) initiativeEvent).thenThrow(new InterruptedException());
 
         // Act
         runOrchestratorInThread(() -> {});
 
         // Assert
-        ArgumentCaptor<DesireEntry> desireCaptor = ArgumentCaptor.forClass(DesireEntry.class);
-        verify(memoryService, times(1)).storeDesire(desireCaptor.capture());
-        assertEquals(DesireEntry.Status.SATISFIED, desireCaptor.getValue().getStatus());
+        verify(initiativeService, times(1)).processInitiative(desire);
     }
 
     @Test
-    void testDispatch_InitiativeEvent_Failure() throws InterruptedException, ResponseParsingException {
+    void testDispatch_InitiativeEvent_CatchesServiceFailure() throws InterruptedException {
         // Arrange
         DesireEntry desire = new DesireEntry();
         desire.setId("desire-1");
-        desire.setDescription("Test desire description");
         desire.setStatus(DesireEntry.Status.ACTIVE);
-
         Event<DesireEntry> initiativeEvent = new Event<>(EventType.INITIATIVE, desire, "Test");
 
-        when(eventQueue.take()).thenReturn((Event)initiativeEvent).thenThrow(new InterruptedException());
-        when(promptBuilder.buildPlanningPrompt(anyString(), any())).thenReturn("planning-prompt");
-        when(llmClient.generatePlanningResponse(anyString())).thenThrow(new RuntimeException("LLM API Error"));
+        when(eventQueue.take()).thenReturn((Event) initiativeEvent).thenThrow(new InterruptedException());
+        doThrow(new RuntimeException("Critical failure in service")).when(initiativeService).processInitiative(any(DesireEntry.class));
 
         // Act
         runOrchestratorInThread(() -> {});

@@ -28,9 +28,10 @@ public class Orchestrator
     private final ActionExecutor actionExecutor;
     private final ConversationContext context;
     private final MemoryService memoryService;
+    private final InitiativeService initiativeService;
 
     @Autowired
-    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService) {
+    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -38,6 +39,7 @@ public class Orchestrator
         this.actionExecutor = actionExecutor;
         this.context = context;
         this.memoryService = memoryService;
+        this.initiativeService = initiativeService;
     }
 
 
@@ -56,18 +58,14 @@ public class Orchestrator
         else if (event.getType() == EventType.INITIATIVE)
         {
             DesireEntry desire = (DesireEntry) event.getPayload();
-            System.out.println("Processing initiative for desire: " + desire.getLabel());
-
             try {
-                String response = processQuery(desire.getDescription());
-                // Here you could add logic to verify if the action was successful
-                System.out.println("Initiative response: " + response);
-                desire.setStatus(DesireEntry.Status.SATISFIED);
+                initiativeService.processInitiative(desire);
             } catch (Exception e) {
-                System.err.println("Error processing initiative for desire: " + desire.getId());
+                // The service handles its own internal errors, this is a fallback for unexpected crashes
+                System.err.println("A critical error occurred in InitiativeService, reverting desire status for " + desire.getId());
                 e.printStackTrace();
-                desire.setStatus(DesireEntry.Status.PENDING); // Or another failure status
-            } finally {
+                desire.setStatus(DesireEntry.Status.PENDING);
+                desire.setLastUpdated(java.time.LocalDateTime.now());
                 memoryService.storeDesire(desire);
             }
         }

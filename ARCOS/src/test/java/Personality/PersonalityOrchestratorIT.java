@@ -14,6 +14,7 @@ import Memory.LongTermMemory.service.MemoryService;
 import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
+import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Producers.DesireInitiativeProducer;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
@@ -108,7 +109,8 @@ public class PersonalityOrchestratorIT {
 
         embeddingService = new EmbeddingService(EMBEDDING_DIMENSION);
 
-        memoryService = new MemoryService(QDRANT_HOST, QDRANT_PORT, embeddingService, llmClient, promptBuilder, llmResponseParser);
+        QdrantClient qdrantClient = new QdrantClient(QDRANT_HOST, QDRANT_PORT);
+        memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);
 
         // Initialize Qdrant collections. A real test setup might need a more robust way
         // to handle this, e.g., using Testcontainers for a disposable DB.

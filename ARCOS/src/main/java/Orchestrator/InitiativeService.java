@@ -1,0 +1,94 @@
+package Orchestrator;
+
+import LLM.LLMClient;
+import LLM.LLMResponseParser;
+import LLM.Prompts.PromptBuilder;
+import Memory.Actions.ActionRegistry;
+import Memory.Actions.Entities.ActionResult;
+import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
+import Memory.LongTermMemory.Models.SearchResult.SearchResult;
+import Memory.LongTermMemory.service.MemoryService;
+import Orchestrator.ActionExecutor;
+import Orchestrator.Entities.ExecutionPlan;
+import Personality.Opinions.OpinionService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+@Service
+public class InitiativeService {
+
+    private final MemoryService memoryService;
+    private final OpinionService opinionService;
+    private final ActionRegistry actionRegistry;
+    private final LLMClient llmClient;
+    private final LLMResponseParser responseParser;
+    private final ActionExecutor actionExecutor;
+    private final PromptBuilder promptBuilder;
+
+    @Autowired
+    public InitiativeService(MemoryService memoryService, OpinionService opinionService, ActionRegistry actionRegistry, LLMClient llmClient, LLMResponseParser responseParser, ActionExecutor actionExecutor, PromptBuilder promptBuilder) {
+        this.memoryService = memoryService;
+        this.opinionService = opinionService;
+        this.actionRegistry = actionRegistry;
+        this.llmClient = llmClient;
+        this.responseParser = responseParser;
+        this.actionExecutor = actionExecutor;
+        this.promptBuilder = promptBuilder;
+    }
+
+    public void processInitiative(DesireEntry desire) {
+        try {
+            System.out.println("Processing initiative for desire: " + desire.getLabel());
+
+            // 1. Enrich context
+            System.out.println("Step 1: Enriching context...");
+            List<MemoryEntry> memories = memoryService.searchMemories(desire.getDescription(), 5).stream()
+                    .map(SearchResult::getEntry)
+                    .collect(Collectors.toList());
+            List<OpinionEntry> opinions = memoryService.searchOpinions(desire.getDescription(), 5).stream()
+                    .map(SearchResult::getEntry)
+                    .collect(Collectors.toList());
+
+            // 2. Transform desire into a plan
+            System.out.println("Step 2: Transforming desire into a plan...");
+            String prompt = promptBuilder.buildInitiativePlanningPrompt(desire, memories, opinions);
+            String planningResponse = llmClient.generatePlanningResponse(prompt);
+            ExecutionPlan plan = responseParser.parseWithMistralRetry(planningResponse, 3);
+            System.out.println("Plan received from LLM: " + plan.getReasoning());
+
+
+            // 3. Execute the plan
+            System.out.println("Step 3: Executing plan...");
+            Map<String, ActionResult> results = actionExecutor.executeActions(plan);
+            System.out.println("Execution results: " + results);
+
+
+            // 4. Update state
+            System.out.println("Step 4: Updating state...");
+            boolean allActionsSucceeded = results.values().stream().allMatch(ActionResult::isSuccess);
+
+            if (allActionsSucceeded) {
+                desire.setStatus(DesireEntry.Status.SATISFIED);
+                System.out.println("Initiative '" + desire.getLabel() + "' was satisfied successfully.");
+            } else {
+                desire.setStatus(DesireEntry.Status.PENDING); // or a new FAILED status
+                System.out.println("Initiative '" + desire.getLabel() + "' failed. Setting status back to PENDING.");
+            }
+
+        } catch (Exception e) {
+            System.err.println("An unexpected error occurred while processing initiative " + desire.getId());
+            e.printStackTrace();
+            desire.setStatus(DesireEntry.Status.PENDING); // Revert to PENDING on failure
+        } finally {
+            desire.setLastUpdated(java.time.LocalDateTime.now());
+            memoryService.storeDesire(desire);
+            System.out.println("Desire " + desire.getId() + " updated in database with status " + desire.getStatus());
+        }
+    }
+}

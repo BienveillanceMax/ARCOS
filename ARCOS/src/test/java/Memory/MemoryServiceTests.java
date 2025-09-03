@@ -42,12 +42,13 @@ public class MemoryServiceTests
     @Mock
     private LLMResponseParser llmResponseParser;
 
-    @InjectMocks
     private MemoryService memoryService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // Manual instantiation with mocks after openMocks()
+        memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);
     }
 
     @Test

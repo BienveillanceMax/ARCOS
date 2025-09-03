@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="Personality.Opinions.OpinionServiceTest" time="0.057" tests="3" errors="0" skipped="0" failures="0">
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report.xsd" version="3.0.2" name="Orchestrator.InitiativeServiceTest" time="0.237" tests="2" errors="0" skipped="0" failures="0">
   <properties>
     <property name="java.specification.version" value="21"/>
     <property name="sun.jnu.encoding" value="UTF-8"/>
@@ -53,10 +53,28 @@
     <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
     <property name="java.class.version" value="65.0"/>
   </properties>
-  <testcase name="testProcessInteraction_addOpinion" classname="Personality.Opinions.OpinionServiceTest" time="0.025"/>
-  <testcase name="testProcessInteraction_updateOpinion" classname="Personality.Opinions.OpinionServiceTest" time="0.012"/>
-  <testcase name="testProcessInteraction_llmError" classname="Personality.Opinions.OpinionServiceTest" time="0.013">
-    <system-out><![CDATA[Erreur de parsing d'opinion : LLM parsing failed
+  <testcase name="testProcessInitiative_Success" classname="Orchestrator.InitiativeServiceTest" time="0.217">
+    <system-out><![CDATA[Processing initiative for desire: null
+Step 1: Enriching context...
+Step 2: Transforming desire into a plan...
+Plan received from LLM: A good plan
+Step 3: Executing plan...
+Execution results: {action1=ActionResult{success=true, message='Action succeeded'}}
+Step 4: Updating state...
+Initiative 'null' was satisfied successfully.
+Desire desire-1 updated in database with status SATISFIED
+]]></system-out>
+  </testcase>
+  <testcase name="testProcessInitiative_PlanExecutionFails" classname="Orchestrator.InitiativeServiceTest" time="0.016">
+    <system-out><![CDATA[Processing initiative for desire: null
+Step 1: Enriching context...
+Step 2: Transforming desire into a plan...
+Plan received from LLM: A plan that will fail
+Step 3: Executing plan...
+Execution results: {action1=ActionResult{success=false, message='Action failed'}}
+Step 4: Updating state...
+Initiative 'null' failed. Setting status back to PENDING.
+Desire desire-2 updated in database with status PENDING
 ]]></system-out>
   </testcase>
 </testsuite>

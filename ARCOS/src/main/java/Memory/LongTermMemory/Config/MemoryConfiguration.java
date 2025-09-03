@@ -3,6 +3,7 @@ package Memory.LongTermMemory.Config;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
+import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Memory.LongTermMemory.service.EmbeddingService;
 import Memory.LongTermMemory.service.MemoryService;
 import org.slf4j.Logger;
@@ -57,16 +58,21 @@ public class MemoryConfiguration {
         }
     }
 
+    @Bean
+    public QdrantClient qdrantClient() {
+        logger.info("Configuration du client Qdrant: {}:{}", qdrantHost, qdrantPort);
+        return new QdrantClient(qdrantHost, qdrantPort);
+    }
+
     /**
      * Bean pour le service principal de mémoire.
      */
     @Bean
-    public MemoryService memoryService(EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+    public MemoryService memoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
         logger.info("Configuration du service de mémoire");
-        logger.info("  - Qdrant: {}:{}", qdrantHost, qdrantPort);
         logger.info("  - Dimension embeddings: {}", embeddingDimension);
 
-        MemoryService memoryService = new MemoryService(qdrantHost, qdrantPort, embeddingService, llmClient, promptBuilder, llmResponseParser);
+        MemoryService memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);
 
         // Initialisation des collections au démarrage
         try {
