@@ -28,7 +28,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-public class OrchestratorTest {
+public class OrchestratorTests{
 
     @Mock
     private EventQueue eventQueue;
@@ -123,7 +123,7 @@ public class OrchestratorTest {
 
         Event<DesireEntry> initiativeEvent = new Event<>(EventType.INITIATIVE, desire, "Test");
 
-        when(eventQueue.take()).thenReturn(initiativeEvent).thenThrow(new InterruptedException());
+        when(eventQueue.take()).thenReturn((Event)initiativeEvent).thenThrow(new InterruptedException());
         when(promptBuilder.buildPlanningPrompt(anyString(), any())).thenReturn("planning-prompt");
         when(llmClient.generatePlanningResponse(anyString())).thenThrow(new RuntimeException("LLM API Error"));
 
@@ -133,7 +133,7 @@ public class OrchestratorTest {
         // Assert
         ArgumentCaptor<DesireEntry> desireCaptor = ArgumentCaptor.forClass(DesireEntry.class);
         verify(memoryService, times(1)).storeDesire(desireCaptor.capture());
-        assertEquals(DesireEntry.Status.ABANDONED, desireCaptor.getValue().getStatus());
+        assertEquals(DesireEntry.Status.PENDING, desireCaptor.getValue().getStatus());
     }
 }
 

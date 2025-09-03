@@ -1,7 +1,9 @@
-package Memory.LongTermMemory.service;
+package Memory;
 
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
+import Memory.LongTermMemory.service.EmbeddingService;
+import Memory.LongTermMemory.service.MemoryService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.BeforeEach;

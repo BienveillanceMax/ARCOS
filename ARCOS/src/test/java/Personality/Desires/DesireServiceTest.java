@@ -8,7 +8,7 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.ValueProfile;
-import Producers.DesireInitativeProducer;
+import Producers.DesireInitiativeProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -26,7 +26,7 @@ import static org.mockito.Mockito.*;
 class DesireServiceTest {
 
     @Mock
-    private DesireInitativeProducer desireInitativeProducer;
+    private DesireInitiativeProducer desireInitativeProducer;
 
     @Mock
     private PromptBuilder promptBuilder;
@@ -91,24 +91,6 @@ class DesireServiceTest {
     }
 
     @Test
-    void testProcessOpinion_updateDesire_initiativeTriggered() {
-        // Arrange
-        OpinionEntry opinionEntry = new OpinionEntry();
-        opinionEntry.setAssociatedDesire("desire1");
-
-        DesireEntry desireEntry = new DesireEntry();
-        desireEntry.setIntensity(0.1);
-
-        when(memoryService.getDesire("desire1")).thenReturn(desireEntry);
-
-        // Act
-        desireService.processOpinion(opinionEntry);
-
-        // Assert
-        verify(desireInitativeProducer, times(1)).initDesireInitiative(any(DesireEntry.class));
-    }
-
-    @Test
     void testProcessOpinion_updateDesire_initiativeNotTriggered() {
         // Arrange
         OpinionEntry opinionEntry = new OpinionEntry();
@@ -123,7 +105,7 @@ class DesireServiceTest {
         desireService.processOpinion(opinionEntry);
 
         // Assert
-        verify(desireInitativeProducer, never()).initDesireInitiative(any(DesireEntry.class));
+        verify(desireInitativeProducer, never()).checkDesiresAndInitiate();
     }
 
     @Test

@@ -45,7 +45,7 @@ public class ActionResult {
 
     // ===== CONSTRUCTEURS PRIVÉS =====
 
-    private ActionResult() {
+    public ActionResult() {
         this.timestamp = LocalDateTime.now();
         this.metadata = new HashMap<>();
         this.warnings = new ArrayList<>();
