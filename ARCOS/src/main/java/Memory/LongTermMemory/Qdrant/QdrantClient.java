@@ -362,6 +362,102 @@ public class QdrantClient
     }
 
     /**
+     * Scrolls through all points in a collection with an optional filter.
+     */
+    public <T> List<T> scroll(String collectionName, ObjectNode filter, Function<JsonNode, T> resultParser) {
+        List<T> results = new ArrayList<>();
+        String nextPageOffset = null;
+
+        try {
+            do {
+                ObjectNode requestBody = objectMapper.createObjectNode();
+                if (filter != null) {
+                    requestBody.set("filter", filter);
+                }
+                requestBody.put("limit", 100); // Or a configurable page size
+                requestBody.put("with_payload", true);
+                if (nextPageOffset != null) {
+                    requestBody.put("offset", nextPageOffset);
+                }
+
+                String json = objectMapper.writeValueAsString(requestBody);
+
+                RequestBody body = RequestBody.create(json, JSON);
+                Request request = new Request.Builder()
+                        .url(baseUrl + "/collections/" + collectionName + "/points/scroll")
+                        .post(body)
+                        .build();
+
+                try (Response response = httpClient.newCall(request).execute()) {
+                    if (response.isSuccessful()) {
+                        String responseBody = response.body().string();
+                        JsonNode responseJson = objectMapper.readTree(responseBody);
+
+                        JsonNode resultNode = responseJson.get("result");
+                        if (resultNode != null) {
+                            JsonNode pointsNode = resultNode.get("points");
+                            if (pointsNode != null && pointsNode.isArray()) {
+                                for (JsonNode pointNode : pointsNode) {
+                                    results.add(resultParser.apply(pointNode));
+                                }
+                            }
+
+                            JsonNode nextPageOffsetNode = resultNode.get("next_page_offset");
+                            if (nextPageOffsetNode != null && !nextPageOffsetNode.isNull()) {
+                                nextPageOffset = nextPageOffsetNode.asText();
+                            } else {
+                                nextPageOffset = null;
+                            }
+                        } else {
+                            nextPageOffset = null;
+                        }
+                    } else {
+                        String responseBody = response.body() != null ? response.body().string() : "";
+                        logger.error("Error while scrolling in '{}': {} - {}",
+                                collectionName, response.code(), responseBody);
+                        break;
+                    }
+                }
+            } while (nextPageOffset != null);
+
+        } catch (Exception e) {
+            logger.error("Exception while scrolling in '{}'", collectionName, e);
+        }
+
+        return results;
+    }
+
+    public DesireEntry parseDesireEntryFromPoint(JsonNode pointNode) {
+        String id = pointNode.get("id").asText();
+        JsonNode payloadNode = pointNode.get("payload");
+
+        String label = payloadNode.get("label").asText();
+        String description = payloadNode.get("description").asText();
+        String reasoning = payloadNode.get("reasoning").asText();
+        double intensity = payloadNode.get("intensity").asDouble();
+        String opinionId = payloadNode.get("opinionId").asText();
+
+        String createdAtStr = payloadNode.get("createdAt").asText();
+        String lastUpdatedStr = payloadNode.get("lastUpdated").asText();
+
+        LocalDateTime createdAt = LocalDateTime.parse(createdAtStr, TIMESTAMP_FORMATTER);
+        LocalDateTime lastUpdated = LocalDateTime.parse(lastUpdatedStr, TIMESTAMP_FORMATTER);
+
+        DesireEntry entry = new DesireEntry();
+        entry.setId(id);
+        entry.setLabel(label);
+        entry.setDescription(description);
+        entry.setReasoning(reasoning);
+        entry.setIntensity(intensity);
+        entry.setOpinionId(opinionId);
+        entry.setCreatedAt(createdAt);
+        entry.setLastUpdated(lastUpdated);
+
+        return entry;
+    }
+
+
+    /**
      * Supprime un point par son ID.
      */
     public boolean deletePoint(String collectionName, String pointId) {

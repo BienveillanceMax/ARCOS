@@ -3,7 +3,8 @@ package EventBus.Events;
 /**
  * Énumération des différents types d'événements supportés par le système
  */
-public enum EventType {
+public enum EventType
+{
     WAKEWORD("Détection de mot-clé de réveil"),
     TIMER("Événement de minuterie"),
     ALERT("Alerte système"),
@@ -16,6 +17,7 @@ public enum EventType {
     NOTIFICATION("Notification"),
     DEVICE_CONNECTED("Périphérique connecté"),
     DEVICE_DISCONNECTED("Périphérique déconnecté"),
+    INITIATIVE("Initiative"),
     CUSTOM("Événement personnalisé");
 
     private final String description;

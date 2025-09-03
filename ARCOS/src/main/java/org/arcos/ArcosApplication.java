@@ -8,11 +8,12 @@ import Producers.WakeWordProducer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
-
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 
 //might need to setup time because of dual boot : timedatectl set-time "2014-05-26 11:13:54"
-@SpringBootApplication(scanBasePackages = {"EventBus","Producers","LLM", "Orchestrator", "Memory", "org.arcos","Personality"})
+@SpringBootApplication(scanBasePackages = {"EventBus", "Producers", "LLM", "Orchestrator", "Memory", "org.arcos", "Personality"})
+@EnableScheduling
 public class ArcosApplication
 {
 

@@ -6,17 +6,16 @@ import EventBus.Events.EventType;
 import Exceptions.ResponseParsingException;
 import IO.OuputHandling.TTSHandler;
 import LLM.LLMResponseParser;
+import Memory.LongTermMemory.Models.DesireEntry;
 import LLM.LLMClient;
 import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
+import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.Entities.ExecutionPlan;
 import LLM.Prompts.PromptBuilder;
-import Personality.PersonalityOrchestrator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.Map;
 
 @Component
@@ -28,17 +27,17 @@ public class Orchestrator
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
     private final ConversationContext context;
-    private final PersonalityOrchestrator personalityOrchestrator;
+    private final MemoryService memoryService;
 
     @Autowired
-    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, PersonalityOrchestrator personalityOrchestrator) {
+    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
         this.responseParser = responseParser;
         this.actionExecutor = actionExecutor;
         this.context = context;
-        this.personalityOrchestrator = personalityOrchestrator;
+        this.memoryService = memoryService;
     }
 
 
@@ -54,13 +53,31 @@ public class Orchestrator
             System.out.println("starting processing");
             ttsHandler.speak( processQuery((String)event.getPayload()));
         }
+        else if (event.getType() == EventType.INITIATIVE)
+        {
+            DesireEntry desire = (DesireEntry) event.getPayload();
+            System.out.println("Processing initiative for desire: " + desire.getLabel());
+
+            try {
+                String response = processQuery(desire.getDescription());
+                // Here you could add logic to verify if the action was successful
+                System.out.println("Initiative response: " + response);
+                desire.setStatus(DesireEntry.Status.SATISFIED);
+            } catch (Exception e) {
+                System.err.println("Error processing initiative for desire: " + desire.getId());
+                e.printStackTrace();
+                desire.setStatus(DesireEntry.Status.PENDING); // Or another failure status
+            } finally {
+                memoryService.storeDesire(desire);
+            }
+        }
     }
 
     public void start() {
         while (true) {
             try {
-               Event<?> event = eventQueue.take();
-               dispatch(event);
+                Event<?> event = eventQueue.take();
+                dispatch(event);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
@@ -69,13 +86,6 @@ public class Orchestrator
 
     private String processQuery(String userQuery) {
 
-        LocalDateTime lastInteraction = context.getLastUpdated();
-        if (lastInteraction != null && Duration.between(lastInteraction, LocalDateTime.now()).toMinutes() > 15) {
-            String conversation = context.getFullConversation();
-            if (conversation != null && !conversation.isEmpty()) {
-                personalityOrchestrator.processMemory(conversation);
-            }
-        }
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
         System.out.println(planningPrompt);

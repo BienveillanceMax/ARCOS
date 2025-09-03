@@ -8,7 +8,6 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.ValueProfile;
-import Producers.DesireInitativeProducer;
 import org.springframework.stereotype.Service;
 
 
@@ -17,7 +16,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Service
 public class DesireService
 {
-    private final DesireInitativeProducer desireInitativeProducer;
     private final PromptBuilder promptBuilder;
     private final ValueProfile valueProfile;
     private final MemoryService memoryService;
@@ -27,8 +25,7 @@ public class DesireService
     public static final double D_UPDATE_THRESHOLD = 0.2;
 
     @Autowired
-    public DesireService(DesireInitativeProducer desireInitativeProducer, PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
-        this.desireInitativeProducer = desireInitativeProducer;
+    public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
         this.memoryService = memoryService;
@@ -91,18 +88,9 @@ public class DesireService
     private DesireEntry updateDesire(OpinionEntry opinionEntry) {
         DesireEntry desireEntry = memoryService.getDesire(opinionEntry.getAssociatedDesire());
 
-        if (desireEntry.getIntensity() < D_UPDATE_THRESHOLD) {
-            desireEntry.setStatus(desireInitativeProducer.initDesireInitiative(desireEntry));
-            memoryService.storeDesire(desireEntry);
-            return desireEntry;
-
-        }
-        else
-        {
-           desireEntry = updateStats(desireEntry, opinionEntry);
-           memoryService.storeDesire(desireEntry);
-           return desireEntry;
-        }
+        desireEntry = updateStats(desireEntry, opinionEntry);
+        memoryService.storeDesire(desireEntry);
+        return desireEntry;
     }
 
     private DesireEntry updateStats(DesireEntry desireEntry, OpinionEntry opinionEntry) {
@@ -150,5 +138,7 @@ public class DesireService
 
 
 }
+
+
 
 

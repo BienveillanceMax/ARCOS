@@ -1,0 +1,70 @@
+package Producers;
+
+import EventBus.EventQueue;
+import EventBus.Events.Event;
+import EventBus.Events.EventPriority;
+import EventBus.Events.EventType;
+import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.service.MemoryService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.EnableScheduling;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+@Component
+@EnableScheduling
+public class DesireInitiativeProducer {
+
+    private static final double INITIATIVE_THRESHOLD = 0.8;
+
+    private final EventQueue eventQueue;
+    private final MemoryService memoryService;
+
+    @Autowired
+    public DesireInitiativeProducer(EventQueue eventQueue, MemoryService memoryService) {
+        this.eventQueue = eventQueue;
+        this.memoryService = memoryService;
+    }
+
+    @Scheduled(fixedRate = 60000) // Check every 60 seconds
+    public void checkDesiresAndInitiate() {
+        System.out.println("Checking for high-intensity desires...");
+        List<DesireEntry> pendingDesires = memoryService.getPendingDesires();
+
+        for (DesireEntry desire : pendingDesires) {
+            if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
+                if (isGoodMomentToInitiate(desire)) {
+                    System.out.println("High-intensity desire found, initiating... " + desire.getLabel());
+                    initiateDesireAction(desire);
+                }
+            }
+        }
+    }
+
+    private boolean isGoodMomentToInitiate(DesireEntry desire) {
+        // Placeholder for modular logic to determine the right moment.
+        // This can be expanded to check for user presence, conversation state, etc.
+        // For now, we assume it's always a good moment.
+        return true;
+    }
+
+    private void initiateDesireAction(DesireEntry desire) {
+        // Create an event for the orchestrator
+        Event<DesireEntry> initiativeEvent = new Event<>(
+                EventType.INITIATIVE,
+                EventPriority.LOW, // Initiatives can be low priority compared to direct user interaction
+                desire,
+                "DesireInitiativeProducer"
+        );
+
+        // Push the event to the queue
+        eventQueue.offer(initiativeEvent);
+
+        // Update the desire's status to ACTIVE
+        desire.setStatus(DesireEntry.Status.ACTIVE);
+        memoryService.storeDesire(desire);
+    }
+}
+

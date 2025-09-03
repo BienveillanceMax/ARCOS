@@ -1,5 +1,6 @@
 package Personality;
 
+import EventBus.EventQueue;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
@@ -13,7 +14,7 @@ import Memory.LongTermMemory.service.MemoryService;
 import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
-import Producers.DesireInitativeProducer;
+import Producers.DesireInitiativeProducer;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -58,7 +59,7 @@ public class PersonalityOrchestratorIT {
     private LLMResponseParser llmResponseParser;
     private PromptBuilder promptBuilder;
     private EmbeddingService embeddingService;
-    private DesireInitativeProducer desireInitativeProducer;
+    private DesireInitiativeProducer desireInitiativeProducer;
     private ActionRegistry actionRegistry;
 
 
@@ -103,6 +104,8 @@ public class PersonalityOrchestratorIT {
         ChatClient.Builder chatClientBuilder = ChatClient.builder(mistralAiChatModel);
         llmClient = new LLMClient(chatClientBuilder);
 
+        EventQueue queue = new EventQueue();
+
         embeddingService = new EmbeddingService(EMBEDDING_DIMENSION);
 
         memoryService = new MemoryService(QDRANT_HOST, QDRANT_PORT, embeddingService, llmClient, promptBuilder, llmResponseParser);
@@ -111,11 +114,11 @@ public class PersonalityOrchestratorIT {
         // to handle this, e.g., using Testcontainers for a disposable DB.
         memoryService.initializeCollections();
 
-        desireInitativeProducer = new DesireInitativeProducer();
+        desireInitiativeProducer = new DesireInitiativeProducer(queue, memoryService);
 
         opinionService = new OpinionService(llmResponseParser, llmClient, memoryService, promptBuilder, valueProfile);
 
-        desireService = new DesireService(desireInitativeProducer, promptBuilder, valueProfile, memoryService, llmClient, llmResponseParser);
+        desireService = new DesireService(promptBuilder, valueProfile, memoryService, llmClient, llmResponseParser);
 
         personalityOrchestrator = new PersonalityOrchestrator(memoryService, opinionService, desireService, valueProfile);
     }

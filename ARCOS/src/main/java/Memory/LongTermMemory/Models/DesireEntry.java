@@ -115,6 +115,8 @@ public class DesireEntry implements QdrantEntry
         payload.put("reasoning", this.getReasoning());
         payload.put("intensity", this.getIntensity());
         payload.put("opinionId", this.getOpinionId());
+        payload.put("status", this.getStatus().name());
+
 
         if (this.getCreatedAt() != null) {
             payload.put("createdAt", this.getCreatedAt().format(TIMESTAMP_FORMATTER));

@@ -8,6 +8,8 @@ import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.*;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
@@ -121,6 +123,18 @@ public class MemoryService
 
     public DesireEntry getDesire(String associatedDesireId) {
         return qdrantClient.getPoint(DESIRES_COLLECTION, associatedDesireId, (jsonNode) -> qdrantClient.parseDesireEntry(jsonNode).getEntry());
+    }
+
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    public List<DesireEntry> getPendingDesires() {
+        ObjectNode filter = objectMapper.createObjectNode();
+        ObjectNode must = filter.putArray("must").addObject();
+        must.put("key", "status");
+        ObjectNode match = must.putObject("match");
+        match.put("value", DesireEntry.Status.PENDING.name());
+
+        return qdrantClient.scroll(DESIRES_COLLECTION, filter, qdrantClient::parseDesireEntryFromPoint);
     }
 
 
