@@ -3,6 +3,7 @@ package IO.InputHandling;
 import io.github.givimad.whisperjni.WhisperJNI;
 import io.github.givimad.whisperjni.WhisperContext;
 import io.github.givimad.whisperjni.WhisperFullParams;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -11,6 +12,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+@Slf4j
 public class SpeechToText {
     private WhisperJNI whisper;
     private WhisperContext context;
@@ -56,7 +58,7 @@ public class SpeechToText {
             this.audioBuffer = new ByteArrayOutputStream();
             this.isInitialized = true;
 
-            System.out.println("WhisperJNI initialized successfully with French language model");
+            log.info("WhisperJNI initialized successfully with French language model");
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to initialize WhisperJNI: " + e.getMessage(), e);
@@ -68,7 +70,7 @@ public class SpeechToText {
      */
     public void processAudio(byte[] audioData) {
         if (!isInitialized) {
-            System.err.println("SpeechToText not initialized");
+            log.error("SpeechToText not initialized");
             return;
         }
 
@@ -76,7 +78,7 @@ public class SpeechToText {
             // Buffer the audio data
             this.audioBuffer.write(audioData);
         } catch (IOException e) {
-            System.err.println("Error buffering audio data: " + e.getMessage());
+            log.error("Error buffering audio data", e);
         }
     }
 
@@ -85,7 +87,7 @@ public class SpeechToText {
      */
     public String getTranscription() {
         if (!isInitialized) {
-            System.err.println("SpeechToText not initialized");
+            log.error("SpeechToText not initialized");
             return "";
         }
 
@@ -103,13 +105,13 @@ public class SpeechToText {
                 return "";
             }
 
-            System.out.println("Processing " + samples.length + " audio samples with Whisper...");
+            log.info("Processing {} audio samples with Whisper...", samples.length);
 
             // Run Whisper transcription
             int result = whisper.full(context, params, samples, samples.length);
 
             if (result != 0) {
-                System.err.println("Whisper transcription failed with code: " + result);
+                log.error("Whisper transcription failed with code: {}", result);
                 return "";
             }
 
@@ -127,8 +129,7 @@ public class SpeechToText {
             return transcription.toString().trim();
 
         } catch (Exception e) {
-            System.err.println("Error during Whisper transcription: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error during Whisper transcription", e);
             return "";
         }
     }
@@ -167,7 +168,7 @@ public class SpeechToText {
         if (this.audioBuffer != null) {
             this.audioBuffer.reset();
         }
-        System.out.println("SpeechToText reset for new session");
+        log.info("SpeechToText reset for new session");
     }
 
     /**
@@ -209,9 +210,9 @@ public class SpeechToText {
                 this.audioBuffer = null;
             }
             this.isInitialized = false;
-            System.out.println("WhisperJNI resources cleaned up");
+            log.info("WhisperJNI resources cleaned up");
         } catch (Exception e) {
-            System.err.println("Error closing SpeechToText: " + e.getMessage());
+            log.error("Error closing SpeechToText", e);
         }
     }
 }

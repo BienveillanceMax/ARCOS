@@ -14,6 +14,7 @@ import Personality.Values.Entities.ValueSchwartz;
 import Personality.Values.ValueProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +25,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class PromptBuilder
 {
 
@@ -470,7 +472,7 @@ public class PromptBuilder
 
             resultsDesc.append("\n");
         }
-        System.out.println(resultsDesc.toString());
+        log.debug("Results description:\n{}", resultsDesc.toString());
         return resultsDesc.toString();
     }
 

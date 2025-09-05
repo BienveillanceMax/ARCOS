@@ -6,6 +6,7 @@ import IO.InputHandling.AudioForwarder;
 import IO.InputHandling.SpeechToText;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
@@ -22,6 +23,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
 
 @Component
+@Slf4j
 public class WakeWordProducer implements Runnable
 {
     private Porcupine porcupine;
@@ -138,10 +140,10 @@ public class WakeWordProducer implements Runnable
                 if (mixer.isLineSupported(dataLineInfo)) {
                     return (TargetDataLine) mixer.getLine(dataLineInfo);
                 } else {
-                    System.err.printf("Audio capture device at index %s does not support the audio format required by Picovoice. Using default capture device.%n", deviceIndex);
+                    log.warn("Audio capture device at index {} does not support the audio format required by Picovoice. Using default capture device.", deviceIndex);
                 }
             } catch (Exception e) {
-                System.err.printf("No capture device found at index %s. Using default capture device.%n", deviceIndex);
+                log.warn("No capture device found at index {}. Using default capture device.", deviceIndex);
             }
         }
         return getDefaultCaptureDevice(dataLineInfo);
@@ -155,20 +157,16 @@ public class WakeWordProducer implements Runnable
             this.micDataLine = getAudioDevice(this.audioDeviceIndex, dataLineInfo);
             this.micDataLine.open(format);
         } catch (LineUnavailableException e) {
-            System.err.println("Failed to get a valid capture device. Use --show_audio_devices to show available capture devices and their indices");
+            log.error("Failed to get a valid capture device. Use --show_audio_devices to show available capture devices and their indices", e);
             System.exit(1);
         }
     }
 
     public String startRecording() {
         try {
-            System.out.println("Starting recording ...");
+            log.info("Starting recording ...");
             this.micDataLine.start();
-            System.out.print("Listening for {");
-            for (String keyword : this.keywords) {
-                System.out.println(keyword);
-            }
-            System.out.print(" }\n");
+            log.info("Listening for {}", String.join(", ", this.keywords));
 
             int frameLength = this.porcupine.getFrameLength();
             ByteBuffer captureBuffer = ByteBuffer.allocate(frameLength * 2);
@@ -184,7 +182,7 @@ public class WakeWordProducer implements Runnable
                 captureBuffer.asShortBuffer().get(porcupineBuffer);
                 int result = this.porcupine.process(porcupineBuffer);
                 if (result >= 0) {
-                    System.out.printf("[%s] Detected '%s'\n",
+                    log.info("[{}] Detected '{}'",
                             LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                             this.keywords[result]);
 
@@ -194,20 +192,20 @@ public class WakeWordProducer implements Runnable
                     // Handle the result asynchronously
                     messageFuture.thenAccept(message -> {
                         if (!message.isEmpty()) {
-                            System.out.println(">>> TRANSCRIBED MESSAGE: " + message);
+                            log.info(">>> TRANSCRIBED MESSAGE: {}", message);
                             // Here you can process the transcribed message
                         } else {
-                            System.out.println(">>> No speech detected or transcription failed");
+                            log.info(">>> No speech detected or transcription failed");
                         }
                     }).exceptionally(throwable -> {
-                        System.err.println("Error during transcription: " + throwable.getMessage());
+                        log.error("Error during transcription", throwable);
                         return null;
                     });
                     return messageFuture.get();
                 }
             }
         } catch (Exception e) {
-            System.err.println(e.toString());
+            log.error("An error occurred during recording", e);
         }
         return "";
     }
@@ -219,7 +217,7 @@ public class WakeWordProducer implements Runnable
         for (int i = 0; i < allMixerInfo.length; i++) {
             Mixer mixer = AudioSystem.getMixer(allMixerInfo[i]);
             if (mixer.isLineSupported(captureLine)) {
-                System.out.printf("Device %d: %s\n", i, allMixerInfo[i].getName());
+                log.info("Device {}: {}", i, allMixerInfo[i].getName());
             }
         }
     }

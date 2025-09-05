@@ -8,12 +8,14 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.ValueProfile;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 
 import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
+@Slf4j
 public class DesireService
 {
     private final PromptBuilder promptBuilder;
@@ -77,7 +79,7 @@ public class DesireService
                 createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
                 return createdDesire;
             } catch (ResponseParsingException e) {
-                System.out.println(e.getMessage());
+                log.error("Error parsing desire from response", e);
             }
 
         }

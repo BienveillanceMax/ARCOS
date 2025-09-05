@@ -6,6 +6,7 @@ import EventBus.Events.EventPriority;
 import EventBus.Events.EventType;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.service.MemoryService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -15,6 +16,7 @@ import java.util.List;
 
 @Component
 @EnableScheduling
+@Slf4j
 public class DesireInitiativeProducer {
 
     private static final double INITIATIVE_THRESHOLD = 0.8;
@@ -30,13 +32,13 @@ public class DesireInitiativeProducer {
 
     @Scheduled(fixedRate = 60000) // Check every 60 seconds
     public void checkDesiresAndInitiate() {
-        System.out.println("Checking for high-intensity desires...");
+        log.info("Checking for high-intensity desires...");
         List<DesireEntry> pendingDesires = memoryService.getPendingDesires();
 
         for (DesireEntry desire : pendingDesires) {
             if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
                 if (isGoodMomentToInitiate(desire)) {
-                    System.out.println("High-intensity desire found, initiating... " + desire.getLabel());
+                    log.info("High-intensity desire found, initiating... {}", desire.getLabel());
                     initiateDesireAction(desire);
                 }
             }

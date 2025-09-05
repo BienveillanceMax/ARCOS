@@ -8,12 +8,14 @@ import Memory.LongTermMemory.service.MemoryService;
 import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@Slf4j
 public class PersonalityOrchestrator
 {
     private final MemoryService memoryService;
@@ -53,7 +55,7 @@ public class PersonalityOrchestrator
                 memoryEntry = memoryService.memorizeConversation(conversation);
                 break;
             } catch (ResponseParsingException e) {
-                System.out.println(e.getMessage());
+                log.error("Error memorizing conversation", e);
                 retries++;
             }
         }

@@ -9,6 +9,7 @@ import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.ValueProfile;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,7 @@ import java.util.UUID;
 
 
 @Service
+@Slf4j
 public class OpinionService
 {
 
@@ -91,7 +93,7 @@ public class OpinionService
         try {
             opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry);
         } catch (Exception e) {
-            System.out.println("Erreur de parsing d'opinion : " + e.getMessage());
+            log.error("Erreur de parsing d'opinion", e);
             return null;
         }
         return opinionEntry;
@@ -182,7 +184,7 @@ public class OpinionService
                 .max(Map.Entry.comparingByValue())
                 .orElse(null);
         if (maxEntry == null) {
-            System.out.println("Erreur null lors du calcul de normVp dans le module OpinionService");
+            log.error("Erreur null lors du calcul de normVp dans le module OpinionService");
             return 0.5;
         } else {
             mainValueScore = maxEntry.getValue();

@@ -295,7 +295,7 @@ public class QdrantClient
                 mainDimension = DimensionSchwartz.valueOf(mainDimensionNode.asText());
             } catch (IllegalArgumentException e) {
                 // Si la valeur n'est pas valide, on laisse null
-                System.out.println("Dimension Schwartz invalide: " + mainDimensionNode.asText());
+                logger.warn("Dimension Schwartz invalide: {}", mainDimensionNode.asText());
             }
         }
 

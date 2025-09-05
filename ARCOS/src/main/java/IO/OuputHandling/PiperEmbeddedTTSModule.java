@@ -1,6 +1,8 @@
 package IO.OuputHandling;
 
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.*;
@@ -13,6 +15,7 @@ import java.util.ArrayList;
  * Module TTS Piper avec modèles intégrés dans les ressources
  * Les modèles sont extraits automatiquement au premier lancement
  */
+@Slf4j
 public class PiperEmbeddedTTSModule
 {
 
@@ -115,7 +118,7 @@ public class PiperEmbeddedTTSModule
      * Extrait un modèle des ressources vers le système de fichiers
      */
     private String extractModel(EmbeddedModel model) throws IOException {
-        System.out.println("Extraction du modèle " + model.name() + "...");
+        log.info("Extraction du modèle {}...", model.name());
 
         // Extraction du modèle ONNX
         File modelFile = new File(modelsDirectory, model.getModelFileName());
@@ -125,7 +128,7 @@ public class PiperEmbeddedTTSModule
         File configFile = new File(modelsDirectory, model.getConfigFileName());
         extractResource(model.getConfigResource(), configFile);
 
-        System.out.println("Modèle extrait vers: " + modelFile.getAbsolutePath());
+        log.info("Modèle extrait vers: {}", modelFile.getAbsolutePath());
         return modelFile.getAbsolutePath();
     }
 
@@ -160,7 +163,7 @@ public class PiperEmbeddedTTSModule
                 return path;
             }
         }
-        //System.out.println();
+        //log.debug();
         return "piper"; // Par défaut dans le PATH
     }
 
@@ -169,17 +172,17 @@ public class PiperEmbeddedTTSModule
      */
     public boolean initialize() {
         try {
-            System.out.println(Paths.get(piperExecutablePath));
+            log.info("Using piper executable at: {}", Paths.get(piperExecutablePath));
             // Vérification de l'exécutable Piper
             if (!Files.exists(Paths.get(piperExecutablePath))) {
-                System.err.println("Exécutable Piper non trouvé: " + piperExecutablePath);
-                System.err.println("Installez Piper ou spécifiez le chemin correct.");
+                log.error("Exécutable Piper non trouvé: {}", piperExecutablePath);
+                log.error("Installez Piper ou spécifiez le chemin correct.");
                 return false;
             }
 
             // Vérification du modèle extrait
             if (!Files.exists(Paths.get(extractedModelPath))) {
-                System.err.println("Modèle extrait non trouvé: " + extractedModelPath);
+                log.error("Modèle extrait non trouvé: {}", extractedModelPath);
                 return false;
             }
 
@@ -194,14 +197,13 @@ public class PiperEmbeddedTTSModule
             isInitialized.set(true);
             startProcessing();
 
-            System.out.println("Module TTS Piper avec modèles intégrés initialisé avec succès");
-            System.out.println("Modèle utilisé: " + extractedModelPath);
+            log.info("Module TTS Piper avec modèles intégrés initialisé avec succès");
+            log.info("Modèle utilisé: {}", extractedModelPath);
 
             return true;
 
         } catch (Exception e) {
-            System.err.println("Erreur lors de l'initialisation: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Erreur lors de l'initialisation", e);
             return false;
         }
     }
@@ -229,66 +231,65 @@ public class PiperEmbeddedTTSModule
             boolean finished = process.waitFor(10, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
-                System.err.println("Timeout lors du test Piper");
+                log.error("Timeout lors du test Piper");
                 return false;
             }
 
             int exitCode = process.exitValue();
             if (exitCode == 0) {
-                System.out.println("Test Piper réussi avec modèle intégré");
+                log.info("Test Piper réussi avec modèle intégré");
                 return true;
             } else {
-                System.err.println("Erreur Piper, code de sortie: " + exitCode);
+                log.error("Erreur Piper, code de sortie: {}", exitCode);
 
                 // Read both stdout and stderr for better diagnosis
                 try (BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                      BufferedReader stderrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
 
                     String line;
-                    System.err.println("--- STDOUT ---");
+                    log.error("--- STDOUT ---");
                     while ((line = stdoutReader.readLine()) != null) {
-                        System.err.println("Piper stdout: " + line);
+                        log.error("Piper stdout: {}", line);
                     }
 
-                    System.err.println("--- STDERR ---");
+                    log.error("--- STDERR ---");
                     while ((line = stderrReader.readLine()) != null) {
-                        System.err.println("Piper stderr: " + line);
+                        log.error("Piper stderr: {}", line);
                     }
                 }
                 return false;
             }
 
         } catch (Exception e) {
-            System.err.println("Erreur lors du test Piper: " + e.getMessage());
-            e.printStackTrace(); // Add stack trace for better debugging
+            log.error("Erreur lors du test Piper", e);
             return false;
         }
     }
 
     private void debugAudioSystem() {
-        System.out.println("=== DEBUG AUDIO SYSTEM ===");
+        log.debug("=== DEBUG AUDIO SYSTEM ===");
 
         // Liste tous les mixers disponibles
         Mixer.Info[] mixers = AudioSystem.getMixerInfo();
-        System.out.println("Mixers audio disponibles:");
+        log.debug("Mixers audio disponibles:");
         for (int i = 0; i < mixers.length; i++) {
-            System.out.println(i + ": " + mixers[i].getName() + " - " + mixers[i].getDescription());
+            log.debug("{}: {} - {}", i, mixers[i].getName(), mixers[i].getDescription());
         }
 
         // Affiche le mixer utilisé par défaut
         try {
             Mixer defaultMixer = AudioSystem.getMixer(null);
-            System.out.println("Mixer par défaut: " + defaultMixer.getMixerInfo().getName());
+            log.debug("Mixer par défaut: {}", defaultMixer.getMixerInfo().getName());
 
             // Vérifie les lignes disponibles
             Line.Info[] sourceLines = defaultMixer.getSourceLineInfo();
-            System.out.println("Lignes de sortie disponibles: " + sourceLines.length);
+            log.debug("Lignes de sortie disponibles: {}", sourceLines.length);
             for (Line.Info lineInfo : sourceLines) {
-                System.out.println("- " + lineInfo);
+                log.debug("- {}", lineInfo);
             }
 
         } catch (Exception e) {
-            System.err.println("Erreur lors du debug audio: " + e.getMessage());
+            log.error("Erreur lors du debug audio", e);
         }
     }
 
@@ -311,12 +312,12 @@ public class PiperEmbeddedTTSModule
             try {
                 if (mixer != null) {
                     if (mixer.isLineSupported(info)) {
-                        System.out.println("Format supporté trouvé: " + format);
+                        log.debug("Format supporté trouvé: {}", format);
                         return format;
                     }
                 } else {
                     if (AudioSystem.isLineSupported(info)) {
-                        System.out.println("Format supporté trouvé (défaut): " + format);
+                        log.debug("Format supporté trouvé (défaut): {}", format);
                         return format;
                     }
                 }
@@ -325,7 +326,7 @@ public class PiperEmbeddedTTSModule
             }
         }
 
-        System.err.println("Aucun format audio supporté trouvé!");
+        log.error("Aucun format audio supporté trouvé!");
         return null;
     }
 
@@ -345,7 +346,7 @@ public class PiperEmbeddedTTSModule
                     DataLine.Info info = new DataLine.Info(SourceDataLine.class, audioFormat);
 
                     if (mixer.isLineSupported(info)) {
-                        System.out.println("Mixer trouvé (priorité 1): " + mixerInfo.getName());
+                        log.debug("Mixer trouvé (priorité 1): {}", mixerInfo.getName());
                         return mixer;
                     }
                 } catch (Exception e) {
@@ -363,7 +364,7 @@ public class PiperEmbeddedTTSModule
                     DataLine.Info info = new DataLine.Info(SourceDataLine.class, audioFormat);
 
                     if (mixer.isLineSupported(info)) {
-                        System.out.println("Mixer trouvé (priorité 2): " + mixerInfo.getName());
+                        log.debug("Mixer trouvé (priorité 2): {}", mixerInfo.getName());
                         return mixer;
                     }
                 } catch (Exception e) {
@@ -371,7 +372,7 @@ public class PiperEmbeddedTTSModule
                 }
             }
         }
-        System.out.println("Aucun mixer spécifique trouvé, utilisation du défaut");
+        log.info("Aucun mixer spécifique trouvé, utilisation du défaut");
         return null; // Utiliser le mixer par défaut
     }
 
@@ -385,14 +386,14 @@ public class PiperEmbeddedTTSModule
     private void setupAudioSystem() throws LineUnavailableException {
         // Version simplifiée - pas besoin de configurer une ligne persistante
         // Chaque fichier audio créera sa propre SourceDataLine
-        System.out.println("Configuration audio simplifiée - utilisation du mixer par défaut");
+        log.info("Configuration audio simplifiée - utilisation du mixer par défaut");
 
         // Test rapide pour vérifier que l'audio fonctionne
         AudioFormat testFormat = new AudioFormat(44100, 16, 2, true, false);
         DataLine.Info info = new DataLine.Info(SourceDataLine.class, testFormat);
 
         if (AudioSystem.isLineSupported(info)) {
-            System.out.println("✓ Support audio confirmé: " + testFormat);
+            log.info("✓ Support audio confirmé: {}", testFormat);
         } else {
             throw new LineUnavailableException("Format audio de base non supporté");
         }
@@ -431,7 +432,7 @@ public class PiperEmbeddedTTSModule
                 }
 
                 long endTime = System.currentTimeMillis();
-                System.out.println("TTS traité en " + (endTime - startTime) + "ms");
+                log.info("TTS traité en {}ms", (endTime - startTime));
 
                 request.markCompleted();
 
@@ -439,7 +440,7 @@ public class PiperEmbeddedTTSModule
                 Thread.currentThread().interrupt();
                 break;
             } catch (Exception e) {
-                System.err.println("Erreur lors du traitement: " + e.getMessage());
+                log.error("Erreur lors du traitement", e);
             }
         }
     }
@@ -480,15 +481,15 @@ public class PiperEmbeddedTTSModule
                 return null;
             }
             if (outputFile.exists()) {
-                System.out.println("Fichier audio généré: " + outputFile.length() + " bytes");
+                log.debug("Fichier audio généré: {} bytes", outputFile.length());
             } else {
-                System.err.println("Aucun fichier audio généré");
+                log.error("Aucun fichier audio généré");
             }
 
             return process.exitValue() == 0 && outputFile.exists() ? outputFile : null;
 
         } catch (Exception e) {
-            System.err.println("Erreur lors de la synthèse: " + e.getMessage());
+            log.error("Erreur lors de la synthèse", e);
             return null;
         }
     }
@@ -514,14 +515,14 @@ public class PiperEmbeddedTTSModule
      * Lit un fichier audio avec conversion de format si nécessaire
      */
     private void playAudioFile(File audioFile) {
-        System.out.println("=== LECTURE AUDIO SIMPLIFIÉE ===");
-        System.out.println("Fichier: " + audioFile.getAbsolutePath());
-        System.out.println("Taille: " + audioFile.length() + " bytes");
+        log.debug("=== LECTURE AUDIO SIMPLIFIÉE ===");
+        log.debug("Fichier: {}", audioFile.getAbsolutePath());
+        log.debug("Taille: {} bytes", audioFile.length());
 
         try (AudioInputStream audioStream = AudioSystem.getAudioInputStream(audioFile)) {
 
             AudioFormat audioFormat = audioStream.getFormat();
-            System.out.println("Format du fichier: " + audioFormat);
+            log.debug("Format du fichier: {}", audioFormat);
 
             // Créer DataLine.Info pour SourceDataLine (pas Clip)
             DataLine.Info info = new DataLine.Info(SourceDataLine.class, audioFormat);
@@ -531,8 +532,8 @@ public class PiperEmbeddedTTSModule
             sourceDataLine.open(audioFormat);
             sourceDataLine.start();
 
-            System.out.println("Format de la ligne: " + sourceDataLine.getFormat());
-            System.out.println("Début de la lecture...");
+            log.debug("Format de la ligne: {}", sourceDataLine.getFormat());
+            log.debug("Début de la lecture...");
 
             // Buffer pour la lecture par chunks
             byte[] buffer = new byte[4096];
@@ -547,7 +548,7 @@ public class PiperEmbeddedTTSModule
 
                 // Debug périodique
                 if (totalBytesPlayed % (buffer.length * 10) == 0) {
-                    System.out.println("Lu: " + totalBytesPlayed + " bytes");
+                    log.trace("Lu: {} bytes", totalBytesPlayed);
                 }
             }
 
@@ -556,11 +557,10 @@ public class PiperEmbeddedTTSModule
             sourceDataLine.close();
 
             long endTime = System.currentTimeMillis();
-            System.out.println("Audio terminé. Total: " + totalBytesPlayed + " bytes en " + (endTime - startTime) + "ms");
+            log.debug("Audio terminé. Total: {} bytes en {}ms", totalBytesPlayed, (endTime - startTime));
 
         } catch (Exception e) {
-            System.err.println("Erreur lors de la lecture audio: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Erreur lors de la lecture audio", e);
         }
     }
 
@@ -577,7 +577,7 @@ public class PiperEmbeddedTTSModule
             this.extractedModelPath = newModelPath;
 
             if (testPiperConnection()) {
-                System.out.println("Modèle changé vers: " + newModel.getDescription());
+                log.info("Modèle changé vers: {}", newModel.getDescription());
 
                 // Nettoyage de l'ancien modèle
                 try {
@@ -595,7 +595,7 @@ public class PiperEmbeddedTTSModule
             }
 
         } catch (Exception e) {
-            System.err.println("Erreur lors du changement de modèle: " + e.getMessage());
+            log.error("Erreur lors du changement de modèle", e);
             return false;
         }
     }
@@ -646,7 +646,7 @@ public class PiperEmbeddedTTSModule
         try {
             speakAsync(text).get();
         } catch (Exception e) {
-            System.err.println("Erreur lors de la synthèse: " + e.getMessage());
+            log.error("Erreur lors de la synthèse", e);
         }
     }
 
@@ -697,7 +697,7 @@ public class PiperEmbeddedTTSModule
         }
 
         cleanup();
-        System.out.println("Module TTS fermé");
+        log.info("Module TTS fermé");
     }
 
     /**
@@ -731,7 +731,7 @@ public class PiperEmbeddedTTSModule
 
     public void startSpeakandStop(String text) {
         List<EmbeddedModel> available = getAvailableModels();
-        System.out.println("Modèles intégrés trouvés: " + available.size());
+        log.info("Modèles intégrés trouvés: {}", available.size());
         this.initialize();
         this.speak(text);
         //this.shutdown();
@@ -789,26 +789,30 @@ public class PiperEmbeddedTTSModule
      * Exemple d'utilisation
      */
     public static void main(String[] args) {
-        System.out.println("=== Module TTS Piper avec modèles intégrés ===");
+        // Configure basic logging for the main method to see the output
+        // In a real Spring application, this would be handled by the logging configuration
+        org.slf4j.Logger mainLog = org.slf4j.LoggerFactory.getLogger(PiperEmbeddedTTSModule.class);
+
+        mainLog.info("=== Module TTS Piper avec modèles intégrés ===");
 
         // Vérification des modèles disponibles
         List<EmbeddedModel> available = getAvailableModels();
-        System.out.println("Modèles intégrés trouvés: " + available.size());
+        mainLog.info("Modèles intégrés trouvés: {}", available.size());
 
         if (available.isEmpty()) {
-            System.err.println("Aucun modèle trouvé dans les ressources!");
-            System.err.println("Assurez-vous d'avoir inclus les fichiers .onnx dans src/main/resources/models/");
+            mainLog.error("Aucun modèle trouvé dans les ressources!");
+            mainLog.error("Assurez-vous d'avoir inclus les fichiers .onnx dans src/main/resources/models/");
             return;
         }
 
         // Utilisation du premier modèle disponible
         EmbeddedModel selectedModel = available.get(0);
-        System.out.println("Utilisation du modèle: " + selectedModel.getDescription());
+        mainLog.info("Utilisation du modèle: {}", selectedModel.getDescription());
 
         PiperEmbeddedTTSModule tts = new PiperEmbeddedTTSModule(selectedModel);
 
         if (!tts.initialize()) {
-            System.err.println("Impossible d'initialiser le module TTS");
+            mainLog.error("Impossible d'initialiser le module TTS");
             return;
         }
 
@@ -819,7 +823,7 @@ public class PiperEmbeddedTTSModule
 
             // Test de changement de modèle
             if (available.size() > 1) {
-                System.out.println("Test de changement de modèle...");
+                mainLog.info("Test de changement de modèle...");
                 if (tts.switchModel(available.get(1))) {
                     tts.speak("Nouveau modèle de voix activé avec succès.");
                 }
@@ -829,10 +833,10 @@ public class PiperEmbeddedTTSModule
             tts.setSpeechRate(1.2f);
             tts.speak("Voici un test avec une vitesse plus rapide.");
 
-            System.out.println("Tests terminés avec succès!");
+            mainLog.info("Tests terminés avec succès!");
 
         } catch (Exception e) {
-            e.printStackTrace();
+            mainLog.error("Erreur dans le main", e);
         } finally {
             tts.shutdown();
         }

@@ -1,10 +1,13 @@
 package IO.InputHandling;
 
+import lombok.extern.slf4j.Slf4j;
+
 import javax.sound.sampled.TargetDataLine;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.CompletableFuture;
 
+@Slf4j
 public class AudioForwarder extends Thread {
     private TargetDataLine microphone;
     private SpeechToText speechToText;
@@ -72,7 +75,7 @@ public class AudioForwarder extends Thread {
         }
 
         double rms = Math.sqrt((double) sum / sampleCount);
-        System.out.println("RMS: " + rms);
+        log.debug("RMS: {}", rms);
         return rms < SILENCE_THRESHOLD;
     }
 
@@ -81,7 +84,7 @@ public class AudioForwarder extends Thread {
         ByteBuffer audioBuffer = ByteBuffer.allocate(FRAME_SIZE);
         audioBuffer.order(ByteOrder.LITTLE_ENDIAN);
 
-        System.out.println("Started listening for speech with WhisperJNI...");
+        log.info("Started listening for speech with WhisperJNI...");
 
         try {
             while (this.isForwarding) {
@@ -93,13 +96,13 @@ public class AudioForwarder extends Thread {
 
                     // Check for silence
                     boolean isSilent = isSilence(audioData);
-                    System.out.println("SpeechToText isSilent: " + isSilent);
+                    log.debug("SpeechToText isSilent: {}", isSilent);
 
                     if (!isSilent) {
                         this.lastSoundTime = System.currentTimeMillis();
                         if (!this.hasDetectedSpeech) {
                             this.hasDetectedSpeech = true;
-                            System.out.println("Speech detected, starting transcription...");
+                            log.info("Speech detected, starting transcription...");
                         }
                     }
 
@@ -110,7 +113,7 @@ public class AudioForwarder extends Thread {
                     if (this.hasDetectedSpeech && isSilent) {
                         long silenceDuration = System.currentTimeMillis() - this.lastSoundTime;
                         if (silenceDuration >= SILENCE_DURATION_MS) {
-                            System.out.println("Detected " + SILENCE_DURATION_MS + "ms of silence, processing transcription...");
+                            log.info("Detected {}ms of silence, processing transcription...", SILENCE_DURATION_MS);
                             break;
                         }
                     }
@@ -118,7 +121,7 @@ public class AudioForwarder extends Thread {
                     // Safety timeout : don't record for more than 30 seconds
                     long totalRecordingTime = System.currentTimeMillis() - this.recordingStartTime;
                     if (totalRecordingTime > 30000) {
-                        System.out.println("Maximum recording time reached (30s), processing transcription...");
+                        log.info("Maximum recording time reached (30s), processing transcription...");
                         break;
                     }
 
@@ -128,10 +131,10 @@ public class AudioForwarder extends Thread {
                 }
             }
         } catch (InterruptedException e) {
-            System.out.println("Audio forwarding interrupted");
+            log.info("Audio forwarding interrupted");
+            Thread.currentThread().interrupt();
         } catch (Exception e) {
-            System.err.println("Error in audio forwarding: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error in audio forwarding", e);
         } finally {
             processTranscription();
         }
@@ -143,18 +146,18 @@ public class AudioForwarder extends Thread {
 
             // Check if we have enough audio for transcription
             if (this.speechToText.hasMinimumAudio()) {
-                System.out.println("Processing " + this.speechToText.getBufferedAudioDurationMs() + "ms of audio...");
+                log.info("Processing {}ms of audio...", this.speechToText.getBufferedAudioDurationMs());
                 transcription = this.speechToText.getTranscription();
             } else {
-                System.out.println("Not enough audio data for transcription (" +
-                        this.speechToText.getBufferedAudioDurationMs() + "ms < " +
-                        this.speechToText.getMinimumAudioDurationMs() + "ms)");
+                log.info("Not enough audio data for transcription ({}ms < {}ms)",
+                        this.speechToText.getBufferedAudioDurationMs(),
+                        this.speechToText.getMinimumAudioDurationMs());
             }
 
             if (!transcription.isEmpty()) {
-                System.out.println("Whisper transcription: \"" + transcription + "\"");
+                log.info("Whisper transcription: \"{}\"", transcription);
             } else {
-                System.out.println("No speech detected or transcription failed");
+                log.info("No speech detected or transcription failed");
             }
 
             this.isForwarding = false;
@@ -163,8 +166,7 @@ public class AudioForwarder extends Thread {
             }
 
         } catch (Exception e) {
-            System.err.println("Error during transcription processing: " + e.getMessage());
-            e.printStackTrace();
+            log.error("Error during transcription processing", e);
 
             this.isForwarding = false;
             if (this.messageCompleteFuture != null) {

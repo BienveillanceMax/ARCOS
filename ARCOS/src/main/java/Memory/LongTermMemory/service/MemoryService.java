@@ -10,6 +10,7 @@ import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
@@ -19,7 +20,7 @@ import java.util.function.Function;
  * Service principal pour la gestion de la mémoire à long terme.
  * Orchestre les interactions entre le client Qdrant et le générateur d'embeddings.
  */
-
+@Slf4j
 public class MemoryService
 {
 
@@ -55,9 +56,9 @@ public class MemoryService
 
         // Log du type d'embedding utilisé
         if (embeddingService.isMistralAvailable()) {
-            System.out.println("Utilisation des embeddings Mistral AI (haute qualité sémantique)");
+            log.info("Utilisation des embeddings Mistral AI (haute qualité sémantique)");
         } else {
-            System.out.println("Utilisation des embeddings mock (développement/test)");
+            log.info("Utilisation des embeddings mock (développement/test)");
         }
     }
 
@@ -73,10 +74,10 @@ public class MemoryService
         boolean desiresOk = initializeCollection(DESIRES_COLLECTION);
 
         if (memoriesOk && summariesOk && opinionsOk && desiresOk) {
-            System.out.println("Toutes les collections ont été initialisées avec succès");
+            log.info("Toutes les collections ont été initialisées avec succès");
             return true;
         } else {
-            System.out.println("Échec de l'initialisation d'une ou plusieurs collections");
+            log.error("Échec de l'initialisation d'une ou plusieurs collections");
             return false;
         }
     }
@@ -146,7 +147,7 @@ public class MemoryService
             return qdrantClient.upsertPoint(collectionName, entry);
 
         } catch (Exception e) {
-            System.out.println("Erreur de persistance de la collection " + collectionName);
+            log.error("Erreur de persistance de la collection {}", collectionName, e);
             return false;
         }
     }
@@ -212,7 +213,7 @@ public class MemoryService
             return qdrantClient.search(collectionName, queryEmbedding, topK, parser);
 
         } catch (Exception e) {
-            System.out.println("Exception lors de la recherche dans la collection " + collectionName + " : " + e.getMessage());
+            log.error("Exception lors de la recherche dans la collection {} : {}", collectionName, e.getMessage(), e);
             return List.of();
         }
     }
