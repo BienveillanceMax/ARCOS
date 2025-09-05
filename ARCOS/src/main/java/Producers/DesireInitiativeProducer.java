@@ -6,12 +6,15 @@ import EventBus.Events.EventPriority;
 import EventBus.Events.EventType;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.service.MemoryService;
+import com.google.type.DateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Component
@@ -48,7 +51,10 @@ public class DesireInitiativeProducer {
     private boolean isGoodMomentToInitiate(DesireEntry desire) {
         // Placeholder for modular logic to determine the right moment.
         // This can be expanded to check for user presence, conversation state, etc.
-        // For now, we assume it's always a good moment.
+
+        if (LocalTime.now().isAfter(LocalTime.MIDNIGHT) && LocalTime.now().isBefore(LocalTime.of(9,0))) {
+            return false;
+        }
         return true;
     }
 

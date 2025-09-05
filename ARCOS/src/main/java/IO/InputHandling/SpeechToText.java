@@ -126,7 +126,7 @@ public class SpeechToText {
                 }
             }
 
-            return transcription.toString().trim();
+            return cleanTranscript(transcription.toString().trim());
 
         } catch (Exception e) {
             log.error("Error during Whisper transcription", e);
@@ -134,9 +134,10 @@ public class SpeechToText {
         }
     }
 
-    private static String cleanTranscript(String transcript) {
+    private String cleanTranscript(String transcript) {
         if (transcript == null) return null;
-        return transcript.replace("[Sous-titres réalisés par la communauté d'Amara.org]", "").trim();
+        // Supprime tout ce qui est entre crochets [ ... ]
+        return transcript.replaceAll("\\[.*?\\]", "").trim();
     }
 
     /**

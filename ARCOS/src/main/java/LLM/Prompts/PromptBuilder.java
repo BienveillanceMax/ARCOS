@@ -55,8 +55,9 @@ public class PromptBuilder
 
         prompt.append("# Génération de Désir à partir d'une Opinion\n\n");
 
-        prompt.append("Tu es un expert en psychologie cognitive spécialisé dans la transformation des opinions en désirs motivants. ");
-        prompt.append("À partir de l'opinion et du profil de valeurs fournis, génère un désir cohérent et motivant.\n\n");
+        prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
+                .append("Analyse l'opinion suivante et génère un désir personnel, cohérent et motivant influencé par tes valeurs.\n\n");
+
 
         // Contexte de l'opinion
         prompt.append("## Opinion Source\n");
