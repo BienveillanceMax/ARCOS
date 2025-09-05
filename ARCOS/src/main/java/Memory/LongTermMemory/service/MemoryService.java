@@ -4,6 +4,7 @@ package Memory.LongTermMemory.service;
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.*;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
@@ -40,19 +41,21 @@ public class MemoryService
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
     private final LLMResponseParser llmResponseParser;
+    private final LLMService llmService;
 
     private final int embeddingDimension;
 
     /**
      * Constructeur principal du service de mémoire.
      */
-    public MemoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+    public MemoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser, LLMService llmService) {
         this.embeddingDimension = embeddingService.getEmbeddingDimension();
         this.qdrantClient = qdrantClient;
         this.embeddingService = embeddingService;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
         this.llmResponseParser = llmResponseParser;
+        this.llmService = llmService;
 
         // Log du type d'embedding utilisé
         if (embeddingService.isMistralAvailable()) {
@@ -285,8 +288,13 @@ public class MemoryService
     }
 
     public MemoryEntry memorizeConversation(String conversation) throws ResponseParsingException {
-
-        MemoryEntry memoryEntry = llmResponseParser.parseMemoryFromMistralResponse(llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation)));
+        String prompt = promptBuilder.buildMemoryPrompt(conversation);
+        MemoryEntry memoryEntry = llmService.generateAndParse(
+            llmClient::generateMemoryResponse,
+            prompt,
+            llmResponseParser::parseMemoryFromMistralResponse,
+            3
+        );
         memoryEntry.setEmbedding(embeddingService.generateEmbedding(memoryEntry.getContent()));
         storeMemory(memoryEntry);
         return memoryEntry;

@@ -6,6 +6,7 @@ import EventBus.Events.EventType;
 import Exceptions.ResponseParsingException;
 import IO.OuputHandling.TTSHandler;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import Memory.LongTermMemory.Models.DesireEntry;
 import LLM.LLMClient;
 import Memory.ConversationContext;
@@ -31,9 +32,10 @@ public class Orchestrator
     private final ConversationContext context;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
+    private final LLMService llmService;
 
     @Autowired
-    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
+    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, LLMService llmService) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -42,6 +44,7 @@ public class Orchestrator
         this.context = context;
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
+        this.llmService = llmService;
     }
 
 
@@ -91,21 +94,24 @@ public class Orchestrator
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
         log.debug("Planning prompt:\n{}", planningPrompt);
 
-        // 2. Appel à Mistral pour planification
-        String planningResponse = llmClient.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
-        log.debug("Planning response:\n{}", planningResponse);
-
-        // 3. Parsing avec retry spécifique Mistral
-        ExecutionPlan plan = null;
+        // 2. Appel au LLM et parsing avec retry
+        ExecutionPlan plan;
         try {
-            plan = responseParser.parseWithMistralRetry(planningResponse, 3);
+            plan = llmService.generateAndParse(
+                llmClient::generatePlanningResponse,
+                planningPrompt,
+                responseParser::parseExecutionPlan,
+                3
+            );
         } catch (ResponseParsingException e) {
-            log.error("Error parsing planning response", e);
-            throw new RuntimeException(e);
+            log.error("Failed to generate and parse execution plan after multiple retries.", e);
+            // Graceful exit: formulate a response indicating the failure
+            return "Je suis désolé, je n'ai pas réussi à traiter votre demande. Veuillez réessayer plus tard.";
         }
 
+
         // 4. Exécution des actions
-        Map<String, ActionResult> results = actionExecutor.executeActions(plan);    //TODO
+        Map<String, ActionResult> results = actionExecutor.executeActions(plan);
         log.debug("Action execution results: {}", results);
 
         // 5. Prompt de formulation

@@ -2,6 +2,7 @@ package Orchestrator;
 
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.ActionResult;
@@ -16,6 +17,7 @@ import Personality.Opinions.OpinionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import Exceptions.ResponseParsingException;
 
 import java.util.List;
 import java.util.Map;
@@ -32,9 +34,10 @@ public class InitiativeService {
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
     private final PromptBuilder promptBuilder;
+    private final LLMService llmService;
 
     @Autowired
-    public InitiativeService(MemoryService memoryService, OpinionService opinionService, ActionRegistry actionRegistry, LLMClient llmClient, LLMResponseParser responseParser, ActionExecutor actionExecutor, PromptBuilder promptBuilder) {
+    public InitiativeService(MemoryService memoryService, OpinionService opinionService, ActionRegistry actionRegistry, LLMClient llmClient, LLMResponseParser responseParser, ActionExecutor actionExecutor, PromptBuilder promptBuilder, LLMService llmService) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;
         this.actionRegistry = actionRegistry;
@@ -42,6 +45,7 @@ public class InitiativeService {
         this.responseParser = responseParser;
         this.actionExecutor = actionExecutor;
         this.promptBuilder = promptBuilder;
+        this.llmService = llmService;
     }
 
     public void processInitiative(DesireEntry desire) {
@@ -60,8 +64,19 @@ public class InitiativeService {
             // 2. Transform desire into a plan
             log.info("Step 2: Transforming desire into a plan...");
             String prompt = promptBuilder.buildInitiativePlanningPrompt(desire, memories, opinions);
-            String planningResponse = llmClient.generatePlanningResponse(prompt);
-            ExecutionPlan plan = responseParser.parseWithMistralRetry(planningResponse, 3);
+            ExecutionPlan plan;
+            try {
+                plan = llmService.generateAndParse(
+                    llmClient::generatePlanningResponse,
+                    prompt,
+                    responseParser::parseExecutionPlan,
+                    3
+                );
+            } catch (ResponseParsingException e) {
+                log.error("Failed to generate and parse initiative plan after multiple retries.", e);
+                desire.setStatus(DesireEntry.Status.PENDING); // Revert to PENDING on failure
+                return;
+            }
             log.info("Plan received from LLM: {}", plan.getReasoning());
 
 

@@ -62,26 +62,6 @@ public class LLMResponseParser
         }
     }
 
-    /**
-     * Parse la réponse du LLM avec retry automatique
-     */
-    public ExecutionPlan parseExecutionPlanWithRetry(String llmResponse, int maxRetries) throws ResponseParsingException {
-        ResponseParsingException lastException = null;
-
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                return parseExecutionPlan(llmResponse);
-            } catch (ResponseParsingException e) {
-                lastException = e;
-                if (attempt < maxRetries) {
-                    // Log de l'erreur pour debugging
-                    System.err.println("Tentative " + attempt + " échouée: " + e.getMessage());
-                }
-            }
-        }
-
-        throw new ResponseParsingException("Échec du parsing après " + maxRetries + " tentatives", lastException);
-    }
 
     /**
      * Nettoie la réponse du LLM pour extraire le JSON
@@ -228,36 +208,6 @@ public class LLMResponseParser
     }
 
 
-    public ExecutionPlan parseWithMistralRetry(String llmResponse, int maxRetries) throws ResponseParsingException {
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                return parseExecutionPlan(llmResponse);
-            } catch (ResponseParsingException e) {
-                if (attempt == maxRetries) {
-                    // Fallback spécial pour Mistral
-                    return createFallbackPlan(llmResponse);
-                }
-
-                // Log l'erreur et retry avec prompt modifié
-                System.err.println("Mistral parsing failed, attempt " + attempt + ": " + e.getMessage());
-            }
-        }
-
-        throw new ResponseParsingException("Failed after " + maxRetries + " attempts");
-    }
-
-
-    //todo update
-    private ExecutionPlan createFallbackPlan(String originalResponse) {
-        // Plan de secours si Mistral ne respecte pas le format JSON
-        ExecutionPlan fallback = new ExecutionPlan();
-        fallback.setReasoning("Réponse directe - format JSON non respecté");
-        fallback.setActions(List.of(
-                new ExecutionPlan.PlannedAction("Répondre",
-                        Map.of("content", originalResponse))
-        ));
-        return fallback;
-    }
 
 /// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Opinion parsing

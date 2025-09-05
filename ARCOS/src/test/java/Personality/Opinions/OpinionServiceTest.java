@@ -2,6 +2,7 @@ package Personality.Opinions;
 
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -14,12 +15,14 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import Exceptions.ResponseParsingException;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -43,6 +46,9 @@ class OpinionServiceTest {
     @Mock
     private LLMResponseParser llmResponseParser;
 
+    @Mock
+    private LLMService llmService;
+
     @InjectMocks
     private OpinionService opinionService;
 
@@ -63,8 +69,7 @@ class OpinionServiceTest {
         opinionEntry.setMainDimension(DimensionSchwartz.OPENNESS_TO_CHANGE);
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn("prompt");
-        when(llmClient.generateOpinionResponse(anyString())).thenReturn("response");
-        when(llmResponseParser.parseOpinionFromResponse(anyString(), any(MemoryEntry.class))).thenReturn(opinionEntry);
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenReturn(opinionEntry);
         when(memoryService.searchOpinions(anyString())).thenReturn(new ArrayList<>());
         when(valueProfile.averageByDimension(any(DimensionSchwartz.class))).thenReturn(60.0);
 
@@ -101,8 +106,7 @@ class OpinionServiceTest {
         List<SearchResult<OpinionEntry>> searchResults = Collections.singletonList(searchResult);
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn("prompt");
-        when(llmClient.generateOpinionResponse(anyString())).thenReturn("response");
-        when(llmResponseParser.parseOpinionFromResponse(anyString(), any(MemoryEntry.class))).thenReturn(newOpinionEntry);
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenReturn(newOpinionEntry);
         when(memoryService.searchOpinions(anyString())).thenReturn(searchResults);
         when(valueProfile.averageByDimension()).thenReturn(new EnumMap<>(Map.of(DimensionSchwartz.OPENNESS_TO_CHANGE, 70.0)));
         when(valueProfile.averageByDimension(DimensionSchwartz.OPENNESS_TO_CHANGE)).thenReturn(70.0);
@@ -127,8 +131,7 @@ class OpinionServiceTest {
         memoryEntry.setContent("Test content");
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn("prompt");
-        when(llmClient.generateOpinionResponse(anyString())).thenReturn("response");
-        when(llmResponseParser.parseOpinionFromResponse(anyString(), any(MemoryEntry.class))).thenThrow(new RuntimeException("LLM parsing failed"));
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenThrow(new ResponseParsingException("LLM parsing failed"));
 
         // Act
         List<OpinionEntry> result = opinionService.processInteraction(memoryEntry);

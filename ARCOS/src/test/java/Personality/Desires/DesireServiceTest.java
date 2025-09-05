@@ -3,6 +3,7 @@ package Personality.Desires;
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -15,6 +16,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import Personality.Values.Entities.DimensionSchwartz;
+
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -43,6 +46,9 @@ class DesireServiceTest {
     @Mock
     private LLMResponseParser llmResponseParser;
 
+    @Mock
+    private LLMService llmService;
+
     @InjectMocks
     private DesireService desireService;
 
@@ -62,8 +68,7 @@ class DesireServiceTest {
 
         when(valueProfile.averageByDimension(any(DimensionSchwartz.class))).thenReturn(80.0);
         when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn("prompt");
-        when(llmClient.generateDesireResponse(anyString())).thenReturn("response");
-        when(llmResponseParser.parseDesireFromResponse(anyString(), any())).thenReturn(new DesireEntry());
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenReturn(new DesireEntry());
 
         // Act
         desireService.processOpinion(opinionEntry);
@@ -119,8 +124,7 @@ class DesireServiceTest {
 
         when(valueProfile.averageByDimension(any(DimensionSchwartz.class))).thenReturn(80.0);
         when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn("prompt");
-        when(llmClient.generateDesireResponse(anyString())).thenReturn("response");
-        when(llmResponseParser.parseDesireFromResponse(anyString(), any())).thenThrow(new ResponseParsingException("parsing failed"));
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenThrow(new ResponseParsingException("parsing failed"));
 
         // Act & Assert
         // The code is designed to catch the parsing exception and return null after retries.

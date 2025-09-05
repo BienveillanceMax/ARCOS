@@ -7,6 +7,7 @@ import Exceptions.ResponseParsingException;
 import IO.OuputHandling.TTSHandler;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.Actions.Entities.ActionResult;
 import Memory.ConversationContext;
@@ -56,6 +57,9 @@ public class OrchestratorTests{
 
     @Mock
     private TTSHandler ttsHandler;
+
+    @Mock
+    private LLMService llmService;
 
     @InjectMocks
     private Orchestrator orchestrator;
@@ -121,4 +125,3 @@ public class OrchestratorTests{
         assertEquals(DesireEntry.Status.PENDING, desireCaptor.getValue().getStatus());
     }
 }
-

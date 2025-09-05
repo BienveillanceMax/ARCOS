@@ -2,6 +2,7 @@ package Orchestrator;
 
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.ActionResult;
@@ -18,10 +19,12 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import Exceptions.ResponseParsingException;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,6 +55,9 @@ public class InitiativeServiceTest {
     @Mock
     private PromptBuilder promptBuilder;
 
+    @Mock
+    private LLMService llmService;
+
     @InjectMocks
     private InitiativeService initiativeService;
 
@@ -75,8 +81,7 @@ public class InitiativeServiceTest {
         when(memoryService.searchMemories(anyString(), anyInt())).thenReturn(Collections.emptyList());
         when(memoryService.searchOpinions(anyString(), anyInt())).thenReturn(Collections.emptyList());
         when(promptBuilder.buildInitiativePlanningPrompt(any(DesireEntry.class), any(List.class), any(List.class))).thenReturn("prompt");
-        when(llmClient.generatePlanningResponse(anyString())).thenReturn("llm-response");
-        when(responseParser.parseWithMistralRetry(anyString(), anyInt())).thenReturn(mockPlan);
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenReturn(mockPlan);
         when(actionExecutor.executeActions(any(ExecutionPlan.class))).thenReturn(Collections.singletonMap("action1", successResult));
 
         // Act
@@ -105,8 +110,7 @@ public class InitiativeServiceTest {
         when(memoryService.searchMemories(anyString(), anyInt())).thenReturn(Collections.emptyList());
         when(memoryService.searchOpinions(anyString(), anyInt())).thenReturn(Collections.emptyList());
         when(promptBuilder.buildInitiativePlanningPrompt(any(DesireEntry.class), any(List.class), any(List.class))).thenReturn("prompt");
-        when(llmClient.generatePlanningResponse(anyString())).thenReturn("llm-response");
-        when(responseParser.parseWithMistralRetry(anyString(), anyInt())).thenReturn(mockPlan);
+        when(llmService.generateAndParse(any(Function.class), anyString(), any(Function.class), anyInt())).thenReturn(mockPlan);
         when(actionExecutor.executeActions(any(ExecutionPlan.class))).thenReturn(Collections.singletonMap("action1", failureResult));
 
         // Act

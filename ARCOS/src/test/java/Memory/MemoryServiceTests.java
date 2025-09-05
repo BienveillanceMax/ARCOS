@@ -1,5 +1,6 @@
 package Memory;
 
+import LLM.LLMService;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Memory.LongTermMemory.service.EmbeddingService;
@@ -42,13 +43,16 @@ public class MemoryServiceTests
     @Mock
     private LLMResponseParser llmResponseParser;
 
+    @Mock
+    private LLMService llmService;
+
     private MemoryService memoryService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         // Manual instantiation with mocks after openMocks()
-        memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);
+        memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser, llmService);
     }
 
     @Test
@@ -76,4 +80,3 @@ public class MemoryServiceTests
         assertEquals("PENDING", value);
     }
 }
-

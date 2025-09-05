@@ -3,6 +3,7 @@ package Personality.Desires;
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -23,16 +24,18 @@ public class DesireService
     private final MemoryService memoryService;
     private final LLMClient llmClient;
     private final LLMResponseParser llmResponseParser;
+    private final LLMService llmService;
     public static final double D_CREATE_THRESHOLD = 0.5;
     public static final double D_UPDATE_THRESHOLD = 0.2;
 
     @Autowired
-    public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
+    public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser, LLMService llmService) {
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
         this.memoryService = memoryService;
         this.llmClient = llmClient;
         this.llmResponseParser = llmResponseParser;
+        this.llmService = llmService;
     }
 
     public DesireEntry processOpinion(OpinionEntry opinionEntry) {
@@ -71,19 +74,30 @@ public class DesireService
 
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) {
         String prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
-        DesireEntry createdDesire;
-
-        int retries = 3;            //bit of a magic number, todo move retry logic to orchestator
-        for(int i = 0; i < retries; i++) {
-            try {
-                createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
-                return createdDesire;
-            } catch (ResponseParsingException e) {
-                log.error("Error parsing desire from response", e);
+        try {
+            return llmService.generateAndParse(
+                llmClient::generateDesireResponse,
+                prompt,
+                llmResponse -> {
+                    try {
+                        return llmResponseParser.parseDesireFromResponse(llmResponse, opinionEntry.getId());
+                    } catch (ResponseParsingException e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                3
+            );
+        } catch (ResponseParsingException e) {
+            log.error("Failed to generate and parse desire after multiple retries.", e);
+            return null;
+        } catch (RuntimeException e) {
+            if (e.getCause() instanceof ResponseParsingException) {
+                log.error("Failed to parse desire after multiple retries.", e.getCause());
+            } else {
+                log.error("An unexpected error occurred during desire generation.", e);
             }
-
+            return null;
         }
-        return null;
     }
 
 
@@ -140,7 +154,3 @@ public class DesireService
 
 
 }
-
-
-
-

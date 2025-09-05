@@ -14,6 +14,7 @@
 /app/ARCOS/src/main/java/IO/OuputHandling/TTSHandler.java
 /app/ARCOS/src/main/java/LLM/LLMClient.java
 /app/ARCOS/src/main/java/LLM/LLMResponseParser.java
+/app/ARCOS/src/main/java/LLM/LLMService.java
 /app/ARCOS/src/main/java/LLM/Prompts/PromptBuilder.java
 /app/ARCOS/src/main/java/Memory/Actions/ActionRegistry.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/ActionResult.java

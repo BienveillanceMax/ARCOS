@@ -2,6 +2,7 @@ package Personality.Opinions;
 
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
+import LLM.LLMService;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -11,6 +12,7 @@ import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.ValueProfile;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import Exceptions.ResponseParsingException;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -29,6 +31,7 @@ public class OpinionService
     private final MemoryService memoryService;
     private final LLMClient llmClient;
     private final LLMResponseParser llmResponseParser;
+    private final LLMService llmService;
 
 
     // ---- Hyperparamètres ----
@@ -52,12 +55,13 @@ public class OpinionService
     private static final double RHO_NETWORK = 0.25; // poids du réseau dans expEffective
 
 
-    public OpinionService(LLMResponseParser llmResponseParser, LLMClient llmClient, MemoryService memoryService, PromptBuilder promptBuilder, ValueProfile valueProfile) {
+    public OpinionService(LLMResponseParser llmResponseParser, LLMClient llmClient, MemoryService memoryService, PromptBuilder promptBuilder, ValueProfile valueProfile, LLMService llmService) {
         this.llmResponseParser = llmResponseParser;
         this.llmClient = llmClient;
         this.memoryService = memoryService;
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
+        this.llmService = llmService;
     }
 
 
@@ -86,17 +90,33 @@ public class OpinionService
      * @return Une OpinionEntry avec les champs verbeux remplis
      */
     private OpinionEntry getOpinionFromMemoryEntry(MemoryEntry memoryEntry) {
-        //gotta make a call, build a new prompt and parse the return
-
-        OpinionEntry opinionEntry;
         String prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
-            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry);
-        } catch (Exception e) {
-            log.error("Erreur de parsing d'opinion", e);
+            return llmService.generateAndParse(
+                llmClient::generateOpinionResponse,
+                prompt,
+                llmResponse -> {
+                    try {
+                        return llmResponseParser.parseOpinionFromResponse(llmResponse, memoryEntry);
+                    } catch (ResponseParsingException e) {
+                        // This re-throwing is necessary to make the lambda compatible with the generic method signature
+                        throw new RuntimeException(e);
+                    }
+                },
+                3
+            );
+        } catch (ResponseParsingException e) {
+            log.error("Failed to generate and parse opinion after multiple retries.", e);
+            return null; // Graceful exit
+        } catch (RuntimeException e) {
+            // This catches the re-thrown exception from the lambda
+            if (e.getCause() instanceof ResponseParsingException) {
+                 log.error("Failed to parse opinion after multiple retries.", e.getCause());
+            } else {
+                log.error("An unexpected error occurred during opinion generation.", e);
+            }
             return null;
         }
-        return opinionEntry;
     }
 
     /**
