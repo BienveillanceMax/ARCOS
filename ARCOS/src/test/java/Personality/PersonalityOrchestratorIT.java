@@ -78,7 +78,7 @@ public class PersonalityOrchestratorIT {
                 "MISTRAL_API_KEY environment variable not set. Skipping integration test.");
 
         // Bottom-up instantiation
-        actionRegistry = new ActionRegistry();
+        actionRegistry = new ActionRegistry(new Tools.PythonTool.PythonExecutor());
         valueProfile = new ValueProfile();
         llmResponseParser = new LLMResponseParser(actionRegistry);
         promptBuilder = new PromptBuilder(actionRegistry, valueProfile);
