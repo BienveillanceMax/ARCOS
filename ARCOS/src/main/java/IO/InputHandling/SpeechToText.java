@@ -133,6 +133,11 @@ public class SpeechToText {
         }
     }
 
+    private static String cleanTranscript(String transcript) {
+        if (transcript == null) return null;
+        return transcript.replace("[Sous-titres réalisés par la communauté d'Amara.org]", "").trim();
+    }
+
     /**
      * Convert 16-bit PCM byte array to float samples
      * Whisper expects float samples in range [-1.0, 1.0]

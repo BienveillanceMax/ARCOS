@@ -21,9 +21,11 @@ public class ArcosApplication
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
 
 
+        Orchestrator orchestrator = context.getBean(Orchestrator.class);
+        orchestrator.start();
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
-        WakeWordProducer.showAudioDevices();
+
         //WakeWordProducer.showAudioDevices();
 
         //EventQueue queue = context.getBean(EventQueue.class);
