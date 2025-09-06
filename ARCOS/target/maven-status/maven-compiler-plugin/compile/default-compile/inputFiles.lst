@@ -48,5 +48,6 @@
 /app/ARCOS/src/main/java/Producers/DesireInitiativeProducer.java
 /app/ARCOS/src/main/java/Producers/SpeechToTextProducer.java
 /app/ARCOS/src/main/java/Producers/WakeWordProducer.java
+/app/ARCOS/src/main/java/Tools/PythonTool/PythonExecutor.java
 /app/ARCOS/src/main/java/Tools/SearchTool/BraveSearchService.java
 /app/ARCOS/src/main/java/org/arcos/ArcosApplication.java

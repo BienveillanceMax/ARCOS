@@ -35,8 +35,8 @@ public class BraveSearchService {
     private final ObjectMapper objectMapper;
     private final String apiKey;
 
-    public BraveSearchService(String apiKey) {
-        this.apiKey = apiKey;
+    public BraveSearchService() {
+        this.apiKey = System.getenv("BRAVE_SEARCH_API_KEY");
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .build();
