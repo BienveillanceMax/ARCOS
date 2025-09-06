@@ -4,12 +4,18 @@ import Memory.Actions.Entities.Actions.Action;
 import Memory.Actions.Entities.Actions.DefaultAction;
 import Memory.Actions.Entities.Actions.SearchAction;
 import Memory.Actions.Entities.Actions.TimeAction;
+import Memory.Actions.Entities.Actions.DeepSearchAction;
+import Memory.Actions.Entities.Actions.ListCalendarEventsAction;
 import Orchestrator.Entities.Parameter;
+import Tools.CalendarTool.CalendarService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import Tools.SearchTool.BraveSearchService;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,10 +24,17 @@ import java.util.Map;
 public class ActionRegistry {
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final BraveSearchService braveSearchService;
+    private final CalendarService calendarService;
 
-    public ActionRegistry() {
+    @Autowired
+    public ActionRegistry(BraveSearchService braveSearchService, CalendarService calendarService) {
+        this.braveSearchService = braveSearchService;
+        this.calendarService = calendarService;
         //registerAction("Parler", new RespondAction()); As of now of little use and not implemented (the speaking execution part, the rest is fine)
-        registerAction("Rechercher sur internet", new SearchAction());
+        registerAction("Rechercher sur internet", new SearchAction(braveSearchService));
+        registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
+        registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
         registerAction("Action par défaut", new DefaultAction());
         registerAction("Accéder à la date et l'heure", new TimeAction());
     }

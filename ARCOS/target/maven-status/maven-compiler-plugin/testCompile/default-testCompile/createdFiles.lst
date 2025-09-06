@@ -1,6 +1,7 @@
 Producers/DesireInitiativeProducerTest.class
 Personality/Values/ValueProfileTest.class
 Personality/Desires/DesireServiceTest.class
+Memory/Actions/DeepSearchActionTest.class
 Orchestrator/InitiativeServiceTest.class
 Memory/MemoryServiceTests.class
 Personality/PersonalityOrchestratorIT.class

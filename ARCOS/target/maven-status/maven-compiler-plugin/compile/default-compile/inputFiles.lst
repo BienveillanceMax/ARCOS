@@ -18,7 +18,9 @@
 /app/ARCOS/src/main/java/Memory/Actions/ActionRegistry.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/ActionResult.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/Action.java
+/app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/DeepSearchAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/DefaultAction.java
+/app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/ListCalendarEventsAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/RespondAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/SearchAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/TimeAction.java
@@ -48,5 +50,8 @@
 /app/ARCOS/src/main/java/Producers/DesireInitiativeProducer.java
 /app/ARCOS/src/main/java/Producers/SpeechToTextProducer.java
 /app/ARCOS/src/main/java/Producers/WakeWordProducer.java
+/app/ARCOS/src/main/java/Tools/CalendarTool/CalendarService.java
+/app/ARCOS/src/main/java/Tools/CalendarTool/CalendarToolConfig.java
+/app/ARCOS/src/main/java/Tools/SearchTool/BraveSearchConfig.java
 /app/ARCOS/src/main/java/Tools/SearchTool/BraveSearchService.java
 /app/ARCOS/src/main/java/org/arcos/ArcosApplication.java
