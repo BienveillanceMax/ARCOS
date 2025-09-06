@@ -12,6 +12,6 @@ public class BraveSearchConfig {
         if (apiKey == null || apiKey.isEmpty()) {
             throw new IllegalStateException("BRAVE_SEARCH_API_KEY environment variable not set.");
         }
-        return new BraveSearchService(apiKey);
+        return new BraveSearchService();
     }
 }
