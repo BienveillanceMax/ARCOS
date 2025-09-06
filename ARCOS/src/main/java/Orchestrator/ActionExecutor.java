@@ -1,11 +1,11 @@
 package Orchestrator;
 
 import Memory.Actions.Entities.ActionResult;
-import Memory.Actions.Entities.Actions.DefaultAction;
-import Memory.Actions.Entities.Actions.RespondAction;
-import Memory.Actions.Entities.Actions.SearchAction;
-import Memory.Actions.Entities.Actions.TimeAction;
+import Memory.Actions.Entities.Actions.*;
 import Orchestrator.Entities.ExecutionPlan;
+import Tools.PythonTool.PythonExecutor;
+import Tools.SearchTool.BraveSearchService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 
@@ -14,14 +14,24 @@ import java.util.*;
 @Component
 public class ActionExecutor
 {
+    private final BraveSearchService braveSearchService;
+    PythonExecutor pythonExecutor;
+    BraveSearchService searchService;
 
+
+    @Autowired
+    public ActionExecutor(PythonExecutor pythonExecutor, BraveSearchService searchService, BraveSearchService braveSearchService) {
+        this.pythonExecutor = pythonExecutor;
+        this.searchService = searchService;
+        this.braveSearchService = braveSearchService;
+    }
 
     // Détermine quelle action faire
     private ActionResult executeAction(String action, Map<String, Object> params)
     {
 
         if (action.equals("Rechercher sur internet")){
-            SearchAction searchAction = new SearchAction();
+            SearchAction searchAction = new SearchAction(braveSearchService);
             return searchAction.execute(params);
         }
         if (action.equals("Parler")){
@@ -36,6 +46,11 @@ public class ActionExecutor
         {
             TimeAction timeAction = new TimeAction();
             return timeAction.execute(params);
+        }
+        if (action.equals("Executer du code Python"))
+        {
+            PythonAction pythonAction = new PythonAction(pythonExecutor);
+            return pythonAction.execute(params);
         }
 
         return null;

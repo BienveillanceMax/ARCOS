@@ -76,12 +76,12 @@ public class SearchAction extends Action
         );
     }
 
-    public SearchAction() {
+    public SearchAction(BraveSearchService braveSearchService) {
         super("Rechercher sur internet",
                 "Recherche des informations sur le web. Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats de recherche.",
                 createParameters());
 
-        this.searchService = new BraveSearchService(System.getenv("BRAVE_SEARCH_API_KEY"));
+        this.searchService = braveSearchService;
 
     }
 

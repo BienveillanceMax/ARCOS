@@ -16,6 +16,7 @@ import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Producers.DesireInitiativeProducer;
+import Tools.SearchTool.BraveSearchService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
@@ -78,7 +79,7 @@ public class PersonalityOrchestratorIT {
                 "MISTRAL_API_KEY environment variable not set. Skipping integration test.");
 
         // Bottom-up instantiation
-        actionRegistry = new ActionRegistry(new Tools.PythonTool.PythonExecutor());
+        actionRegistry = new ActionRegistry(new Tools.PythonTool.PythonExecutor(), new BraveSearchService());
         valueProfile = new ValueProfile();
         llmResponseParser = new LLMResponseParser(actionRegistry);
         promptBuilder = new PromptBuilder(actionRegistry, valueProfile);

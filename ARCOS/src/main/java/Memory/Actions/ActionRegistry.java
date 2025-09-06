@@ -7,10 +7,12 @@ import Memory.Actions.Entities.Actions.SearchAction;
 import Memory.Actions.Entities.Actions.TimeAction;
 import Tools.PythonTool.PythonExecutor;
 import Orchestrator.Entities.Parameter;
+import Tools.SearchTool.BraveSearchService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -20,16 +22,16 @@ import java.util.Map;
 public class ActionRegistry {
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final PythonExecutor pythonExecutor;
 
 
-    public ActionRegistry(PythonExecutor pythonExecutor) {
-        this.pythonExecutor = pythonExecutor;
+
+    @Autowired
+    public ActionRegistry(PythonExecutor pythonExecutor, BraveSearchService braveSearchService) {
         //registerAction("Parler", new RespondAction()); As of now of little use and not implemented (the speaking execution part, the rest is fine)
-        registerAction("Rechercher sur internet", new SearchAction());
+        registerAction("Rechercher sur internet", new SearchAction(braveSearchService));
         registerAction("Action par défaut", new DefaultAction());
         registerAction("Accéder à la date et l'heure", new TimeAction());
-        registerAction("Executer du code Python", new PythonAction(this.pythonExecutor));
+        registerAction("Executer du code Python", new PythonAction(pythonExecutor));
     }
 
     public void registerAction(String name, Action action) {

@@ -26,7 +26,7 @@ public class PythonAction extends Action {
 
     public PythonAction(PythonExecutor pythonExecutor) {
         super("Executer du code Python",
-                "Exécute un bloc de code Python. Le code doit être simple et ne doit pas avoir d'effets de bord dangereux.",
+                "Exécute un bloc de code Python. Le code ne doit pas avoir d'effets de bord dangereux.",
                 createParameters());
         this.pythonExecutor = pythonExecutor;
     }
@@ -39,7 +39,7 @@ public class PythonAction extends Action {
         PythonExecutor.ExecutionResult result = pythonExecutor.execute(code);
 
         if (result.isSuccess()) {
-            return ActionResult.success(result.getStdout(), "Code Python exécuté avec succès.")
+            return ActionResult.success(List.of(result.getStdout()), "Code Python exécuté avec succès.")
                     .addMetadata("exit_code", result.getExitCode())
                     .withExecutionTime(System.currentTimeMillis() - startTime);
         } else {
