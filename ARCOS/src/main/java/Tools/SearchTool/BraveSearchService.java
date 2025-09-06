@@ -7,13 +7,13 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
+import org.jsoup.Jsoup;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -25,7 +25,6 @@ import java.util.Optional;
  * Service de recherche web utilisant l'API Brave Search
  * Conçu pour être intégré dans un assistant IA
  */
-@Component
 public class BraveSearchService {
 
     private static final Logger logger = LoggerFactory.getLogger(BraveSearchService.class);
@@ -49,6 +48,34 @@ public class BraveSearchService {
     public SearchResult search(String query) throws SearchException {
         return search(query, SearchOptions.defaultOptions());
     }
+
+    public SearchResult searchAndExtractContent(String query) throws SearchException {
+        SearchResult searchResult = search(query, SearchOptions.defaultOptions());
+
+        if (searchResult.hasResults()) {
+            SearchResultItem topResult = searchResult.getItems().get(0);
+            try {
+                String content = fetchAndExtractContent(topResult.getUrl());
+                topResult.setExtractedContent(content);
+            } catch (IOException | InterruptedException e) {
+                logger.error("Failed to fetch and extract content for url: {}", topResult.getUrl(), e);
+            }
+        }
+
+        return searchResult;
+    }
+
+    private String fetchAndExtractContent(String url) throws IOException, InterruptedException {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .timeout(Duration.ofSeconds(10))
+                .GET()
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        return Jsoup.parse(response.body()).text();
+    }
+
 
     /**
      * Effectue une recherche web avec des options personnalisées
@@ -169,6 +196,7 @@ public class BraveSearchService {
         private final String url;
         private final String description;
         private final String publishedDate;
+        private String extractedContent;
 
         public SearchResultItem(String title, String url, String description, String publishedDate) {
             this.title = title;
@@ -181,6 +209,11 @@ public class BraveSearchService {
         public String getUrl() { return url; }
         public String getDescription() { return description; }
         public Optional<String> getPublishedDate() { return Optional.ofNullable(publishedDate); }
+        public Optional<String> getExtractedContent() { return Optional.ofNullable(extractedContent); }
+
+        public void setExtractedContent(String extractedContent) {
+            this.extractedContent = extractedContent;
+        }
 
         @Override
         public String toString() {

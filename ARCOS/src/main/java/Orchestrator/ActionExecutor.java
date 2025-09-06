@@ -1,62 +1,33 @@
 package Orchestrator;
 
+import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.ActionResult;
-import Memory.Actions.Entities.Actions.*;
+import Memory.Actions.Entities.Actions.Action;
 import Orchestrator.Entities.ExecutionPlan;
-import Tools.PythonTool.PythonExecutor;
-import Tools.SearchTool.BraveSearchService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 @Component
-public class ActionExecutor
-{
-    private final BraveSearchService braveSearchService;
-    PythonExecutor pythonExecutor;
-    BraveSearchService searchService;
+public class ActionExecutor {
 
+    private final ActionRegistry actionRegistry;
 
     @Autowired
-    public ActionExecutor(PythonExecutor pythonExecutor, BraveSearchService searchService, BraveSearchService braveSearchService) {
-        this.pythonExecutor = pythonExecutor;
-        this.searchService = searchService;
-        this.braveSearchService = braveSearchService;
+    public ActionExecutor(ActionRegistry actionRegistry) {
+        this.actionRegistry = actionRegistry;
     }
 
-    // Détermine quelle action faire
-    private ActionResult executeAction(String action, Map<String, Object> params)
-    {
-
-        if (action.equals("Rechercher sur internet")){
-            SearchAction searchAction = new SearchAction(braveSearchService);
-            return searchAction.execute(params);
+    private ActionResult executeAction(String actionName, Map<String, Object> params) {
+        Action action = actionRegistry.getAction(actionName);
+        if (action != null) {
+            return action.execute(params);
         }
-        if (action.equals("Parler")){
-            RespondAction respondAction = new RespondAction();
-            return respondAction.execute(params);
-        }
-        if (action.equals("Action par défaut")){
-            DefaultAction defaultAction = new DefaultAction();
-            return defaultAction.execute(params);
-        }
-        if (action.equals("Accéder à la date et l'heure"))
-        {
-            TimeAction timeAction = new TimeAction();
-            return timeAction.execute(params);
-        }
-        if (action.equals("Executer du code Python"))
-        {
-            PythonAction pythonAction = new PythonAction(pythonExecutor);
-            return pythonAction.execute(params);
-        }
-
-        return null;
+        return ActionResult.failure("Action not found: " + actionName);
     }
-
-
 
     public Map<String, ActionResult> executeActions(ExecutionPlan plan) {
         Map<String, ActionResult> finalResponse = new HashMap<>();

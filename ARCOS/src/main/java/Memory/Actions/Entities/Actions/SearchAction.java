@@ -76,13 +76,12 @@ public class SearchAction extends Action
         );
     }
 
-    public SearchAction(BraveSearchService braveSearchService) {
+    public SearchAction(BraveSearchService searchService) {
         super("Rechercher sur internet",
                 "Recherche des informations sur le web. Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats de recherche.",
                 createParameters());
 
-        this.searchService = braveSearchService;
-
+        this.searchService = searchService;
     }
 
     @Override

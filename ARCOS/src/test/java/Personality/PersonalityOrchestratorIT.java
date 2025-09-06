@@ -16,9 +16,11 @@ import Personality.Opinions.OpinionService;
 import Personality.Values.ValueProfile;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Producers.DesireInitiativeProducer;
+import Tools.CalendarTool.CalendarService;
 import Tools.SearchTool.BraveSearchService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
+import org.mockito.Mock;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import io.micrometer.observation.ObservationRegistry;
@@ -63,6 +65,10 @@ public class PersonalityOrchestratorIT {
     private EmbeddingService embeddingService;
     private DesireInitiativeProducer desireInitiativeProducer;
     private ActionRegistry actionRegistry;
+    @Mock
+    private BraveSearchService braveSearchService;
+    @Mock
+    private CalendarService calendarService;
 
 
     // Configuration
@@ -79,7 +85,7 @@ public class PersonalityOrchestratorIT {
                 "MISTRAL_API_KEY environment variable not set. Skipping integration test.");
 
         // Bottom-up instantiation
-        actionRegistry = new ActionRegistry(new Tools.PythonTool.PythonExecutor(), new BraveSearchService());
+        actionRegistry = new ActionRegistry(braveSearchService, calendarService);
         valueProfile = new ValueProfile();
         llmResponseParser = new LLMResponseParser(actionRegistry);
         promptBuilder = new PromptBuilder(actionRegistry, valueProfile);

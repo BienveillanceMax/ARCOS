@@ -1,4 +1,4 @@
 -------------------------------------------------------------------------------
-Test set: Memory.MemoryServiceTests
+Test set: Memory.Actions.DeepSearchActionTest
 -------------------------------------------------------------------------------
-Tests run: 1, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.480 s -- in Memory.MemoryServiceTests
+Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.156 s -- in Memory.Actions.DeepSearchActionTest
