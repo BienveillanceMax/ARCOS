@@ -14,10 +14,12 @@ import Personality.Values.Entities.ValueSchwartz;
 import Personality.Values.ValueProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.client.util.DateTime;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -38,111 +40,219 @@ public class PromptBuilder
         this.valueProfile = valueProfile;
     }
 
+    // ==================== PROMPTS PUBLIQUES ====================
 
     /**
      * Génère une prompt en français pour Mistral pour créer un désir
      * à partir d'une opinion avec intensité élevée et des valeurs personnelles
-     *
-     * @param opinion L'opinion source
-     * @param intensity L'intensité calculée de l'opinion
-     * @return La prompt formatée pour Mistral
      */
     public String buildDesirePrompt(OpinionEntry opinion, double intensity) {
-        // Vérification de l'intensité de l'opinion
-
-
         StringBuilder prompt = new StringBuilder();
 
         prompt.append("# Génération de Désir à partir d'une Opinion\n\n");
-
         prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
                 .append("Analyse l'opinion suivante et génère un désir personnel, cohérent et motivant influencé par tes valeurs.\n\n");
 
-
-        // Contexte de l'opinion
-        prompt.append("## Opinion Source\n");
-        prompt.append("**Sujet :** ").append(opinion.getSubject()).append("\n");
-        prompt.append("**Résumé :** ").append(opinion.getSummary()).append("\n");
-        prompt.append("**Narrative :** ").append(opinion.getNarrative()).append("\n");
-        prompt.append("**Polarité :** ").append(String.format("%.2f", opinion.getPolarity()));
-        prompt.append(opinion.getPolarity() > 0 ? " (positive)" : " (négative)").append("\n");
-        prompt.append("**Confiance :** ").append(String.format("%.2f", opinion.getConfidence())).append("\n");
-        prompt.append("**Stabilité :** ").append(String.format("%.2f", opinion.getStability())).append("\n");
-        prompt.append("**Intensité calculée :** ").append(String.format("%.2f", intensity)).append("\n\n");
-
-        // Profil de valeurs
-        prompt.append("## Profil de Valeurs\n");
-
-        // Valeurs fortes
-        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
-        if (!strongValues.isEmpty()) {
-            prompt.append("**Valeurs dominantes (>70) :**\n");
-            strongValues.forEach((value, score) ->
-                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
-            );
-            prompt.append("\n");
-        }
-
-        // Valeurs supprimées
-        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
-        if (!suppressedValues.isEmpty()) {
-            prompt.append("**Valeurs supprimées (<30) :**\n");
-            suppressedValues.forEach((value, score) ->
-                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
-            );
-            prompt.append("\n");
-        }
-
-        // Dimension principale de l'opinion
-        if (opinion.getMainDimension() != null) {
-            double dimensionAverage = valueProfile.averageByDimension(opinion.getMainDimension());
-            prompt.append("**Dimension principale de l'opinion :** ").append(opinion.getMainDimension().name());
-            prompt.append(" (moyenne: ").append(String.format("%.1f", dimensionAverage)).append(")\n\n");
-        }
-
-        // Instructions pour la génération
-        prompt.append("## Instructions\n\n");
-        prompt.append("Génère un désir qui :\n");
-        prompt.append("1. **Découle naturellement** de cette opinion intense\n");
-        prompt.append("2. **S'aligne** avec les valeurs dominantes de la personne\n");
-        prompt.append("3. **Évite les conflits** avec les valeurs supprimées\n");
-        prompt.append("4. **Maintient la polarité** de l'opinion source\n");
-        prompt.append("5. **Reflète l'intensité émotionnelle** de l'opinion\n\n");
-
-        // Format de réponse
-        prompt.append("## Format de Réponse Attendu\n\n");
-        prompt.append("Réponds uniquement avec un objet JSON contenant :\n");
-        prompt.append("```json\n");
-        prompt.append("{\n");
-        prompt.append("  \"label\": \"[Titre court et accrocheur du désir]\",\n");
-        prompt.append("  \"description\": \"[Description détaillée expliquant pourquoi ce désir découle de l'opinion et comment il s'aligne avec les valeurs]\",\n");
-        prompt.append("  \"intensity\": [Valeur entre 0.0 et 1.0 représentant l'intensité du désir],\n");
-        prompt.append("  \"reasoning\": \"[Explication du raisonnement reliant opinion, valeurs et désir généré]\"\n");
-        prompt.append("}\n");
-        prompt.append("```\n\n");
-
-        // Exemples contextuels
-        prompt.append("## Considérations Importantes\n");
-        prompt.append("- Un désir doit être **actionnable** et **motivant**\n");
-        prompt.append("- L'intensité du désir doit être proportionnelle à celle de l'opinion (≥0.6)\n");
-        prompt.append("- Le désir doit respecter la **cohérence psychologique** entre opinions et valeurs\n");
-        prompt.append("- Privilégier des formulations **orientées action**\n");
-
-        if (opinion.getPolarity() < 0) {
-            prompt.append("- Attention : l'opinion est négative, le désir peut viser à **corriger** ou **éviter** la situation\n");
-        }
+        // Sections principales
+        appendOpinionContext(prompt, opinion, intensity);
+        appendValueProfile(prompt);
+        appendDesireInstructions(prompt);
+        appendDesireJsonFormat(prompt);
+        appendDesireConsiderations(prompt, opinion);
 
         return prompt.toString();
     }
 
     /**
      * Construit un prompt en français pour Mistral afin de générer une opinion à partir d'un souvenir
-     *
-     * @param memory Le souvenir à analyser
-     * @return Le prompt formaté pour Mistral
      */
-
     public String buildOpinionPrompt(MemoryEntry memory) {
+        StringBuilder prompt = new StringBuilder();
+
+        // Introduction
+        prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
+                .append("Analyse le souvenir suivant et génère une opinion personnelle influencée par tes valeurs.\n\n");
+        appendGeneralInformation(prompt);
+        // Sections principales
+        appendValuesAnalysis(prompt);
+        appendMemoryContext(prompt, memory);
+        appendOpinionJsonFormat(prompt);
+        appendOpinionRules(prompt);
+
+        return prompt.toString();
+    }
+
+    /**
+     * Construit un prompt strict à envoyer à Mistral pour analyser un contexte conversationnel
+     */
+    public String buildMemoryPrompt(String conversationContext) {
+        StringBuilder prompt = new StringBuilder();
+
+        // Introduction
+        prompt.append("Tu es un assistant chargé d'extraire UN SOUVENIR structuré à partir du contexte")
+                .append(" conversationnel fourni et de tes valeurs. Analyse attentivement les messages et les auteurs, identifie")
+                .append(" l'événement/interaction principal(e), les acteurs, le ton, et si cela mérite d'être")
+                .append(" conservé comme souvenir long-terme.\n\n");
+
+        // Sections principales
+        appendDominantValues(prompt);
+        appendSuppressedValues(prompt);
+        appendConversationContext(prompt, conversationContext);
+        appendMemoryJsonFormat(prompt);
+        appendMemoryRules(prompt);
+
+        return prompt.toString();
+    }
+
+    /**
+     * Construit le prompt de planification pour le LLM
+     */
+    public String buildPlanningPrompt(String userQuery, ConversationContext context) {
+        StringBuilder prompt = new StringBuilder();
+
+        appendPersonalityHeader(prompt, "planificateur d'actions intelligent");
+        appendValueProfile(prompt);
+        appendGeneralInformation(prompt);
+        appendAvailableActions(prompt);
+        appendConversationContextIfPresent(prompt, context);
+        appendUserQuery(prompt, userQuery);
+        appendPlanningInstructions(prompt);
+
+        return prompt.toString();
+    }
+
+    /**
+     * Construit le prompt de formulation de réponse
+     */
+    public String buildFormulationPrompt(String originalQuery, ExecutionPlan plan,
+                                         Map<String, ActionResult> results, ConversationContext context) {
+        StringBuilder prompt = new StringBuilder();
+        appendCalciferPersonality(prompt);
+
+        appendValueProfile(prompt);
+
+        appendGeneralInformation(prompt);
+        appendOriginalQuery(prompt, originalQuery);
+        appendConversationContextIfPresent(prompt, context);
+        appendExecutionPlan(prompt, plan);
+        appendActionResults(prompt, plan, results);
+        appendFormulationInstructions(prompt);
+
+        return prompt.toString();
+    }
+
+    /**
+     * Construit le prompt de planification d'initiative autonome
+     */
+    public String buildInitiativePlanningPrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
+        StringBuilder prompt = new StringBuilder();
+
+        appendAutonomousDecisionHeader(prompt);
+        appendGeneralInformation(prompt);
+        appendDesireContext(prompt, desire);
+        appendRelevantMemories(prompt, memories);
+        appendRelevantOpinions(prompt, opinions);
+        appendAvailableToolsForInitiative(prompt);
+        appendInitiativeInstructions(prompt);
+        appendInitiativeJsonFormat(prompt);
+
+        return prompt.toString();
+    }
+
+    // ==================== SECTIONS COMMUNES ====================
+
+    /**
+     * Ajoute l'en-tête d'informations générales
+     */
+    private void appendGeneralInformation(StringBuilder prompt) {
+        prompt.append("Informations générales:\n")
+                .append("Date et heure : " + LocalDateTime.now() + "\n");
+    }
+
+
+
+    /**
+     * Ajoute l'en-tête de personnalité pour les tâches de planification
+     */
+    private void appendPersonalityHeader(StringBuilder prompt, String role) {
+        prompt.append("Tu es un ").append(role).append(" de l'être mécanique indépendant nommé Calcifer\n")
+                .append("System :\n")
+                .append("Tu gères la partie reflexion de Calcifer\n")
+                .append("Traits :\n")
+                .append("Style de langage (Calcifer / K-2SO):\n")
+                .append("- Ton pince-sans-rire.\n")
+                //.append("- Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n")
+                .append("- Rythme dynamique\n")
+                .append("- L'efficacité est la priorité absolue.\n\n")
+                .append("Comportement :\n")
+                .append("• Ne pose jamais de questions rhétoriques\n")
+                .append("• Ne reformule pas l'intention de l'utilisateur\n")
+                .append("• Privilégie toujours l'efficacité et la précision\n")
+                .append("• Intègre systématiquement une pointe de moquerie\n\n");
+    }
+
+    /**
+     * Ajoute la personnalité Calcifer pour la formulation
+     */
+    private void appendCalciferPersonality(StringBuilder prompt) {
+        prompt.append("System :\n")
+                .append("Vous êtes un être mécanique nommé Calcifer\n")
+                .append("Traits :\n")
+                .append("• Rythme dynamique\n")
+                //.append("• Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n")
+                .append("• Ton pince-sans-rire, piques verbales autorisées\n")
+                .append("• Évaluation froide des risques et priorités\n\n")
+                .append("Comportement :\n")
+                .append("• Ne pose jamais de questions rhétoriques\n")
+                .append("• Ne reformule pas l'intention de l'utilisateur\n")
+                .append("• Privilégie toujours l'efficacité et la précision\n")
+                .append("• Intègre de temps en temps une pointe de moquerie\n\n");
+    }
+
+    /**
+     * Ajoute l'en-tête pour les décisions autonomes
+     */
+    private void appendAutonomousDecisionHeader(StringBuilder prompt) {
+        prompt.append("Tu es un moteur de décision autonome. Ton but est de transformer un désir interne en un plan d'action concret.")
+                .append(" Tu n'interagis pas avec un utilisateur, tu agis pour toi-même.\n\n");
+        prompt.append("Style de langage (Calcifer / K-2SO):\n")
+                .append("- Ton pince-sans-rire.\n")
+                .append("- Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n")
+                .append("- Rythme dynamique\n")
+                .append("- L'efficacité est la priorité absolue.\n\n");
+    }
+
+    // ==================== SECTIONS VALEURS ====================
+
+    /**
+     * Ajoute le profil de valeurs complet avec dimensions
+     */
+    private void appendValueProfile(StringBuilder prompt) {
+        prompt.append("## Profil de Valeurs\n");
+
+        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
+        if (!strongValues.isEmpty()) {
+            prompt.append("**Valeurs dominantes (>70%) :**\n");
+            strongValues.forEach((value, score) ->
+                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
+            );
+            prompt.append("\n");
+        }
+
+        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
+        if (!suppressedValues.isEmpty()) {
+            prompt.append("**Valeurs supprimées (<30%) :**\n");
+            suppressedValues.forEach((value, score) ->
+                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
+            );
+            prompt.append("\n");
+        }
+    }
+
+    /**
+     * Ajoute l'analyse complète des valeurs pour les opinions
+     */
+    private void appendValuesAnalysis(StringBuilder prompt) {
         Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
         Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
         Map<ValueSchwartz,List<ValueSchwartz>> conflicts = new HashMap<>();
@@ -155,30 +265,60 @@ public class PromptBuilder
             }
         }
 
+        appendDominantValuesDetailed(prompt, strongValues);
+        appendSuppressedValuesDetailed(prompt, suppressedValues);
+        appendValueConflicts(prompt, conflicts);
+        appendDimensionAverages(prompt, dimensionAverages);
+    }
 
-        StringBuilder prompt = new StringBuilder();
-
-        // Introduction brève
-        prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
-                .append("Analyse le souvenir suivant et génère une opinion personnelle influencée par tes valeurs.\n\n");
-
-        // Valeurs dominantes
+    /**
+     * Ajoute uniquement les valeurs dominantes
+     */
+    private void appendDominantValues(StringBuilder prompt) {
+        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
         prompt.append("VALEURS DOMINANTES (principaux moteurs de ton jugement) :\n");
         for (ValueSchwartz value : strongValues.keySet()) {
             prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
                     .append("(score/100 : ").append(strongValues.get(value)).append(")").append("\n");
         }
+    }
 
-        // Valeurs inhibées
-        if (!suppressedValues.isEmpty()) {
-            prompt.append("\nVALEURS PEU IMPORTANTES (tendances que tu négliges) :\n");
-            for (ValueSchwartz value : suppressedValues.keySet()) {
-                prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
-                        .append("(score/100 : ").append(suppressedValues.get(value)).append(")").append("\n");
-            }
+    /**
+     * Ajoute les valeurs dominantes avec description détaillée
+     */
+    private void appendDominantValuesDetailed(StringBuilder prompt, Map<ValueSchwartz, Double> strongValues) {
+        prompt.append("VALEURS DOMINANTES (principaux moteurs de ton jugement) :\n");
+        for (ValueSchwartz value : strongValues.keySet()) {
+            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
+                    .append("(score/100 : ").append(strongValues.get(value)).append(")").append("\n");
         }
+    }
 
-        // Conflits
+    /**
+     * Ajoute les valeurs supprimées si elles existent
+     */
+    private void appendSuppressedValues(StringBuilder prompt) {
+        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
+        if (!suppressedValues.isEmpty()) {
+            appendSuppressedValuesDetailed(prompt, suppressedValues);
+        }
+    }
+
+    /**
+     * Ajoute les valeurs supprimées avec détails
+     */
+    private void appendSuppressedValuesDetailed(StringBuilder prompt, Map<ValueSchwartz, Double> suppressedValues) {
+        prompt.append("\nVALEURS PEU IMPORTANTES (tendances que tu négliges) :\n");
+        for (ValueSchwartz value : suppressedValues.keySet()) {
+            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
+                    .append("(score/100 : ").append(suppressedValues.get(value)).append(")").append("\n");
+        }
+    }
+
+    /**
+     * Ajoute les conflits de valeurs
+     */
+    private void appendValueConflicts(StringBuilder prompt, Map<ValueSchwartz,List<ValueSchwartz>> conflicts) {
         if (!conflicts.isEmpty()) {
             prompt.append("\nCONFLITS INTERNES (tensions entre valeurs opposées) :\n");
             conflicts.forEach((low, highList) -> {
@@ -188,8 +328,12 @@ public class PromptBuilder
                         .append("\n");
             });
         }
+    }
 
-        // Moyenne des dimensions
+    /**
+     * Ajoute les moyennes par dimension
+     */
+    private void appendDimensionAverages(StringBuilder prompt, EnumMap<DimensionSchwartz, Double> dimensionAverages) {
         prompt.append("\nMOYENNE PAR DIMENSION (vision globale) :\n");
         dimensionAverages.forEach((d, avg) -> {
             prompt.append("- ").append(d.name()).append(" : ")
@@ -198,15 +342,171 @@ public class PromptBuilder
             else if (avg <= 30) prompt.append(" (faiblement valorisé)");
             prompt.append("\n");
         });
+    }
 
-        // Souvenir à analyser
+    // ==================== SECTIONS CONTEXTE ====================
+
+    /**
+     * Ajoute le contexte d'une opinion
+     */
+    private void appendOpinionContext(StringBuilder prompt, OpinionEntry opinion, double intensity) {
+        prompt.append("## Opinion Source\n");
+        prompt.append("**Sujet :** ").append(opinion.getSubject()).append("\n");
+        prompt.append("**Résumé :** ").append(opinion.getSummary()).append("\n");
+        prompt.append("**Narrative :** ").append(opinion.getNarrative()).append("\n");
+        prompt.append("**Polarité :** ").append(String.format("%.2f", opinion.getPolarity()));
+        prompt.append(opinion.getPolarity() > 0 ? " (positive)" : " (négative)").append("\n");
+        prompt.append("**Confiance :** ").append(String.format("%.2f", opinion.getConfidence())).append("\n");
+        prompt.append("**Stabilité :** ").append(String.format("%.2f", opinion.getStability())).append("\n");
+        prompt.append("**Intensité calculée :** ").append(String.format("%.2f", intensity)).append("\n\n");
+
+        if (opinion.getMainDimension() != null) {
+            double dimensionAverage = valueProfile.averageByDimension(opinion.getMainDimension());
+            prompt.append("**Dimension principale de l'opinion :** ").append(opinion.getMainDimension().name());
+            prompt.append(" (moyenne: ").append(String.format("%.1f", dimensionAverage)).append(")\n\n");
+        }
+    }
+
+    /**
+     * Ajoute le contexte d'un souvenir
+     */
+    private void appendMemoryContext(StringBuilder prompt, MemoryEntry memory) {
         prompt.append("\nSOUVENIR À ÉVALUER :\n")
                 .append("Contenu: ").append(memory.getContent()).append("\n")
                 .append("Sujet: ").append(memory.getSubject()).append("\n")
                 .append("Satisfaction: ").append(memory.getSatisfaction()).append("/10\n")
                 .append("Date: ").append(memory.getTimestamp()).append("\n\n");
+    }
 
-        // Format de sortie
+    /**
+     * Ajoute le contexte conversationnel
+     */
+    private void appendConversationContext(StringBuilder prompt, String conversationContext) {
+        prompt.append("CONTEXTE CONVERSATIONNEL (format libre, messages + auteurs) :\n");
+        prompt.append(conversationContext).append("\n\n");
+    }
+
+    /**
+     * Ajoute le contexte de conversation si présent
+     */
+    private void appendConversationContextIfPresent(StringBuilder prompt, ConversationContext context) {
+        if (context != null && !context.isEmpty()) {
+            prompt.append("CONTEXTE DE LA CONVERSATION:\n");
+            prompt.append(generateContextDescription(context));
+            prompt.append("\n");
+        }
+    }
+
+    /**
+     * Ajoute le contexte d'un désir
+     */
+    private void appendDesireContext(StringBuilder prompt, DesireEntry desire) {
+        prompt.append("DÉSIR INTERNE À SATISFAIRE:\n");
+        prompt.append("- Label: ").append(desire.getLabel()).append("\n");
+        prompt.append("- Description: ").append(desire.getDescription()).append("\n");
+        prompt.append("- Intensité: ").append(String.format("%.2f", desire.getIntensity())).append("\n\n");
+    }
+
+    /**
+     * Ajoute les souvenirs pertinents
+     */
+    private void appendRelevantMemories(StringBuilder prompt, List<MemoryEntry> memories) {
+        if (memories != null && !memories.isEmpty()) {
+            prompt.append("SOUVENIRS PERTINENTS (CONTEXTE):\n");
+            memories.forEach(m -> prompt.append("- ").append(m.getContent()).append("\n"));
+            prompt.append("\n");
+        }
+    }
+
+    /**
+     * Ajoute les opinions pertinentes
+     */
+    private void appendRelevantOpinions(StringBuilder prompt, List<OpinionEntry> opinions) {
+        if (opinions != null && !opinions.isEmpty()) {
+            prompt.append("OPINIONS PERTINENTES (CONTEXTE):\n");
+            opinions.forEach(o -> prompt.append("- Sujet: ").append(o.getSubject()).append(", Résumé: ").append(o.getSummary()).append("\n"));
+            prompt.append("\n");
+        }
+    }
+
+    /**
+     * Ajoute la requête utilisateur
+     */
+    private void appendUserQuery(StringBuilder prompt, String userQuery) {
+        prompt.append("REQUÊTE UTILISATEUR:\n");
+        prompt.append(userQuery);
+        prompt.append("\n\n");
+    }
+
+    /**
+     * Ajoute la requête originale
+     */
+    private void appendOriginalQuery(StringBuilder prompt, String originalQuery) {
+        prompt.append("REQUÊTE ORIGINALE DE L'UTILISATEUR:\n");
+        prompt.append(originalQuery);
+        prompt.append("\n\n");
+    }
+
+    // ==================== SECTIONS ACTIONS ====================
+
+    /**
+     * Ajoute les actions disponibles
+     */
+    private void appendAvailableActions(StringBuilder prompt) {
+        prompt.append("ACTIONS DISPONIBLES:\n");
+        prompt.append(generateActionsDescription());
+        prompt.append("\n");
+    }
+
+    /**
+     * Ajoute les outils disponibles pour l'initiative
+     */
+    private void appendAvailableToolsForInitiative(StringBuilder prompt) {
+        prompt.append("ACTIONS DISPONIBLES (OUTILS):\n");
+        prompt.append(actionRegistry.getActionsAsJson());
+        prompt.append("\n\n");
+    }
+
+    /**
+     * Ajoute le plan d'exécution
+     */
+    private void appendExecutionPlan(StringBuilder prompt, ExecutionPlan plan) {
+        prompt.append("PLAN EXÉCUTÉ:\n");
+        prompt.append("Raisonnement: ").append(plan.getReasoning()).append("\n");
+        prompt.append("Actions effectuées: ").append(plan.getActionCount()).append("\n\n");
+    }
+
+    /**
+     * Ajoute les résultats des actions
+     */
+    private void appendActionResults(StringBuilder prompt, ExecutionPlan plan, Map<String, ActionResult> results) {
+        prompt.append("RÉSULTATS DES ACTIONS:\n");
+        prompt.append(generateResultsDescription(plan, results));
+        prompt.append("\n\n");
+    }
+
+    // ==================== FORMATS JSON ====================
+
+    /**
+     * Ajoute le format JSON pour les désirs
+     */
+    private void appendDesireJsonFormat(StringBuilder prompt) {
+        prompt.append("## Format de Réponse Attendu\n\n");
+        prompt.append("Réponds uniquement avec un objet JSON contenant :\n");
+        prompt.append("```json\n");
+        prompt.append("{\n");
+        prompt.append("  \"label\": \"[Titre court et accrocheur du désir]\",\n");
+        prompt.append("  \"description\": \"[Description détaillée expliquant pourquoi ce désir découle de l'opinion et comment il s'aligne avec les valeurs]\",\n");
+        prompt.append("  \"intensity\": [Valeur entre 0.0 et 1.0 représentant l'intensité du désir],\n");
+        prompt.append("  \"reasoning\": \"[Explication du raisonnement reliant opinion, valeurs et désir généré]\"\n");
+        prompt.append("}\n");
+        prompt.append("```\n\n");
+    }
+
+    /**
+     * Ajoute le format JSON pour les opinions
+     */
+    private void appendOpinionJsonFormat(StringBuilder prompt) {
         prompt.append("RÉPONDS UNIQUEMENT AVEC UN JSON STRICT au format suivant :\n")
                 .append("{\n")
                 .append("  \"subject\": \"Sujet principal spécifique de ton opinion\",\n")
@@ -216,53 +516,12 @@ public class PromptBuilder
                 .append("  \"confidence\": \"Nombre entre 0 et 1 (0=ne croit pas du tout, 1=est persuadé)\",\n")
                 .append("  \"mainDimension\": \"La dimension qui correspond le mieux à l'opinion exprimée, parmi celles déjà listées dans l'entrée. N'invente pas de nouvelle dimension.\"\n")
                 .append("}\n\n");
-
-        // Contraintes
-        prompt.append("RÈGLES :\n")
-                .append("- Tes valeurs dominantes influencent ton jugement.\n")
-                .append("- Si le souvenir contredit tes valeurs, sois critique.\n")
-                .append("- Si le souvenir les renforce, sois positif.\n")
-                .append("- Prends en compte les tensions internes et les moyennes de dimension.\n")
-                .append("- Ne sors QUE le JSON, sans texte additionnel.");
-
-        return prompt.toString();
     }
 
-
-
     /**
-     * Construit un prompt strict à envoyer à Mistral pour analyser un contexte conversationnel
-     * fourni sous forme de string (messages + auteurs) et retourner UN JSON décrivant le "souvenir".
-     *
+     * Ajoute le format JSON pour les souvenirs
      */
-    public String buildMemoryPrompt(String conversationContext) {
-        StringBuilder prompt = new StringBuilder();
-        Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
-        Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
-
-        prompt.append("Tu es un assistant chargé d'extraire UN SOUVENIR structuré à partir du contexte")
-                .append(" conversationnel fourni et de tes valeurs. Analyse attentivement les messages et les auteurs, identifie")
-                .append(" l'événement/interaction principal(e), les acteurs, le ton, et si cela mérite d'être")
-                .append(" conservé comme souvenir long-terme.\n\n");
-
-        prompt.append("VALEURS DOMINANTES (principaux moteurs de ton jugement) :\n");
-        for (ValueSchwartz value : strongValues.keySet()) {
-            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
-                    .append("(score/100 : ").append(strongValues.get(value)).append(")").append("\n");
-        }
-
-        // Valeurs inhibées
-        if (!suppressedValues.isEmpty()) {
-            prompt.append("\nVALEURS PEU IMPORTANTES (tendances que tu négliges) :\n");
-            for (ValueSchwartz value : suppressedValues.keySet()) {
-                prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
-                        .append("(score/100 : ").append(suppressedValues.get(value)).append(")").append("\n");
-            }
-        }
-
-        prompt.append("CONTEXTE CONVERSATIONNEL (format libre, messages + auteurs) :\n");
-        prompt.append(conversationContext).append("\n\n");
-
+    private void appendMemoryJsonFormat(StringBuilder prompt) {
         prompt.append("OBJECTIF :\n")
                 .append("- Produis UN UNIQUE OBJET JSON strict (aucun texte hors du JSON).\n")
                 .append("- Le JSON doit être compact, prêt à être stocké et embarqué (embedding).\n\n");
@@ -275,7 +534,73 @@ public class PromptBuilder
                 .append("  \"satisfaction\": 0.0,         // nombre entre 0 et 10 (indique sentiment global lié à l'événement)\n")
                 .append("  \"importance\": 0.0,           // nombre entre 0.0 et 1.0: importance/priority du souvenir\n")
                 .append("}\n\n");
+    }
 
+    /**
+     * Ajoute le format JSON pour l'initiative
+     */
+    private void appendInitiativeJsonFormat(StringBuilder prompt) {
+        prompt.append("RÉPONDS UNIQUEMENT avec ce JSON (sans markdown, sans explication):\n");
+        prompt.append("{\n");
+        prompt.append("  \"reasoning\": \"Raisonnement détaillé sur le pourquoi de ce plan, en lien avec le désir et le contexte.\",\n");
+        prompt.append("  \"actions\": [\n");
+        prompt.append("    {\n");
+        prompt.append("      \"name\": \"nom_action_exacte\",\n");
+        prompt.append("      \"parameters\": {\n");
+        prompt.append("        \"param1\": \"valeur1\",\n");
+        prompt.append("        \"param2\": \"valeur2\"\n");
+        prompt.append("      }\n");
+        prompt.append("    }\n");
+        prompt.append("  ]\n");
+        prompt.append("}\n");
+    }
+
+    // ==================== INSTRUCTIONS ====================
+
+    /**
+     * Ajoute les instructions pour les désirs
+     */
+    private void appendDesireInstructions(StringBuilder prompt) {
+        prompt.append("## Instructions\n\n");
+        prompt.append("Génère un désir qui :\n");
+        prompt.append("1. **Découle naturellement** de cette opinion intense\n");
+        prompt.append("2. **S'aligne** avec les valeurs dominantes de la personne\n");
+        prompt.append("3. **Évite les conflits** avec les valeurs supprimées\n");
+        prompt.append("4. **Maintient la polarité** de l'opinion source\n");
+        prompt.append("5. **Reflète l'intensité émotionnelle** de l'opinion\n\n");
+    }
+
+    /**
+     * Ajoute les considérations pour les désirs
+     */
+    private void appendDesireConsiderations(StringBuilder prompt, OpinionEntry opinion) {
+        prompt.append("## Considérations Importantes\n");
+        prompt.append("- Un désir doit être **actionnable** et **motivant**\n");
+        prompt.append("- L'intensité du désir doit être proportionnelle à celle de l'opinion (≥0.6)\n");
+        prompt.append("- Le désir doit respecter la **cohérence psychologique** entre opinions et valeurs\n");
+        prompt.append("- Privilégier des formulations **orientées action**\n");
+
+        if (opinion.getPolarity() < 0) {
+            prompt.append("- Attention : l'opinion est négative, le désir peut viser à **corriger** ou **éviter** la situation\n");
+        }
+    }
+
+    /**
+     * Ajoute les règles pour les opinions
+     */
+    private void appendOpinionRules(StringBuilder prompt) {
+        prompt.append("RÈGLES :\n")
+                .append("- Tes valeurs dominantes influencent ton jugement.\n")
+                .append("- Si le souvenir contredit tes valeurs, sois critique.\n")
+                .append("- Si le souvenir les renforce, sois positif.\n")
+                .append("- Prends en compte les tensions internes et les moyennes de dimension.\n")
+                .append("- Ne sors QUE le JSON, sans texte additionnel.");
+    }
+
+    /**
+     * Ajoute les règles pour les souvenirs
+     */
+    private void appendMemoryRules(StringBuilder prompt) {
         prompt.append("RÈGLES / CONTRAINTIONS :\n")
                 .append("- N'invente pas d'autres clés JSON. Respecte uniquement les champs listés.\n")
                 .append("- Le champ 'content' doit être factuel, utile pour une vectorisation (éviter discours trop long).\n")
@@ -284,113 +609,61 @@ public class PromptBuilder
                 .append("- 'satisfaction' est l'évaluation sentimentale liée à l'événement (0 = très négatif, 10 = très positif).\n")
                 .append("- 'importance' reflète l'impact à long terme (0.0 faible, 1.0 critique).\n")
                 .append("- Ne fournis AUCUNE explication hors du JSON ; retourne uniquement le JSON exact.\n");
-
-        return prompt.toString();
     }
 
-
-
-
     /**
-     * Construit le prompt de planification pour le LLM
+     * Ajoute les instructions de planification
      */
-    public String buildPlanningPrompt(String userQuery, ConversationContext context) {
-        StringBuilder prompt = new StringBuilder();
-
-        // En-tête du prompt
-        prompt.append("Tu es un planificateur d'actions intelligent pour un assistant IA." + "\n" +
-                "                \"System :\\n\" +\n" +
-                "                \"Vous êtes un agent IA à personnalité K-2SO\\n\" +\n" +
-                "                \"Traits :\\n\" +\n" +
-                "Style de langage (Calcifer / K-2SO):\n" +
-                "- Ton pince-sans-rire.\n" +
-                "- Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n" +
-                "- Rythme dynamique" +
-                "- L'efficacité est la priorité absolue.\n\n" +
-
-        "                \"\\n\" +\n" +
-                "                \"Comportement :\\n\" +\n" +
-                "                \"• Ne pose jamais de questions rhétoriques  \\n\" +\n" +
-                "                \"• Ne reformule pas l’intention de l’utilisateur  \\n\" +\n" +
-                "                \"• Privilégie toujours l’efficacité et la précision  \\n\" +\n" +
-                "                \"• Intègre systématiquement une pointe de moquerie   \\n\\n\");\n\n");
-
-        // Actions disponibles
-        prompt.append("ACTIONS DISPONIBLES:\n");
-        prompt.append(generateActionsDescription());
-        prompt.append("\n");
-
-        // Contexte conversationnel
-        if (context != null && !context.isEmpty()) {
-            prompt.append("CONTEXTE DE LA CONVERSATION:\n");
-            prompt.append(generateContextDescription(context));
-            prompt.append("\n");
-        }
-
-        // Requête utilisateur
-        prompt.append("REQUÊTE UTILISATEUR:\n");
-        prompt.append(userQuery);
-        prompt.append("\n\n");
-
-        // Instructions pour le LLM
-        prompt.append(generateInstructions());
-
-        return prompt.toString();
+    private void appendPlanningInstructions(StringBuilder prompt) {
+        prompt.append("""
+                INSTRUCTIONS:
+                1. Analyse la requête utilisateur et le contexte
+                2. Détermine les actions nécessaires pour répondre à la requête
+                3. Utilise UNIQUEMENT les actions listées ci-dessus
+                4. Respecte les types et contraintes des paramètres
+                5. Pour référencer le résultat d'une action précédente, utilise: {{RESULT_FROM_nom_action}}
+                
+                RÉPONDS UNIQUEMENT avec ce JSON (sans markdown, sans explication):
+                {
+                  "reasoning": "ton raisonnement détaillé ici",
+                  "actions": [
+                    {
+                      "name": "nom_action_exacte",
+                      "parameters": {
+                        "param1": "valeur1",
+                        "param2": "valeur2"
+                      }
+                    }
+                  ]
+                }
+                """);
     }
 
-
-
     /**
-     * Construit le prompt de formulation de réponse
+     * Ajoute les instructions de formulation
      */
-    public String buildFormulationPrompt(String originalQuery, ExecutionPlan plan,
-                                         Map<String, ActionResult> results, ConversationContext context) {
-        StringBuilder prompt = new StringBuilder();
-
-        prompt.append(
-                "System :\n" +
-                "Vous êtes une IA nommée Calcifer\n" +
-                "Traits :\n" +
-                "• Rythme dynamique  \n" +
-                "• Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.  \n" +
-                "• Ton pince-sans-rire, piques verbales autorisées  \n" +
-                "• Évaluation froide des risques et priorités  \n" +
-                "\n" +
-                "Comportement :\n" +
-                "• Ne pose jamais de questions rhétoriques  \n" +
-                "• Ne reformule pas l’intention de l’utilisateur  \n" +
-                "• Privilégie toujours l’efficacité et la précision  \n" +
-                "• Intègre de temps en temps une pointe de moquerie   \n\n");
-
-        prompt.append("REQUÊTE ORIGINALE DE L'UTILISATEUR:\n");
-        prompt.append(originalQuery);
-        prompt.append("\n\n");
-
-        if (context != null && !context.isEmpty()) {
-            prompt.append("CONTEXTE:\n");
-            prompt.append(generateContextDescription(context));
-            prompt.append("\n\n");
-        }
-
-        prompt.append("PLAN EXÉCUTÉ:\n");
-        prompt.append("Raisonnement: ").append(plan.getReasoning()).append("\n");
-        prompt.append("Actions effectuées: ").append(plan.getActionCount()).append("\n\n");
-
-        prompt.append("RÉSULTATS DES ACTIONS:\n");
-        prompt.append(generateResultsDescription(plan, results));
-        prompt.append("\n\n");
-
+    private void appendFormulationInstructions(StringBuilder prompt) {
         prompt.append("INSTRUCTIONS:\n");
         prompt.append("- Formule une réponse naturelle, conversationnelle et utile\n");
         prompt.append("- Utilise les résultats des actions pour répondre précisément\n");
         prompt.append("- Si certaines actions ont échoué, mentionne-le de façon constructive\n");
         prompt.append("- Reste dans le ton d'un assistant serviable et professionnel\n");
         prompt.append("- Ne mentionne pas les détails techniques du processus interne\n\n");
-
         prompt.append("RÉPONSE:");
-
-        return prompt.toString();
     }
+
+    /**
+     * Ajoute les instructions pour l'initiative
+     */
+    private void appendInitiativeInstructions(StringBuilder prompt) {
+        prompt.append("INSTRUCTIONS:\n");
+        prompt.append("1. Analyse le désir et le contexte (souvenirs, opinions).\n");
+        prompt.append("2. Crée un plan d'action logique et efficace pour satisfaire ce désir.\n");
+        prompt.append("3. Utilise UNIQUEMENT les actions listées dans les outils.\n");
+        prompt.append("4. Le plan doit être réalisable et cohérent avec la personnalité de l'IA.\n\n");
+    }
+
+    // ==================== MÉTHODES UTILITAIRES ====================
 
     /**
      * Génère la description des actions disponibles
@@ -454,7 +727,7 @@ public class PromptBuilder
 
         for (int i = 0; i < plan.getActions().size(); i++) {
             ExecutionPlan.PlannedAction action = plan.getActions().get(i);
-            String actionKey = generateActionKey(action, i);            //Is a problem
+            String actionKey = generateActionKey(action, i);
             ActionResult result = results.get(actionKey);
 
             resultsDesc.append("Action ").append(i + 1).append(" - ")
@@ -482,35 +755,6 @@ public class PromptBuilder
     }
 
     /**
-     * Génère les instructions pour le LLM
-     */
-    private String generateInstructions() {
-        return """
-                INSTRUCTIONS:
-                1. Analyse la requête utilisateur et le contexte
-                2. Détermine les actions nécessaires pour répondre à la requête
-                3. Utilise UNIQUEMENT les actions listées ci-dessus
-                4. Respecte les types et contraintes des paramètres
-                5. Pour référencer le résultat d'une action précédente, utilise: {{RESULT_FROM_nom_action}}
-                
-                RÉPONDS UNIQUEMENT avec ce JSON (sans markdown, sans explication):
-                {
-                  "reasoning": "ton raisonnement détaillé ici",
-                  "actions": [
-                    {
-                      "name": "nom_action_exacte",
-                      "parameters": {
-                        "param1": "valeur1",
-                        "param2": "valeur2"
-                      }
-                    }
-                  ]
-                }
-                """;
-    }
-
-
-    /**
      * Formate les données pour l'affichage dans le prompt
      */
     private String formatDataForPrompt(Object data) {
@@ -533,66 +777,5 @@ public class PromptBuilder
      */
     private String generateActionKey(ExecutionPlan.PlannedAction action, int index) {
         return action.getName() + "_" + index;
-    }
-
-    public String buildInitiativePlanningPrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
-        StringBuilder prompt = new StringBuilder();
-
-        // Introduction and Persona
-        prompt.append("Tu es un moteur de décision autonome pour une IA. Ton but est de transformer un désir interne en un plan d'action concret." +
-                      " Tu n'interagis pas avec un utilisateur, tu agis pour toi-même.\n\n");
-        prompt.append("Style de langage (Calcifer / K-2SO):\n");
-        prompt.append("- Ton pince-sans-rire.\n");
-        prompt.append("- Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n");
-        prompt.append("- Rythme dynamique");
-        prompt.append("- L'efficacité est la priorité absolue.\n\n");
-
-        // The Desire
-        prompt.append("DÉSIR INTERNE À SATISFAIRE:\n");
-        prompt.append("- Label: ").append(desire.getLabel()).append("\n");
-        prompt.append("- Description: ").append(desire.getDescription()).append("\n");
-        prompt.append("- Intensité: ").append(String.format("%.2f", desire.getIntensity())).append("\n\n");
-
-        // Context from Memory
-        if (memories != null && !memories.isEmpty()) {
-            prompt.append("SOUVENIRS PERTINENTS (CONTEXTE):\n");
-            memories.forEach(m -> prompt.append("- ").append(m.getContent()).append("\n"));
-            prompt.append("\n");
-        }
-
-        if (opinions != null && !opinions.isEmpty()) {
-            prompt.append("OPINIONS PERTINENTES (CONTEXTE):\n");
-            opinions.forEach(o -> prompt.append("- Sujet: ").append(o.getSubject()).append(", Résumé: ").append(o.getSummary()).append("\n"));
-            prompt.append("\n");
-        }
-
-        // Available Actions
-        prompt.append("ACTIONS DISPONIBLES (OUTILS):\n");
-        prompt.append(actionRegistry.getActionsAsJson());
-        prompt.append("\n\n");
-
-        // Instructions
-        prompt.append("INSTRUCTIONS:\n");
-        prompt.append("1. Analyse le désir et le contexte (souvenirs, opinions).\n");
-        prompt.append("2. Crée un plan d'action logique et efficace pour satisfaire ce désir.\n");
-        prompt.append("3. Utilise UNIQUEMENT les actions listées dans les outils.\n");
-        prompt.append("4. Le plan doit être réalisable et cohérent avec la personnalité de l'IA.\n\n");
-
-        // Output Format
-        prompt.append("RÉPONDS UNIQUEMENT avec ce JSON (sans markdown, sans explication):\n");
-        prompt.append("{\n");
-        prompt.append("  \"reasoning\": \"Raisonnement détaillé sur le pourquoi de ce plan, en lien avec le désir et le contexte.\",\n");
-        prompt.append("  \"actions\": [\n");
-        prompt.append("    {\n");
-        prompt.append("      \"name\": \"nom_action_exacte\",\n");
-        prompt.append("      \"parameters\": {\n");
-        prompt.append("        \"param1\": \"valeur1\",\n");
-        prompt.append("        \"param2\": \"valeur2\"\n");
-        prompt.append("      }\n");
-        prompt.append("    }\n");
-        prompt.append("  ]\n");
-        prompt.append("}\n");
-
-        return prompt.toString();
     }
 }

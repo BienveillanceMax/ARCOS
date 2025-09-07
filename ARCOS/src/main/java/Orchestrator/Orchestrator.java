@@ -50,8 +50,6 @@ public class Orchestrator
         if (event.getType() == EventType.WAKEWORD)
         {
 
-            //todo change
-            processQuery((String)event.getPayload());
             TTSHandler ttsHandler = new TTSHandler();
             ttsHandler.initialize();
             log.info("starting processing");

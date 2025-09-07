@@ -13,7 +13,9 @@ Le projet est construit sur une architecture microservices-like, où chaque comp
 - **Memory**: Gère la mémoire à court et à long terme du système. La mémoire à long terme est implémentée à l'aide d'une base de données vectorielle Qdrant.
 - **Personality**: Simule la personnalité du système, y compris ses valeurs, ses opinions et ses désirs.
 - **EventBus**: Un bus d'événements simple qui permet aux différents composants de communiquer de manière asynchrone.
+- **Producer**: Regroupe l'ensemble des producteurs d'évenements qui sont push dans l'EventBus
 - **IO**: Gère les entrées/sorties, y compris la reconnaissance vocale (Speech-to-Text) et la synthèse vocale (Text-to-Speech).
+- **Tools**: Regroupe les outils externes utilisés par l'IA.
 
 ### Gestion des erreurs
 
