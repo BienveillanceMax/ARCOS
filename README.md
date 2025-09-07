@@ -1,6 +1,7 @@
 # ArCoS - Artificial Cognitive System
 
 ARCOS est un système cognitif autonome conçu pour simuler une personnalité numérique capable d'interagir, de se souvenir, de former des opinions et de prendre des initiatives. Ce projet s'appuie sur des technologies modernes en matière d'IA, notamment les grands modèles de langage (LLM) et les bases de données vectorielles, pour créer une expérience interactive et évolutive.
+`/! Le projet est encore en développement actif, le lancer pour vous dans son état actuel risque d'être un enfer  !\`
 
 ## Architecture
 
@@ -39,7 +40,7 @@ Chaque erreur de parsing ou d'appel doit permettre une logique de retry ou d'éc
 
 2.  **Qdrant**: La base de données vectorielle Qdrant est utilisée pour la mémoire à long terme. Le projet est configuré pour se connecter à une instance Qdrant locale via Docker Compose.
 
-3.  **Clé d'API BraveSearch**: Le projet utilise l'API de Brave pour les recherches internet. Vous devez fournir votre clé d'api en variable d'environement. 
+3.  **Clé d'API BraveSearch**: Le projet utilise l'API de Brave pour les recherches internet. Vous devez fournir votre clé d'api en variable d'environement. `BRAVE_SEARCH_API_KEY=yourkey` 
 ### Lancement
 
 1.  **Lancer Qdrant**:
