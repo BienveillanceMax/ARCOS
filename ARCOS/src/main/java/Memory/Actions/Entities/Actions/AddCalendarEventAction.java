@@ -8,6 +8,7 @@ import com.google.api.services.calendar.model.Event;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 
 public class AddCalendarEventAction extends Action {
@@ -42,7 +43,7 @@ public class AddCalendarEventAction extends Action {
 
             Event createdEvent = calendarService.createEvent(title, description, startDateTime, endDateTime, location);
 
-            return ActionResult.success(createdEvent, "L'événement a été créé avec succès.");
+            return ActionResult.success(List.of(createdEvent.getSummary(), createdEvent.getDescription()), "L'événement a été créé avec succès.");
         } catch (Exception e) {
             return ActionResult.failure("Erreur lors de la création de l'événement : " + e.getMessage(), e);
         }

@@ -37,7 +37,7 @@ public class DesireInitiativeProducer {
     public void checkDesiresAndInitiate() {
         log.info("Checking for high-intensity desires...");
         List<DesireEntry> pendingDesires = memoryService.getPendingDesires();
-
+        log.info("High intensity desires found: {}", pendingDesires.size());
         for (DesireEntry desire : pendingDesires) {
             if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
                 if (isGoodMomentToInitiate(desire)) {

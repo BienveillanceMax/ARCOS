@@ -1,5 +1,6 @@
 package Personality.Desires;
 
+import Exceptions.DesireCreationException;
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
@@ -43,15 +44,23 @@ public class DesireService
             double opinionIntensity = calculateOpinionIntensity(opinionEntry);
 
             if (opinionIntensity >= D_CREATE_THRESHOLD) {
-                createdDesire = createDesire(opinionEntry, opinionIntensity);
-                if (createdDesire == null) {
+                try {
+                    createdDesire = createDesire(opinionEntry, opinionIntensity);
+                } catch (DesireCreationException e) {
+                    log.error("Failed to create desire for opinion {}", opinionEntry.getId(), e);
                     return null;
                 }
                 boolean stored = memoryService.storeDesire(createdDesire);
                 if (stored) {
-                    opinionEntry.setAssociatedDesire(createdDesire.getId());
-                    memoryService.storeOpinion(opinionEntry);
-                    return createdDesire;
+                    try {
+                        opinionEntry.setAssociatedDesire(createdDesire.getId());
+                        memoryService.storeOpinion(opinionEntry);
+                        return createdDesire;
+                    } catch (Exception e) {
+                        log.error("Failed to update opinion {} with new desire {}. Deleting desire to prevent orphan.", opinionEntry.getId(), createdDesire.getId(), e);
+                        memoryService.deleteDesire(createdDesire.getId());
+                        return null;
+                    }
                 } else {
                     log.error("Failed to store desire for opinion {}", opinionEntry.getId());
                     return null;
@@ -74,7 +83,7 @@ public class DesireService
         return absPolarity * opinionEntry.getStability() * (valueProfile.averageByDimension(opinionEntry.getMainDimension())/100);
     }
 
-    private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) {
+    private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) throws DesireCreationException {
         String prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
         DesireEntry createdDesire;
 
@@ -84,11 +93,11 @@ public class DesireService
                 createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
                 return createdDesire;
             } catch (ResponseParsingException e) {
-                log.error("Error parsing desire from response", e);
+                log.error("Error parsing desire from response, retry {}/{}", i + 1, retries, e);
             }
 
         }
-        return null;
+        throw new DesireCreationException("Failed to create desire for opinion " + opinionEntry.getId() + " after " + retries + " retries.");
     }
 
 
@@ -145,6 +154,7 @@ public class DesireService
 
 
 }
+
 
 
 

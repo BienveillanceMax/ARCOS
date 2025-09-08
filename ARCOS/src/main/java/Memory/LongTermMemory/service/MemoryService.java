@@ -248,6 +248,14 @@ public class MemoryService
     }
 
     /**
+     * Supprime une entrée de la collection Desires.
+     */
+    public boolean deleteDesire(String desireId) {
+        return qdrantClient.deletePoint(DESIRES_COLLECTION, desireId);
+    }
+
+
+    /**
      * Supprime un résumé de la collection Summaries.
      */
     public boolean deleteSummary(String summaryId) {
