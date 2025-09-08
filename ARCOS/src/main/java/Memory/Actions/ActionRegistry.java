@@ -1,10 +1,13 @@
 package Memory.Actions;
 
 import Memory.Actions.Entities.Actions.Action;
+import Memory.Actions.Entities.Actions.AddCalendarEventAction;
 import Memory.Actions.Entities.Actions.DefaultAction;
 import Memory.Actions.Entities.Actions.SearchAction;
 import Memory.Actions.Entities.Actions.DeepSearchAction;
 import Memory.Actions.Entities.Actions.ListCalendarEventsAction;
+import Memory.Actions.Entities.Actions.DeleteCalendarEventAction;
+import Memory.Actions.Entities.Actions.SearchCalendarEventsAction;
 import Orchestrator.Entities.Parameter;
 import Tools.CalendarTool.CalendarService;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -35,6 +38,9 @@ public class ActionRegistry
         registerAction("Rechercher sur internet", new SearchAction(braveSearchService));
         registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
         registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
+        registerAction("Ajouter un événement au calendrier", new AddCalendarEventAction(calendarService));
+        registerAction("Supprimer un événement du calendrier", new DeleteCalendarEventAction(calendarService));
+        registerAction("Rechercher des événements dans le calendrier", new SearchCalendarEventsAction(calendarService));
         registerAction("Action par défaut", new DefaultAction());
     }
 
