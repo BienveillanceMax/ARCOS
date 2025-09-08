@@ -15,11 +15,14 @@ import Personality.Values.ValueProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.api.client.util.DateTime;
+import com.google.api.services.calendar.model.Event;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.FormatStyle;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -79,6 +82,19 @@ public class PromptBuilder
         appendOpinionJsonFormat(prompt);
         appendOpinionRules(prompt);
 
+        return prompt.toString();
+    }
+
+    public String buildSchedulerAlertPrompt(Object payload) {
+        Event event = (Event) payload;
+        StringBuilder prompt = new StringBuilder();
+        appendCalciferPersonality(prompt);
+        appendValueProfile(prompt);
+        prompt.append("Rappelle à ton créateur l'évenement suivant :\n")
+                .append("Résumé : ").append(event.getSummary()).append("\n")
+                .append("").append(event.getDescription()).append("\n").append("")
+                .append(event.getLocation()).append("\n").append("").append(event.getOriginalStartTime())
+                .append("\n").append("").append(event.getEnd()).append("\n\n");
         return prompt.toString();
     }
 
@@ -166,7 +182,9 @@ public class PromptBuilder
      */
     private void appendGeneralInformation(StringBuilder prompt) {
         prompt.append("Informations générales:\n")
-                .append("Date et heure : " + LocalDateTime.now() + "\n");
+                .append("Date : " + LocalDateTime.now().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) + "\n")
+                .append("Heure : " + LocalDateTime.now().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM)) + "\n")
+                .append("\n\n");
     }
 
 
@@ -778,4 +796,5 @@ public class PromptBuilder
     private String generateActionKey(ExecutionPlan.PlannedAction action, int index) {
         return action.getName() + "_" + index;
     }
+
 }

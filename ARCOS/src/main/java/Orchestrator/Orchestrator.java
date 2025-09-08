@@ -31,6 +31,7 @@ public class Orchestrator
     private final ConversationContext context;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
+    private final TTSHandler ttsHandler;
 
     @Autowired
     public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
@@ -42,21 +43,19 @@ public class Orchestrator
         this.context = context;
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
+        this.ttsHandler = new TTSHandler();
+        this.ttsHandler.start();
     }
 
 
-    private void dispatch(Event<?> event)
-    {
-        if (event.getType() == EventType.WAKEWORD)
-        {
+    private void dispatch(Event<?> event) {
+        if (event.getType() == EventType.WAKEWORD) {
 
             TTSHandler ttsHandler = new TTSHandler();
             ttsHandler.initialize();
             log.info("starting processing");
-            ttsHandler.speak( processQuery((String)event.getPayload()));
-        }
-        else if (event.getType() == EventType.INITIATIVE)
-        {
+            ttsHandler.speak(processQuery((String) event.getPayload()));
+        } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
                 initiativeService.processInitiative(desire);
@@ -67,6 +66,11 @@ public class Orchestrator
                 desire.setLastUpdated(java.time.LocalDateTime.now());
                 memoryService.storeDesire(desire);
             }
+        }
+        else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
+
+            ttsHandler.speak(llmClient.generateResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+
         }
     }
 
@@ -118,7 +122,7 @@ public class Orchestrator
 
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
-        context.addAssistantMessage(finalResponse,plan);
+        context.addAssistantMessage(finalResponse, plan);
 
         return finalResponse;
     }

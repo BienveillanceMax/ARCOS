@@ -18,7 +18,7 @@ public enum EventType
     DEVICE_CONNECTED("Périphérique connecté"),
     DEVICE_DISCONNECTED("Périphérique déconnecté"),
     INITIATIVE("Initiative"),
-    CUSTOM("Événement personnalisé");
+    CALENDAR_EVENT_SCHEDULER("Événement de calendrier");
 
     private final String description;
 
