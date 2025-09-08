@@ -99,7 +99,8 @@ public class MemoryService
 
 
     public boolean storeDesire(DesireEntry createdDesire) {
-        return storeEntry(DESIRES_COLLECTION, createdDesire, createdDesire.getLabel());
+        String textToEmbed = createdDesire.getLabel() + ". " + createdDesire.getDescription();
+        return storeEntry(DESIRES_COLLECTION, createdDesire, textToEmbed);
     }
 
 
