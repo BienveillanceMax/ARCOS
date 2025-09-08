@@ -47,10 +47,15 @@ public class DesireService
                 if (createdDesire == null) {
                     return null;
                 }
-                memoryService.storeDesire(createdDesire);
-                opinionEntry.setAssociatedDesire(createdDesire.getId());
-                memoryService.storeOpinion(opinionEntry);
-                return createdDesire;
+                boolean stored = memoryService.storeDesire(createdDesire);
+                if (stored) {
+                    opinionEntry.setAssociatedDesire(createdDesire.getId());
+                    memoryService.storeOpinion(opinionEntry);
+                    return createdDesire;
+                } else {
+                    log.error("Failed to store desire for opinion {}", opinionEntry.getId());
+                    return null;
+                }
 
             }
         } else {

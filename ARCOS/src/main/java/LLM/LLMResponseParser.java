@@ -354,21 +354,16 @@ public class LLMResponseParser
             // Extraire le JSON de la réponse (au cas où il y aurait du texte autour)
             String cleanJson = extractJsonFromResponse(jsonResponse);
 
-            // Parser la réponse JSON
-            DesireEntry response = objectMapper.readValue(cleanJson, DesireEntry.class);
+            // Parser la réponse JSON et remplir les champs manquants
+            DesireEntry desire = objectMapper.readValue(cleanJson, DesireEntry.class);
 
             // Valider la réponse
-            validateMistralResponse(response);
+            validateMistralResponse(desire);
 
-            // Créer et remplir l'objet DesireEntry
-            DesireEntry desire = new DesireEntry();
+            // Remplir les champs
             desire.setId(UUID.randomUUID().toString());
             desire.setOpinionId(opinionId);
-            desire.setLabel(response.getLabel());
-            desire.setDescription(response.getDescription());
-            desire.setIntensity(response.getIntensity());
             desire.setStatus(DesireEntry.Status.PENDING);
-
             LocalDateTime now = LocalDateTime.now();
             desire.setCreatedAt(now);
             desire.setLastUpdated(now);
