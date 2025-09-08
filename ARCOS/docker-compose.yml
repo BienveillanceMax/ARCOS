@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Qdrant service for the vector database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant_memory
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage:z
+    restart: unless-stopped
+
+  # ArCoS Application Service
+  arcos-app:
+    build: .
+    container_name: arcos_app
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+
+    # --- Environment & Secrets Configuration ---
+    # The application will use the API keys defined in the .env file.
+    # Make sure to create a .env file in this directory with your keys, e.g.:
+    # MISTRALAI_API_KEY=YOUR_MISTRAL_KEY
+    # BRAVE_SEARCH_API_KEY=YOUR_BRAVE_KEY
+    env_file: .env
+
+    # --- Hardware Access Configuration ---
+    # WARNING: The following settings grant the container extensive access to host hardware.
+    # This is necessary for Bluetooth and Audio to function, but it reduces container isolation.
+
+    # Use the host's network stack. This is the simplest way to ensure
+    # the container can access Bluetooth devices.
+    network_mode: "host"
+
+    # Grant the container access to all host devices. This is required for
+    # low-level access to the Bluetooth hardware stack.
+    privileged: true
+
+    volumes:
+      # Mount the Google Calendar credentials file (read-only).
+      - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
+
+      # Mount the Piper TTS voice models (read-only).
+      - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
+
+      # Mount the D-Bus socket to allow communication with the host's Bluetooth service.
+      - /var/run/dbus:/var/run/dbus:ro
+
+      # Mount the PipeWire socket for audio input/output.
+      # NOTE: '1000' is the typical user ID on Raspberry Pi OS.
+      # If your user ID is different, you may need to change this path.
+      # You can find your user ID by running the `id -u` command on your Pi.
+      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+
+      # Mount the sound devices directly.
+      - /dev/snd:/dev/snd
+
+volumes:
+  qdrant_storage:
