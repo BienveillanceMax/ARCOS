@@ -3,7 +3,6 @@ package Memory.Actions;
 import Memory.Actions.Entities.Actions.Action;
 import Memory.Actions.Entities.Actions.DefaultAction;
 import Memory.Actions.Entities.Actions.SearchAction;
-import Memory.Actions.Entities.Actions.TimeAction;
 import Memory.Actions.Entities.Actions.DeepSearchAction;
 import Memory.Actions.Entities.Actions.ListCalendarEventsAction;
 import Orchestrator.Entities.Parameter;
@@ -21,7 +20,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 @Component
-public class ActionRegistry {
+public class ActionRegistry
+{
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final BraveSearchService braveSearchService;
@@ -36,7 +36,6 @@ public class ActionRegistry {
         registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
         registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
         registerAction("Action par défaut", new DefaultAction());
-        registerAction("Accéder à la date et l'heure", new TimeAction());
     }
 
     public void registerAction(String name, Action action) {
@@ -131,7 +130,7 @@ public class ActionRegistry {
         // Métadonnées additionnelles
         ObjectNode metadataNode = objectMapper.createObjectNode();
         metadataNode.put("parameter_count", action.getParameters().size());
-        metadataNode.put("required_parameters",  countRequiredParameters(action));
+        metadataNode.put("required_parameters", countRequiredParameters(action));
         metadataNode.put("optional_parameters", countOptionalParameters(action));
         actionNode.set("metadata", metadataNode);
 
