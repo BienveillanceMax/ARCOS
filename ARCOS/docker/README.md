@@ -9,7 +9,7 @@ This guide provides instructions to deploy the ArCoS application and its depende
     ```bash
     sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin
     ```
-3.  **Hardware**: Your "Newpie Newline" Bluetooth speaker/microphone must be paired and connected to the Raspberry Pi using the `bluetoothctl` tool as described in the main project documentation.
+3.  **Hardware**: Your Bluetooth speaker/microphone must be paired and connected to the Raspberry Pi using the `bluetoothctl` tool as described in the main project documentation.
 4.  **API Keys and Credentials**: You must have the following secrets ready:
     *   Mistral AI API Key
     *   BraveSearch API Key
@@ -25,7 +25,7 @@ All commands should be run from the `ARCOS` directory of the project.
 Before building the container, you need to place your secrets in the correct locations.
 
 1.  **Create `.env` file**:
-    Create a file named `.env` in the `ARCOS` directory. This file will hold your API keys. Its content should be:
+    Create a file named `.env` in the `~/ARCOS` directory. This file will hold your API keys. Its content should be:
     ```
     MISTRALAI_API_KEY=YOUR_MISTRAL_API_KEY_HERE
     BRAVE_SEARCH_API_KEY=YOUR_BRAVE_SEARCH_API_KEY_HERE
@@ -37,7 +37,10 @@ Before building the container, you need to place your secrets in the correct loc
 
 3.  **Place TTS Voice Models**:
     *   Create a new directory: `src/main/resources/upmc-model/`
-    *   Place your `fr_FR-upmc-medium.onnx` and `fr_FR-upmc-medium.onnx.json` files inside this new directory.
+    *   Place your `fr_FR-upmc-medium.onnx` and `fr_FR-upmc-medium.onnx.json` files (or any other piper-compatible voice model) inside this new directory.
+
+4.  **Place WakeWord Models**:
+    *   Place your `.ppn` and `.pv` files in `src/main/resources/`, custom wakeword can be made through picovoice (very easily).    
 
 ### Step 2: Build and Run the Application
 
@@ -48,9 +51,11 @@ sudo docker compose up --build
 ```
 
 **What this command does:**
-*   `--build`: This flag tells Docker Compose to first build the `arcos-app` image using the `Dockerfile`. It will download the base Java image, install Piper, copy your application code, and compile it with Maven. This only needs to be done the first time or when you change the application code.
+*   `--build`: This flag tells Docker Compose to first build the `arcos-app` image using the `Dockerfile`. It will download the base Java image, install Piper, copy the application's code, and compile it with Maven. This only needs to be done the first time or when you change the application code.
 *   `up`: This command starts all the services defined in the `docker-compose.yml` file (`arcos-app` and `qdrant`).
 
 The application should now be running. You can view the logs for all services in your terminal. To stop the application, press `Ctrl+C`. To run it in the background in the future, you can use `sudo docker compose up -d`.
 
 This completes the containerized deployment process.
+
+WARNING: You'll still have to connect with Oauth2 to google (to access the calendar functionalities).
