@@ -35,11 +35,6 @@ public class OpinionService
     private static final double W_EXPERIENCE = 0.70;   // poids experience dans polarity
     private static final double W_COHERENCE = 0.30;    // poids coherence valeur -> polarity
 
-    private static final double BASE_CONF_WEIGHT = 0.5; // pour init confiance
-    private static final double IMP_CONF_WEIGHT = 0.5;  // pour init confiance
-
-    private static final double BETA_IMP = 0.60;   // pour stabilité: importance
-    private static final double BETA_ALIGN = 0.40; // pour stabilité: alignment
 
     private static final double ALPHA_POL_UPDATE = 0.0; // non utilisé (inertie via oldS used)
     private static final double REINFORCE_BASE = 0.05; // gain confiance quand cohérent

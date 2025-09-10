@@ -16,8 +16,14 @@ import LLM.Prompts.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import Personality.PersonalityOrchestrator;
 
+
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.Period;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 
 @Component
 @Slf4j
@@ -32,9 +38,12 @@ public class Orchestrator
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
     private final TTSHandler ttsHandler;
+    private final PersonalityOrchestrator personalityOrchestrator;
+
+    private LocalDateTime lastInteracted;
 
     @Autowired
-    public Orchestrator(EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -43,6 +52,9 @@ public class Orchestrator
         this.context = context;
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
+        this.personalityOrchestrator = personalityOrchestrator;
+        lastInteracted = LocalDateTime.now();
+
         this.ttsHandler = new TTSHandler();
         this.ttsHandler.start();
     }
@@ -60,14 +72,12 @@ public class Orchestrator
             try {
                 initiativeService.processInitiative(desire);
             } catch (Exception e) {
-                // The service handles its own internal errors, this is a fallback for unexpected crashes
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
                 desire.setStatus(DesireEntry.Status.PENDING);
                 desire.setLastUpdated(java.time.LocalDateTime.now());
                 memoryService.storeDesire(desire);
             }
-        }
-        else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
+        } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
 
             ttsHandler.speak(llmClient.generateResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
@@ -123,7 +133,27 @@ public class Orchestrator
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
         context.addAssistantMessage(finalResponse, plan);
-
+        triggerPersonalityProcessing(lastInteracted);
+        lastInteracted = LocalDateTime.now();
         return finalResponse;
+    }
+
+
+    private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                // On ne veut pas que la personnalité se déclenche à chaque interaction.
+                Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
+
+                if (context.getMessageHistory().size() > 2 && elapsedTime.toMinutes() > 10) {
+                    log.info("Triggering personality processing...");
+                    String fullConversation = context.getFullConversation();
+                    personalityOrchestrator.processMemory(fullConversation);
+                }
+            } catch (Exception e) {
+                log.error("Error during personality processing", e);
+            }
+        });
+
     }
 }
