@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # Qdrant service for the vector database
   qdrant:
-    image: qdrant/qdrant:latest
+    image: qdrant/qdrant:v1.11.4-arm64
     platform: linux/arm64
     container_name: qdrant_memory
     ports:
