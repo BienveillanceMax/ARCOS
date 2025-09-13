@@ -48,6 +48,7 @@ public class WakeWordProducer implements Runnable
 
     @Autowired
     public WakeWordProducer(EventQueue eventQueue) {
+        log.info("Initializing WakeWordProducer with new resource loading logic (v2).");
         this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
         String porcupineModelName = "porcupine_params_fr.pv";
