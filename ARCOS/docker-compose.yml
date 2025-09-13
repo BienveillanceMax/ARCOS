@@ -4,6 +4,7 @@ services:
   # Qdrant service for the vector database
   qdrant:
     image: qdrant/qdrant:latest
+    platform: linux/arm64
     container_name: qdrant_memory
     ports:
       - "6333:6333"
