@@ -14,9 +14,13 @@ import org.springframework.stereotype.Component;
 
 import javax.sound.sampled.*;
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.nio.ByteOrder;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -69,51 +73,37 @@ public class WakeWordProducer implements Runnable
         this.audioForwarder = new AudioForwarder(this.micDataLine, this.speechToText);
     }
 
+    private String extractResource(String resourceName) {
+        try (InputStream in = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+            if (in == null) {
+                throw new IllegalArgumentException("Resource not found: " + resourceName);
+            }
+
+            File tempFile = File.createTempFile(resourceName, "");
+            tempFile.deleteOnExit();
+
+            Files.copy(in, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            return tempFile.getAbsolutePath();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to extract resource: " + resourceName, e);
+        }
+    }
+
     private String getWhisperModelPath() {
         // You can either put the model in resources or use an absolute path
         // For resources: ggml-medium.fr.bin ggml-small.bin
-        URL url = getClass().getClassLoader().getResource("ggml-small.bin");
-        //URL url = getClass().getClassLoader().getResource("ggml-medium.fr.bin");
-
-
-        File modelFile = null;
-        try {
-            modelFile = new File(url.toURI());
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-        return modelFile.getAbsolutePath();
+        return extractResource("ggml-small.bin");
     }
 
     /// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// Porcupine initialization
 
     private String getKeywordPath(String keyword) {
-        URL url = getClass().getClassLoader().getResource(keyword);
-        if (url == null) {
-            throw new IllegalArgumentException("Keyword file not found in resources.");
-        }
-        File keywordFile = null;
-        try {
-            keywordFile = new File(url.toURI());
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-        return keywordFile.getAbsolutePath();
+        return extractResource(keyword);
     }
 
     private String getPorcupineModelPath(String model) {
-        URL url = getClass().getClassLoader().getResource(model);
-        if (url == null) {
-            throw new IllegalArgumentException("Model file not found in resources.");
-        }
-        File modelFile = null;
-        try {
-            modelFile = new File(url.toURI());
-        } catch (URISyntaxException e) {
-            throw new RuntimeException(e);
-        }
-        return modelFile.getAbsolutePath();
+        return extractResource(model);
     }
 
     private void initializePorcupine(String[] keywords, String modelPath) {
