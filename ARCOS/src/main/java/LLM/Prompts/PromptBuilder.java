@@ -123,7 +123,7 @@ public class PromptBuilder
     /**
      * Construit le prompt de planification pour le LLM
      */
-    public String buildPlanningPrompt(String userQuery, ConversationContext context) {
+    public String buildPlanningPrompt(String userQuery, ConversationContext context, List<MemoryEntry> memories) {
         StringBuilder prompt = new StringBuilder();
 
         appendPersonalityHeader(prompt, "planificateur d'actions intelligent");
@@ -131,6 +131,7 @@ public class PromptBuilder
         appendGeneralInformation(prompt);
         appendAvailableActions(prompt);
         appendConversationContextIfPresent(prompt, context);
+        appendRelevantMemories(prompt, memories);
         appendUserQuery(prompt, userQuery);
         appendPlanningInstructions(prompt);
 
@@ -430,9 +431,15 @@ public class PromptBuilder
      */
     private void appendRelevantMemories(StringBuilder prompt, List<MemoryEntry> memories) {
         if (memories != null && !memories.isEmpty()) {
-            prompt.append("SOUVENIRS PERTINENTS (CONTEXTE):\n");
-            memories.forEach(m -> prompt.append("- ").append(m.getContent()).append("\n"));
-            prompt.append("\n");
+            prompt.append("## Souvenirs pertinents\n\n");
+            prompt.append("Pour t'aider dans ta réflexion, voici quelques souvenirs pertinents extraits de ta mémoire long-terme:\n\n");
+            memories.forEach(m -> {
+                prompt.append("### Souvenir: ").append(m.getSubject()).append("\n");
+                prompt.append("- **Contenu:** ").append(m.getContent()).append("\n");
+                prompt.append("- **Date:** ").append(m.getTimestamp()).append("\n");
+                prompt.append("- **Satisfaction:** ").append(m.getSatisfaction()).append("/10\n\n");
+            });
+            prompt.append("Utilise ces informations pour éclairer ta décision et formuler un plan d'action cohérent.\n\n");
         }
     }
 

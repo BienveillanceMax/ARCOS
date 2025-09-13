@@ -7,7 +7,11 @@ import Exceptions.ResponseParsingException;
 import IO.OuputHandling.TTSHandler;
 import LLM.LLMResponseParser;
 import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import LLM.LLMClient;
+import java.util.List;
+import java.util.stream.Collectors;
 import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.service.MemoryService;
@@ -44,6 +48,10 @@ public class Orchestrator
 
     @Autowired
     public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
+        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, new TTSHandler());
+    }
+
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, TTSHandler ttsHandler) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -53,10 +61,8 @@ public class Orchestrator
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
+        this.ttsHandler = ttsHandler;
         lastInteracted = LocalDateTime.now();
-
-        this.ttsHandler = new TTSHandler();
-        this.ttsHandler.start();
     }
 
 
@@ -85,6 +91,7 @@ public class Orchestrator
     }
 
     public void start() {
+        this.ttsHandler.start();
         while (true) {
             try {
                 Event<?> event = eventQueue.take();
@@ -99,8 +106,15 @@ public class Orchestrator
     private String processQuery(String userQuery) {
 
         log.info("Processing query: {}", userQuery);
+
+        // Search for relevant memories
+        List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery)
+                .stream()
+                .map(SearchResult::getEntry)
+                .collect(Collectors.toList());
+
         // 1. Génération du prompt
-        String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context);
+        String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context, relevantMemories);
         log.debug("Planning prompt:\n{}", planningPrompt);
 
         // 2. Appel à Mistral pour planification
