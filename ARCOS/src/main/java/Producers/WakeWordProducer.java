@@ -47,7 +47,14 @@ public class WakeWordProducer implements Runnable
         this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
         String porcupineModelName = "porcupine_params_fr.pv";
-        String[] keywordPaths = new String[]{getKeywordPath(keywordName)};
+        String[] keywordPaths;
+        try {
+            keywordPaths = new String[]{getKeywordPath("Calcifer.ppn")};
+        }
+        catch (IllegalArgumentException e)
+        {
+            keywordPaths = new String[]{getKeywordPath(keywordName)};
+        }
         String porcupineModelPath = getPorcupineModelPath(porcupineModelName);
 
         File keywordFile = new File(keywordPaths[0]);
