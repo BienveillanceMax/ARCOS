@@ -29,6 +29,7 @@
     <properties>
         <java.version>21</java.version>
         <spring-ai.version>1.0.0</spring-ai.version>
+        <porcupine.version>3.0.5</porcupine.version>
     </properties>
     <dependencyManagement>
         <dependencies>
@@ -78,7 +79,7 @@
         <dependency>
             <groupId>ai.picovoice</groupId>
             <artifactId>porcupine-java</artifactId>
-            <version>3.0.5</version>
+            <version>${porcupine.version}</version>
         </dependency>
 
 
@@ -126,6 +127,30 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>unpack-porcupine</id>
+                        <phase>prepare-package</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>ai.picovoice</groupId>
+                                    <artifactId>porcupine-java</artifactId>
+                                    <version>${porcupine.version}</version>
+                                    <outputDirectory>${project.build.outputDirectory}</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
