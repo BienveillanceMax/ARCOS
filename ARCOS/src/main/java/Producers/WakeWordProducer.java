@@ -44,9 +44,13 @@ public class WakeWordProducer implements Runnable {
 
     @EventListener(ApplicationReadyEvent.class)
     public void startAfterStartup() {
-        Thread thread = new Thread(this);
-        thread.setDaemon(true);
-        thread.start();
+        if (this.micDataLine != null) {
+            Thread thread = new Thread(this);
+            thread.setDaemon(true);
+            thread.start();
+        } else {
+            log.warn("No audio input device found or configured. Wake word detection thread will not start.");
+        }
     }
 
     @Autowired
@@ -71,8 +75,13 @@ public class WakeWordProducer implements Runnable {
         this.audioDeviceIndex = 10; // TODO SELECT THE RIGHT INPUT
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
-        this.speechToText = new SpeechToText(getWhisperModelPath());
-        this.audioForwarder = new AudioForwarder(this.micDataLine, this.speechToText);
+        if (this.micDataLine != null) {
+            this.speechToText = new SpeechToText(getWhisperModelPath());
+            this.audioForwarder = new AudioForwarder(this.micDataLine, this.speechToText);
+        } else {
+            this.speechToText = null;
+            this.audioForwarder = null;
+        }
     }
 
     private String extractResource(String resourceName) {
@@ -120,34 +129,44 @@ public class WakeWordProducer implements Runnable {
         AudioFormat sourceFormat = new AudioFormat(SOURCE_SAMPLE_RATE, 16, 1, true, false);
         DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, sourceFormat);
 
-        try {
-            this.micDataLine = getAudioDevice(this.audioDeviceIndex, dataLineInfo);
-            this.micDataLine.open(sourceFormat);
-            this.micDataLine.start();
-        } catch (LineUnavailableException e) {
-            log.error("Failed to get a valid capture device. Use --show_audio_devices to show available capture devices and their indices", e);
-            System.exit(1);
+        this.micDataLine = getAudioDevice(this.audioDeviceIndex, dataLineInfo);
+
+        if (this.micDataLine != null) {
+            try {
+                this.micDataLine.open(sourceFormat);
+                this.micDataLine.start();
+                log.info("Successfully initialized audio device.");
+            } catch (LineUnavailableException e) {
+                log.error("Audio device is unavailable, even after getting the line. Wake word detection will be disabled.", e);
+                this.micDataLine = null;
+            }
         }
     }
 
     private static TargetDataLine getAudioDevice(int deviceIndex, DataLine.Info dataLineInfo) {
         if (deviceIndex >= 0) {
             try {
-                Mixer.Info mixerInfo = AudioSystem.getMixerInfo()[deviceIndex];
-                Mixer mixer = AudioSystem.getMixer(mixerInfo);
-                if (mixer.isLineSupported(dataLineInfo)) {
-                    return (TargetDataLine) mixer.getLine(dataLineInfo);
+                Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
+                if (deviceIndex < mixerInfos.length) {
+                    Mixer.Info mixerInfo = mixerInfos[deviceIndex];
+                    Mixer mixer = AudioSystem.getMixer(mixerInfo);
+                    if (mixer.isLineSupported(dataLineInfo)) {
+                        return (TargetDataLine) mixer.getLine(dataLineInfo);
+                    } else {
+                        log.warn("Audio capture device at index {} does not support the requested audio format. Using default.", deviceIndex);
+                    }
                 } else {
-                    log.warn("Audio capture device at index {} does not support the requested audio format. Using default.", deviceIndex);
+                    log.warn("Audio device index {} is out of bounds. Using default.", deviceIndex);
                 }
             } catch (Exception e) {
-                log.warn("Could not get audio device at index {}. Using default.", deviceIndex);
+                log.warn("Could not get audio device at index {}. Using default.", deviceIndex, e);
             }
         }
         try {
             return (TargetDataLine) AudioSystem.getLine(dataLineInfo);
-        } catch (LineUnavailableException e) {
-            throw new RuntimeException("Default audio capture device does not support the requested audio format.", e);
+        } catch (LineUnavailableException | IllegalArgumentException e) {
+            log.warn("Could not get default audio capture device. Wake word detection will be disabled.");
+            return null;
         }
     }
 
