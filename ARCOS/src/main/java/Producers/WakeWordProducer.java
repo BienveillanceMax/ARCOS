@@ -39,7 +39,7 @@ public class WakeWordProducer implements Runnable {
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
 
-    private static final float SOURCE_SAMPLE_RATE = 20000f;
+    private static final float SOURCE_SAMPLE_RATE = 44100f;
     private static final int TARGET_SAMPLE_RATE = 16000;
 
     @EventListener(ApplicationReadyEvent.class)
@@ -58,7 +58,7 @@ public class WakeWordProducer implements Runnable {
         String[] keywordPaths;
         try {
             keywordPaths = new String[]{getKeywordPath("Calcifer.ppn")};
-        } catch (Exception e) {
+        } catch (IllegalArgumentException e) {
             keywordPaths = new String[]{getKeywordPath(keywordName)};
         }
         String porcupineModelPath = getPorcupineModelPath(porcupineModelName);
