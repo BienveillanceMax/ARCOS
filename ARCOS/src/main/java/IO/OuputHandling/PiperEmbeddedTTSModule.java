@@ -4,6 +4,8 @@ package IO.OuputHandling;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.*;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.file.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -39,8 +41,8 @@ public class PiperEmbeddedTTSModule
     private float noiseScaleW = 0.8f;
 
     // Cache et répertoires temporaires
-    private final File tempDirectory;
-    private final File modelsDirectory;
+    private File tempDirectory;
+    private File modelsDirectory;
     private final ConcurrentHashMap<String, File> audioCache;
 
     // Modèles disponibles dans les ressources
@@ -110,7 +112,10 @@ public class PiperEmbeddedTTSModule
             Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
         } catch (IOException e) {
-            throw new RuntimeException("Impossible de créer les répertoires temporaires", e);
+            log.error("Failed to create temp directories or extract/download model", e);
+            // Do not throw a RuntimeException, allow the object to be created in a failed state.
+            this.tempDirectory = null;
+            this.modelsDirectory = null;
         }
     }
 
@@ -133,15 +138,74 @@ public class PiperEmbeddedTTSModule
     }
 
     /**
-     * Extrait une ressource vers un fichier
+     * Extrait une ressource vers un fichier, en la téléchargeant si elle n'est pas trouvée localement.
      */
     private void extractResource(String resourcePath, File targetFile) throws IOException {
+        // Try to find resource in classpath first
         try (InputStream inputStream = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
-            if (inputStream == null) {
-                throw new IOException("Ressource non trouvée: " + resourcePath);
+            if (inputStream != null) {
+                log.debug("Extracting resource from classpath: {}", resourcePath);
+                Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                return;
             }
+        } catch (Exception e) {
+            log.warn("Could not read resource from classpath: {}", e.getMessage());
+        }
 
-            Files.copy(inputStream, targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        // If not found, attempt to download from Hugging Face
+        log.warn("Resource not found in classpath: {}. Attempting to download from Hugging Face.", resourcePath);
+        String modelUrl = buildModelUrl(resourcePath);
+
+        if (modelUrl == null) {
+            throw new IOException("Could not construct download URL for " + resourcePath);
+        }
+
+        try {
+            downloadFile(modelUrl, targetFile.toPath());
+        } catch (IOException e) {
+            log.error("Failed to download model from {}: {}", modelUrl, e.getMessage());
+            // Chain the exception
+            throw new IOException("Failed to download model for resource: " + resourcePath, e);
+        }
+    }
+
+    private static String buildModelUrl(String resourcePath) {
+        String fileName = Paths.get(resourcePath).getFileName().toString();
+        // Assuming filename format like: {locale}-{voice}-{quality}.onnx
+        String[] parts = fileName.replace(".onnx.json", "").replace(".onnx", "").split("-");
+
+        if (parts.length < 3) {
+            log.error("Cannot determine model URL from resource path format: {}", resourcePath);
+            return null;
+        }
+
+        String locale = parts[0];
+        String voice = parts[1];
+        String quality = parts[2];
+        String lang = locale.substring(0, 2);
+
+        return String.format(
+                "https://huggingface.co/rhasspy/piper-voices/resolve/main/%s/%s/%s/%s/%s",
+                lang, locale, voice, quality, fileName);
+    }
+
+    private void downloadFile(String urlString, Path targetPath) throws IOException {
+        URL url = new URL(urlString);
+        log.info("Downloading model from {}", url);
+
+        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        // It's good practice to set timeouts
+        connection.setConnectTimeout(10000); // 10 seconds
+        connection.setReadTimeout(30000);    // 30 seconds
+
+        int responseCode = connection.getResponseCode();
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            try (InputStream inputStream = connection.getInputStream()) {
+                Files.copy(inputStream, targetPath, StandardCopyOption.REPLACE_EXISTING);
+                log.info("Successfully downloaded model to {}", targetPath);
+            }
+        } else {
+            throw new IOException("Failed to download model. Server responded with code: " + responseCode + " for URL: " + urlString);
         }
     }
 
