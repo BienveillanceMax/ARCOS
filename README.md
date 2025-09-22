@@ -32,26 +32,21 @@ Chaque erreur de parsing ou d'appel doit permettre une logique de retry ou d'éc
 
 ### Configuration
 
-1.  **Clé d'API Mistral AI**: Le projet utilise l'API de Mistral AI. Vous devez fournir votre clé d'API dans le fichier `src/main/resources/application.properties`:
+Dans un fichier .env dans le même dossier que me docker-compose.yml vous devez définir ces valeurs : 
 
-    ```properties
-    spring.ai.mistralai.api-key=VOTRE_CLÉ_API_MISTRAL
-    ```
+1.  **Clé d'API Mistral AI**: Le projet utilise l'API de Mistral AI. Vous devez fournir votre clé d'API dans le fichier sous la forme :
+`MISTRALAI_API_KEY=yourkey`
 
-2.  **Qdrant**: La base de données vectorielle Qdrant est utilisée pour la mémoire à long terme. Le projet est configuré pour se connecter à une instance Qdrant locale via Docker Compose.
+2.  **Clé d'API BraveSearch**: Le projet utilise l'API de Brave pour les recherches internet. Vous devez fournir votre clé d'api dans le fichier sous la forme :
+ `BRAVE_SEARCH_API_KEY=yourkey`
 
-3.  **Clé d'API BraveSearch**: Le projet utilise l'API de Brave pour les recherches internet. Vous devez fournir votre clé d'api en variable d'environement. `BRAVE_SEARCH_API_KEY=yourkey` 
+3.  **Clé d'accès PicoVoice Porcupine**: Le projet utilise Porcupine pour détecter les "wake words" Vous devez fournir votre clé dans le fichier sous la forme :
+ `PORCUPINE_ACCESS_KEY=yourkey`.
 ### Lancement
-
-1.  **Lancer Qdrant**:
-    ```bash
-    docker-compose up -d
-    ```
-    Cette commande se trouve dans le dossier `src/main/java/Docker`.
 
 2.  **Lancer l'application**:
     ```bash
-    mvn spring-boot:run
+    docker compose up
     ```
 
 ## Utilisation
