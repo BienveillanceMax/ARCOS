@@ -42,9 +42,12 @@ Dans un fichier .env dans le même dossier que me docker-compose.yml vous devez 
 
 3.  **Clé d'accès PicoVoice Porcupine**: Le projet utilise Porcupine pour détecter les "wake words" Vous devez fournir votre clé dans le fichier sous la forme :
  `PORCUPINE_ACCESS_KEY=yourkey`.
+
+Dans le dossier src/main/ressources vous devez ajouter le dossier `client_secret.json` contenant les accès à l'api Google.
+
 ### Lancement
 
-2.  **Lancer l'application**:
+1.  **Lancer l'application**:
     ```bash
     docker compose up
     ```
