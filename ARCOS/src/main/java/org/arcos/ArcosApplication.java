@@ -28,14 +28,14 @@ public class ArcosApplication
         orchestrator.start();
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
-        DesireService desireService = context.getBean(DesireService.class);
-        MemoryService memoryService = context.getBean(MemoryService.class);
-        DesireEntry desireEntry = new DesireEntry();
-        desireEntry.setStatus(DesireEntry.Status.PENDING);
-        desireEntry.setIntensity(0.9);
-        desireEntry.setDescription("J'aimerai mieux comprendre ce monde");
+        //DesireService desireService = context.getBean(DesireService.class);
+        //MemoryService memoryService = context.getBean(MemoryService.class);
+        //DesireEntry desireEntry = new DesireEntry();
+        //desireEntry.setStatus(DesireEntry.Status.PENDING);
+        //desireEntry.setIntensity(0.9);
+        //desireEntry.setDescription("J'aimerai mieux comprendre ce monde");
 
-        memoryService.storeDesire(desireEntry);
+        //memoryService.storeDesire(desireEntry);
 
         //WakeWordProducer.showAudioDevices();
 
@@ -48,7 +48,7 @@ public class ArcosApplication
         //EventLoopRunner eventLoopRunner = new EventLoopRunner(orchestrator);
         //eventLoopRunner.run();
 
-        //WakeWordDetector.showAudioDevices();
+        WakeWordProducer.showAudioDevices();
     }
 
 }
