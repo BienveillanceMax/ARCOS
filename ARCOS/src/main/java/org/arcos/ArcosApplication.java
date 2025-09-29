@@ -35,7 +35,7 @@ public class ArcosApplication
         desireEntry.setIntensity(0.9);
         desireEntry.setDescription("J'aimerai mieux comprendre ce monde");
 
-        memoryService.storeDesire(desireEntry);
+        //memoryService.storeDesire(desireEntry);
 
         //WakeWordProducer.showAudioDevices();
 
@@ -48,7 +48,7 @@ public class ArcosApplication
         //EventLoopRunner eventLoopRunner = new EventLoopRunner(orchestrator);
         //eventLoopRunner.run();
 
-        //WakeWordDetector.showAudioDevices();
+        WakeWordProducer.showAudioDevices();
     }
 
 }
