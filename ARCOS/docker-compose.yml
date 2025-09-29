@@ -20,23 +20,44 @@ services:
     restart: unless-stopped
     depends_on:
       - qdrant
-      - piper
+
+    # --- Environment & Secrets Configuration ---
+    # The application will use the API keys defined in the .env file.
+    # Make sure to create a .env file in this directory with your keys, e.g.:
+    # MISTRALAI_API_KEY=YOUR_MISTRAL_KEY
+    # BRAVE_SEARCH_API_KEY=YOUR_BRAVE_KEY
     env_file: .env
-    network_mode: "host"       # you already have this
+
+    # --- Hardware Access Configuration ---
+    # WARNING: The following settings grant the container extensive access to host hardware.
+    # This is necessary for Bluetooth and Audio to function, but it reduces container isolation.
+
+    # Use the host's network stack. This is the simplest way to ensure
+    # the container can access Bluetooth devices.
+    network_mode: "host"
+
+    # Grant the container access to all host devices. This is required for
+    # low-level access to the Bluetooth hardware stack.
     privileged: true
+
     volumes:
+      # Mount the Google Calendar credentials file (read-only).
       - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
+
+      # Mount the Piper TTS voice models (read-only).
       - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
+
+      # Mount the D-Bus socket to allow communication with the host's Bluetooth service.
       - /var/run/dbus:/var/run/dbus:ro
+
+      # Mount the PipeWire socket for audio input/output.
+      # NOTE: '1000' is the typical user ID on Raspberry Pi OS.
+      # If your user ID is different, you may need to change this path.
+      # You can find your user ID by running the `id -u` command on your Pi.
       - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+
+      # Mount the sound devices directly.
       - /dev/snd:/dev/snd
 
-  piper:
-      image: rhasspy/wyoming-piper:latest    # or linuxserver/piper, artibex/piper-http etc.
-      container_name: wyoming_piper
-      restart: unless-stopped
-      ports:
-        - "10200:10200"    # Wyoming protocol port
-      volumes:
-        - ./piper-data:/data   # models and download dir for piper voices
-      command: [ "--voice", "fr_FR-upmc-medium" ]  # optional default voice
+volumes:
+  qdrant_storage:
