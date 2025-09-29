@@ -9,6 +9,9 @@ import java.net.URL;
 import java.nio.file.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipEntry;
 import javax.sound.sampled.*;
 import java.util.List;
 import java.util.ArrayList;
@@ -29,10 +32,6 @@ public class PiperEmbeddedTTSModule
     // Chemins des ressources
     private final String piperExecutablePath;
     private String extractedModelPath;
-
-    // Configuration audio
-    private AudioFormat audioFormat;
-    private SourceDataLine audioLine;
 
     // Paramètres Piper
     private float speechRate = 1.0f;
@@ -84,15 +83,14 @@ public class PiperEmbeddedTTSModule
     }
 
     public PiperEmbeddedTTSModule() {
-        this(findPiperExecutable(), EmbeddedModel.UPMC);
+        this(null, EmbeddedModel.UPMC);
     }
 
     public PiperEmbeddedTTSModule(EmbeddedModel preferredModel) {
-        this(findPiperExecutable(), preferredModel);
+        this(null, preferredModel);
     }
 
     public PiperEmbeddedTTSModule(String piperExecutablePath, EmbeddedModel model) {
-        this.piperExecutablePath = piperExecutablePath;
         this.requestQueue = new LinkedBlockingQueue<>();
         this.executorService = Executors.newFixedThreadPool(3);
         this.isRunning = new AtomicBoolean(false);
@@ -100,22 +98,34 @@ public class PiperEmbeddedTTSModule
         this.audioCache = new ConcurrentHashMap<>();
 
         try {
-            // Création des répertoires temporaires
+            // 1. Create temporary directory
             this.tempDirectory = Files.createTempDirectory("piper_tts").toFile();
-            this.modelsDirectory = new File(tempDirectory, "models");
-            this.modelsDirectory.mkdirs();
 
-            // Extraction du modèle préféré
+            // 2. Ensure Piper executable is available
+            if (piperExecutablePath == null || piperExecutablePath.trim().isEmpty()) {
+                this.piperExecutablePath = ensurePiperExecutable();
+            } else {
+                this.piperExecutablePath = piperExecutablePath;
+            }
+
+            // 3. Create models directory
+            this.modelsDirectory = new File(tempDirectory, "models");
+            if (!this.modelsDirectory.mkdirs() && !this.modelsDirectory.exists()) {
+                throw new IOException("Could not create models directory: " + this.modelsDirectory.getAbsolutePath());
+            }
+
+            // 4. Extract the preferred model
             this.extractedModelPath = extractModel(model);
 
-            // Nettoyage à la fermeture de la JVM
+            // 5. Add a shutdown hook for cleanup
             Runtime.getRuntime().addShutdownHook(new Thread(this::cleanup));
 
         } catch (IOException e) {
-            log.error("Failed to create temp directories or extract/download model", e);
-            // Do not throw a RuntimeException, allow the object to be created in a failed state.
-            this.tempDirectory = null;
-            this.modelsDirectory = null;
+            log.error("Failed to initialize PiperTTSModule", e);
+            // Clean up partially created directories if initialization fails
+            cleanup();
+            // Fail fast
+            throw new RuntimeException("Failed to initialize PiperTTSModule", e);
         }
     }
 
@@ -209,65 +219,231 @@ public class PiperEmbeddedTTSModule
         }
     }
 
-    /**
-     * Trouve l'exécutable Piper dans le système
-     */
-    private static String findPiperExecutable() {
+    private String ensurePiperExecutable() {
+        // 1. Check common paths for existing executable
         String[] possiblePaths = {
-                "/usr/local/bin/piper",
-                "/usr/bin/piper",
                 "./piper",
                 "piper.exe",
+                "/usr/local/bin/piper",
+                "/usr/bin/piper",
                 "C:\\piper\\piper.exe",
                 System.getProperty("user.home") + "/piper/piper"
         };
 
         for (String path : possiblePaths) {
             if (Files.exists(Paths.get(path))) {
+                log.info("Found existing piper executable at: {}", path);
                 return path;
             }
         }
-        //log.debug();
-        return "piper"; // Par défaut dans le PATH
+
+        // 2. If not found, download it
+        log.info("Piper executable not found. Attempting to download...");
+        try {
+            return downloadPiper();
+        } catch (IOException e) {
+            log.error("Failed to download piper executable", e);
+            throw new RuntimeException("Could not find or download piper executable.", e);
+        }
+    }
+
+    private String downloadPiper() throws IOException {
+        String os = getOS();
+        String arch = getArch();
+        String version = "2023.11.14-2";
+        String fileName;
+        String url;
+
+        if ("unknown".equals(os) || "unknown".equals(arch)) {
+            throw new IOException("Unsupported OS or architecture: " + os + " " + arch);
+        }
+
+        switch (os) {
+            case "windows":
+                fileName = "piper_windows_amd64.zip";
+                break;
+            case "linux":
+                fileName = "piper_linux_" + (arch.equals("amd64") ? "x86_64" : "aarch64") + ".tar.gz";
+                break;
+            case "macos":
+                fileName = "piper_macos_" + (arch.equals("amd64") ? "x86_64" : "aarch64") + ".zip";
+                break;
+            default:
+                throw new IOException("Unsupported OS: " + os);
+        }
+
+        url = "https://github.com/rhasspy/piper/releases/download/" + version + "/" + fileName;
+
+        Path targetPath = Paths.get(tempDirectory.getAbsolutePath(), fileName);
+        downloadFile(url, targetPath);
+
+        // Unzip/untar and find the executable
+        File piperExe = decompress(targetPath.toFile(), tempDirectory);
+
+        // Make executable
+        if (!piperExe.setExecutable(true)) {
+            log.warn("Could not make piper executable. This might cause issues on Linux/macOS.");
+        }
+
+        return piperExe.getAbsolutePath();
+    }
+
+    private File decompress(File sourceFile, File destinationDir) throws IOException {
+        String fileName = sourceFile.getName();
+        if (fileName.endsWith(".zip")) {
+            return unzip(sourceFile, destinationDir);
+        } else if (fileName.endsWith(".tar.gz")) {
+            return untarGz(sourceFile, destinationDir);
+        }
+        throw new IOException("Unsupported archive format: " + fileName);
+    }
+
+    private File unzip(File zipFile, File destDir) throws IOException {
+        byte[] buffer = new byte[1024];
+        File piperExecutable = null;
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFile))) {
+            ZipEntry zipEntry = zis.getNextEntry();
+            while (zipEntry != null) {
+                File newFile = new File(destDir, zipEntry.getName());
+                if (zipEntry.isDirectory()) {
+                    if (!newFile.isDirectory() && !newFile.mkdirs()) {
+                        throw new IOException("Failed to create directory " + newFile);
+                    }
+                } else {
+                    File parent = newFile.getParentFile();
+                    if (!parent.isDirectory() && !parent.mkdirs()) {
+                        throw new IOException("Failed to create directory " + parent);
+                    }
+                    try (FileOutputStream fos = new FileOutputStream(newFile)) {
+                        int len;
+                        while ((len = zis.read(buffer)) > 0) {
+                            fos.write(buffer, 0, len);
+                        }
+                    }
+                    if (newFile.getName().startsWith("piper")) {
+                        piperExecutable = newFile;
+                    }
+                }
+                zipEntry = zis.getNextEntry();
+            }
+        }
+        if (piperExecutable == null) {
+            throw new IOException("Could not find piper executable in zip archive");
+        }
+        return piperExecutable;
+    }
+
+    private File untarGz(File tarGzFile, File destDir) throws IOException {
+        File piperExecutable = null;
+        try (FileInputStream fis = new FileInputStream(tarGzFile);
+             GZIPInputStream gzis = new GZIPInputStream(fis);
+             // Standard Java doesn't have a TarInputStream. We'll use a simplified manual extraction.
+             // This is a basic implementation that assumes a simple tar structure.
+             // For more complex tar files, a library like Apache Commons Compress would be better.
+             InputStream is = new BufferedInputStream(gzis)) {
+
+            byte[] buffer = new byte[1024];
+            // A TAR archive is a sequence of 512-byte records.
+            byte[] headerBuffer = new byte[512];
+
+            while (is.read(headerBuffer) != -1) {
+                String name = new String(headerBuffer, 0, 100).trim();
+                if (name.isEmpty()) {
+                    continue; // End of archive marker
+                }
+                String sizeStr = new String(headerBuffer, 124, 12).trim();
+                long size = Long.parseLong(sizeStr, 8);
+
+                File outputFile = new File(destDir, name);
+
+                if (name.endsWith("/")) { // It's a directory
+                    outputFile.mkdirs();
+                } else { // It's a file
+                    outputFile.getParentFile().mkdirs();
+                    try (FileOutputStream fos = new FileOutputStream(outputFile)) {
+                        long bytesRemaining = size;
+                        while (bytesRemaining > 0) {
+                            int read = is.read(buffer, 0, (int) Math.min(buffer.length, bytesRemaining));
+                            if (read == -1) break;
+                            fos.write(buffer, 0, read);
+                            bytesRemaining -= read;
+                        }
+                    }
+                    if (outputFile.getName().startsWith("piper")) {
+                        piperExecutable = outputFile;
+                    }
+                }
+
+                // Skip padding to the next 512-byte boundary
+                long padding = (512 - (size % 512)) % 512;
+                if (is.skip(padding) != padding) {
+                    throw new IOException("Failed to skip padding in tar archive");
+                }
+            }
+        }
+        if (piperExecutable == null) {
+            throw new IOException("Could not find piper executable in tar.gz archive");
+        }
+        return piperExecutable;
+    }
+
+    private String getOS() {
+        String osName = System.getProperty("os.name").toLowerCase();
+        if (osName.contains("win")) {
+            return "windows";
+        } else if (osName.contains("nix") || osName.contains("nux") || osName.contains("aix")) {
+            return "linux";
+        } else if (osName.contains("mac")) {
+            return "macos";
+        }
+        return "unknown";
+    }
+
+    private String getArch() {
+        String osArch = System.getProperty("os.arch").toLowerCase();
+        if (osArch.contains("amd64") || osArch.contains("x86_64")) {
+            return "amd64";
+        } else if (osArch.contains("aarch64") || osArch.contains("arm64")) {
+            return "aarch64";
+        }
+        return "unknown";
     }
 
     /**
      * Initialise le module TTS
      */
     public boolean initialize() {
+        if (isInitialized.get()) {
+            log.warn("Module is already initialized.");
+            return true;
+        }
+
         try {
-            log.info("Using piper executable at: {}", Paths.get(piperExecutablePath));
-            // Vérification de l'exécutable Piper
-            if (!Files.exists(Paths.get(piperExecutablePath))) {
-                log.error("Exécutable Piper non trouvé: {}", piperExecutablePath);
-                log.error("Installez Piper ou spécifiez le chemin correct.");
-                return false;
-            }
+            // The constructor now ensures the executable and model are ready.
+            log.info("Initializing Piper TTS Module...");
+            log.info("Using piper executable at: {}", piperExecutablePath);
+            log.info("Using model: {}", extractedModelPath);
 
-            // Vérification du modèle extrait
-            if (!Files.exists(Paths.get(extractedModelPath))) {
-                log.error("Modèle extrait non trouvé: {}", extractedModelPath);
-                return false;
-            }
-
-            // Test de Piper
+            // 1. Test Piper connection
             if (!testPiperConnection()) {
+                log.error("Piper connection test failed. Initialization aborted.");
                 return false;
             }
 
-            // Configuration audio
+            // 2. Configure audio system
             setupAudioSystem();
 
-            isInitialized.set(true);
+            // 3. Start processing thread
             startProcessing();
 
-            log.info("Module TTS Piper avec modèles intégrés initialisé avec succès");
-            log.info("Modèle utilisé: {}", extractedModelPath);
-
+            isInitialized.set(true);
+            log.info("Piper TTS Module initialized successfully.");
             return true;
 
         } catch (Exception e) {
-            log.error("Erreur lors de l'initialisation", e);
+            log.error("A critical error occurred during initialization", e);
+            // Ensure we are in a clean state if initialization fails
+            shutdown();
             return false;
         }
     }
@@ -330,115 +506,6 @@ public class PiperEmbeddedTTSModule
         }
     }
 
-    private void debugAudioSystem() {
-        log.debug("=== DEBUG AUDIO SYSTEM ===");
-
-        // Liste tous les mixers disponibles
-        Mixer.Info[] mixers = AudioSystem.getMixerInfo();
-        log.debug("Mixers audio disponibles:");
-        for (int i = 0; i < mixers.length; i++) {
-            log.debug("{}: {} - {}", i, mixers[i].getName(), mixers[i].getDescription());
-        }
-
-        // Affiche le mixer utilisé par défaut
-        try {
-            Mixer defaultMixer = AudioSystem.getMixer(null);
-            log.debug("Mixer par défaut: {}", defaultMixer.getMixerInfo().getName());
-
-            // Vérifie les lignes disponibles
-            Line.Info[] sourceLines = defaultMixer.getSourceLineInfo();
-            log.debug("Lignes de sortie disponibles: {}", sourceLines.length);
-            for (Line.Info lineInfo : sourceLines) {
-                log.debug("- {}", lineInfo);
-            }
-
-        } catch (Exception e) {
-            log.error("Erreur lors du debug audio", e);
-        }
-    }
-
-    private AudioFormat findSupportedAudioFormat(Mixer mixer) {
-        // Formats à essayer par ordre de préférence
-        AudioFormat[] formatsToTry = {
-                // Format original
-                new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 22050, 16, 1, 2, 22050, false),
-                // Formats alternatifs
-                new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 44100, 16, 1, 2, 44100, false), // 44.1kHz mono
-                new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 44100, 16, 2, 4, 44100, false), // 44.1kHz stéréo
-                new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 48000, 16, 1, 2, 48000, false), // 48kHz mono
-                new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 48000, 16, 2, 4, 48000, false), // 48kHz stéréo
-                new AudioFormat(AudioFormat.Encoding.PCM_SIGNED, 22050, 16, 2, 4, 22050, false), // 22kHz stéréo
-        };
-
-        for (AudioFormat format : formatsToTry) {
-            DataLine.Info info = new DataLine.Info(SourceDataLine.class, format);
-
-            try {
-                if (mixer != null) {
-                    if (mixer.isLineSupported(info)) {
-                        log.debug("Format supporté trouvé: {}", format);
-                        return format;
-                    }
-                } else {
-                    if (AudioSystem.isLineSupported(info)) {
-                        log.debug("Format supporté trouvé (défaut): {}", format);
-                        return format;
-                    }
-                }
-            } catch (Exception e) {
-                // Continue à essayer
-            }
-        }
-
-        log.error("Aucun format audio supporté trouvé!");
-        return null;
-    }
-
-    private Mixer findBestAudioMixer() {
-        Mixer.Info[] mixers = AudioSystem.getMixerInfo();
-
-        // Priorité 1: Chercher un mixer avec "Generic" et "Analog" (sortie casque/haut-parleurs)
-        for (Mixer.Info mixerInfo : mixers) {
-            String name = mixerInfo.getName().toLowerCase();
-            String desc = mixerInfo.getDescription().toLowerCase();
-
-            if ((name.contains("generic") || desc.contains("analog")) &&
-                    !name.contains("nvidia") && !name.contains("hdmi")) {
-
-                try {
-                    Mixer mixer = AudioSystem.getMixer(mixerInfo);
-                    DataLine.Info info = new DataLine.Info(SourceDataLine.class, audioFormat);
-
-                    if (mixer.isLineSupported(info)) {
-                        log.debug("Mixer trouvé (priorité 1): {}", mixerInfo.getName());
-                        return mixer;
-                    }
-                } catch (Exception e) {
-                    // Continue à chercher
-                }
-            }
-        }
-        // Priorité 2: Chercher un mixer qui n'est pas HDMI/NVidia
-        for (Mixer.Info mixerInfo : mixers) {
-            String name = mixerInfo.getName().toLowerCase();
-
-            if (!name.contains("nvidia") && !name.contains("hdmi") && !name.contains("port")) {
-                try {
-                    Mixer mixer = AudioSystem.getMixer(mixerInfo);
-                    DataLine.Info info = new DataLine.Info(SourceDataLine.class, audioFormat);
-
-                    if (mixer.isLineSupported(info)) {
-                        log.debug("Mixer trouvé (priorité 2): {}", mixerInfo.getName());
-                        return mixer;
-                    }
-                } catch (Exception e) {
-                    // Continue à chercher
-                }
-            }
-        }
-        log.info("Aucun mixer spécifique trouvé, utilisation du défaut");
-        return null; // Utiliser le mixer par défaut
-    }
 
     /**
      * Configuration du système audio
@@ -734,9 +801,7 @@ public class PiperEmbeddedTTSModule
      */
     public void stop() {
         requestQueue.clear();
-        if (audioLine != null) {
-            audioLine.flush();
-        }
+        // The audio playback is now handled per-file, so there's no global audio line to stop.
     }
 
     /**
@@ -753,11 +818,6 @@ public class PiperEmbeddedTTSModule
             }
         } catch (InterruptedException e) {
             executorService.shutdownNow();
-        }
-
-        if (audioLine != null) {
-            audioLine.drain();
-            audioLine.close();
         }
 
         cleanup();
@@ -882,9 +942,7 @@ public class PiperEmbeddedTTSModule
 
         try {
             // Tests
-            tts.speak("Bonjour, je suis un module TTS avec modèles intégrés.");
-            tts.speak("Les modèles sont extraits automatiquement des ressources Java.");
-
+            tts.speak("Bonjour, Système de communication activé");
             // Test de changement de modèle
             if (available.size() > 1) {
                 mainLog.info("Test de changement de modèle...");
