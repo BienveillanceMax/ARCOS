@@ -18,7 +18,8 @@ FROM eclipse-temurin:21-jre-jammy
 # Install runtime dependencies
 # - wget: to download piper
 # - alsa-utils: for audio playback
-RUN apt-get update && apt-get install -y wget alsa-utils && rm -rf /var/lib/apt/lists/*
+# - libasound2 & libsndfile1-dev: for audio synthesis and playback
+RUN apt-get update && apt-get install -y wget alsa-utils libasound2 libsndfile1-dev && rm -rf /var/lib/apt/lists/*
 
 # Install Piper TTS
 WORKDIR /app
@@ -33,3 +34,4 @@ COPY --from=builder /app/target/ARCOS-0.0.1-SNAPSHOT.jar ./application.jar
 
 # Set the entrypoint to run the application
 ENTRYPOINT ["java", "-jar", "application.jar"]
+f
