@@ -4,7 +4,7 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import Exceptions.ResponseParsingException;
-import IO.OuputHandling.TTSHandler;
+import IO.OuputHandling.PiperEmbeddedTTSModule;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
@@ -59,7 +59,7 @@ public class OrchestratorTests{
     private InitiativeService initiativeService;
 
     @Mock
-    private TTSHandler ttsHandler;
+    private PiperEmbeddedTTSModule ttsHandler;
 
     @Mock
     private PersonalityOrchestrator personalityOrchestrator;
@@ -70,7 +70,6 @@ public class OrchestratorTests{
     void setUp() {
         MockitoAnnotations.openMocks(this);
         orchestrator = new Orchestrator(personalityOrchestrator, eventQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, ttsHandler);
-        doNothing().when(ttsHandler).start();
     }
 
     @Test
