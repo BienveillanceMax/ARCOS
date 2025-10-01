@@ -428,9 +428,8 @@ public class PiperEmbeddedTTSModule {
                 // Try paplay first (PulseAudio), fallback to aplay
                 if (isCommandAvailable("paplay")) {
                     pb = new ProcessBuilder("paplay", audioFile.getAbsolutePath());
-                } else if (isCommandAvailable("aplay")) {
-                    pb = new ProcessBuilder("aplay", audioFile.getAbsolutePath());
-                } else {
+                }
+                else {
                     throw new RuntimeException("No audio player found. Install pulseaudio-utils or alsa-utils");
                 }
                 break;
