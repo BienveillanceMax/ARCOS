@@ -8,7 +8,7 @@ import java.util.zip.ZipInputStream;
 
 public class PiperEmbeddedTTSModule {
     private static final String PIPER_VERSION = "2023.11.14-2";
-    private static final String PIPER_DIR = System.getProperty("user.home") + "/.piper-tts/piper";
+    private static final String PIPER_DIR = System.getProperty("user.home") + "/.piper-tts";
     private static final String MODEL_DIR = PIPER_DIR + "/models";
     private static final String UPMC_MODEL_PATH = "upmc-model/fr_FR-upmc-medium.onnx";
     private static final String UPMC_CONFIG_PATH = "upmc-model/fr_FR-upmc-medium.onnx.json";
@@ -49,7 +49,7 @@ public class PiperEmbeddedTTSModule {
 
     private boolean isPiperInstalled() {
         String os = getOperatingSystem();
-        String executable = PIPER_DIR + "/piper" + (os.equals("windows") ? ".exe" : "");
+        String executable = PIPER_DIR + "/piper/piper" + (os.equals("windows") ? ".exe" : "");
         File piperFile = new File(executable);
 
         if (piperFile.exists() && piperFile.canExecute()) {
