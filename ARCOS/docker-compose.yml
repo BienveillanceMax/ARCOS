@@ -2,43 +2,57 @@ version: '3.8'
 
 services:
   # Qdrant service for the vector database
+
+
   qdrant:
-    image: y0mg/qdrant-raspberry-pi
-    platform: linux/arm64
+    image: qdrant/qdrant:latest
+    #image: y0mg/qdrant-raspberry-pi
     container_name: qdrant_memory
     ports:
       - "6333:6333"
       - "6334:6334"
     volumes:
       - ./qdrant_storage:/qdrant/storage:z
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+      - QDRANT__SERVICE__GRPC_PORT=6334
+      - QDRANT__LOG_LEVEL=INFO
     restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:6333/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+
 
   # ArCoS Application Service
   arcos-app:
-    build: .
+    build:
+      context: .
+      args:
+        USER_ID: ${UID:-1000}
+        GROUP_ID: ${GID:-1000}
     container_name: arcos_app
     restart: unless-stopped
     depends_on:
       - qdrant
 
-    # --- Environment & Secrets Configuration ---
-    # The application will use the API keys defined in the .env file.
-    # Make sure to create a .env file in this directory with your keys, e.g.:
-    # MISTRALAI_API_KEY=YOUR_MISTRAL_KEY
-    # BRAVE_SEARCH_API_KEY=YOUR_BRAVE_KEY
     env_file: .env
 
     # --- Hardware Access Configuration ---
-    # WARNING: The following settings grant the container extensive access to host hardware.
-    # This is necessary for Bluetooth and Audio to function, but it reduces container isolation.
-
-    # Use the host's network stack. This is the simplest way to ensure
-    # the container can access Bluetooth devices.
     network_mode: "host"
-
-    # Grant the container access to all host devices. This is required for
-    # low-level access to the Bluetooth hardware stack.
     privileged: true
+
+    environment:
+      # tell clients inside container where to find host PulseAudio socket
+      - PULSE_SERVER=unix:/run/user/${UID}/pulse/native
+      # If you run PipeWire and want to point to a specific socket (optional)
+      - PIPEWIRE_SOCKET=/run/user/${UID}/pipewire-0
+      # helpful to debug permissions inside container
+      - HOST_UID=${UID}
+      - HOST_GID=${GID}
 
     volumes:
       # Mount the Google Calendar credentials file (read-only).
@@ -50,13 +64,22 @@ services:
       # Mount the D-Bus socket to allow communication with the host's Bluetooth service.
       - /var/run/dbus:/var/run/dbus:ro
 
-      # Mount the PipeWire socket for audio input/output.
-      # NOTE: '1000' is the typical user ID on Raspberry Pi OS.
-      # If your user ID is different, you may need to change this path.
-      # You can find your user ID by running the `id -u` command on your Pi.
+      # Mount the PipeWire socket for audio input/output (keep your existing PipeWire mount).
       - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
 
-      # Mount the sound devices directly.
+      # Mount host PulseAudio socket (systemd user path). Use your actual UID if different.
+      - /run/user/${UID}/pulse:/run/user/${UID}/pulse:ro
+
+      # Mount the Pulse cookie for authentication if the host uses cookie auth (optional but often required)
+      - /home/${USER}/.config/pulse/cookie:/home/appuser/.config/pulse/cookie:ro
+
+      # Mount the sound devices directly for ALSA access (mic/speakers)
+      - /dev/snd:/dev/snd
+
+      # mount your local jar instead of copying into image (optional)
+      # - ./target/ARCOS-0.0.1-SNAPSHOT.jar:/home/appuser/app/application.jar:ro
+
+    devices:
       - /dev/snd:/dev/snd
 
 volumes:
