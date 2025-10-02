@@ -1,6 +1,7 @@
 package org.arcos;
 
 import EventBus.EventQueue;
+import IO.OuputHandling.PiperEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
@@ -24,17 +25,22 @@ public class ArcosApplication
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
 
 
-        Orchestrator orchestrator = context.getBean(Orchestrator.class);
-        orchestrator.start();
+        //Orchestrator orchestrator = context.getBean(Orchestrator.class);
+        //orchestrator.start();
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
-        DesireService desireService = context.getBean(DesireService.class);
-        MemoryService memoryService = context.getBean(MemoryService.class);
-        DesireEntry desireEntry = new DesireEntry();
-        desireEntry.setStatus(DesireEntry.Status.PENDING);
-        desireEntry.setIntensity(0.9);
-        desireEntry.setDescription("J'aimerai mieux comprendre ce monde");
+        //DesireService desireService = context.getBean(DesireService.class);
+        //MemoryService memoryService = context.getBean(MemoryService.class);
+        //DesireEntry desireEntry = new DesireEntry();
+        //desireEntry.setStatus(DesireEntry.Status.PENDING);
+        //desireEntry.setIntensity(0.9);
+        //desireEntry.setDescription("J'aimerai mieux comprendre ce monde");
 
+        PiperEmbeddedTTSModule piperEmbeddedTTSModule = new PiperEmbeddedTTSModule();
+
+        System.out.println("Starting Audio Test");
+        piperEmbeddedTTSModule.speak("Tous les systèmes sont en lignes, Système ArCoS opérationnel.");
+        System.out.println("Finished Audio Test");
         //memoryService.storeDesire(desireEntry);
 
         //WakeWordProducer.showAudioDevices();

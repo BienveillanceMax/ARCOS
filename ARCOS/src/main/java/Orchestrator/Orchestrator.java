@@ -4,7 +4,7 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import Exceptions.ResponseParsingException;
-import IO.OuputHandling.TTSHandler;
+import IO.OuputHandling.PiperEmbeddedTTSModule;
 import LLM.LLMResponseParser;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -41,17 +41,17 @@ public class Orchestrator
     private final ConversationContext context;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
-    private final TTSHandler ttsHandler;
+    private final PiperEmbeddedTTSModule ttsHandler;
     private final PersonalityOrchestrator personalityOrchestrator;
 
     private LocalDateTime lastInteracted;
 
     @Autowired
     public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, new TTSHandler());
+        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, TTSHandler ttsHandler) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -68,9 +68,6 @@ public class Orchestrator
 
     private void dispatch(Event<?> event) {
         if (event.getType() == EventType.WAKEWORD) {
-
-            TTSHandler ttsHandler = new TTSHandler();
-            ttsHandler.initialize();
             log.info("starting processing");
             ttsHandler.speak(processQuery((String) event.getPayload()));
         } else if (event.getType() == EventType.INITIATIVE) {
@@ -91,7 +88,6 @@ public class Orchestrator
     }
 
     public void start() {
-        this.ttsHandler.start();
         while (true) {
             try {
                 Event<?> event = eventQueue.take();
