@@ -17,16 +17,17 @@ FROM eclipse-temurin:21-jre-jammy
 
 # Install runtime dependencies
 # - wget: to download piper
-# - alsa-utils: for audio playback
+# - alsa-utils: for audio playback (provides aplay)
+# - pulseaudio-utils: for PulseAudio playback (provides paplay - recommended)
 # - libasound2 & libsndfile1-dev: for audio synthesis and playback
-RUN apt-get update && apt-get install -y wget alsa-utils libasound2 libsndfile1-dev && rm -rf /var/lib/apt/lists/*
-
-# Install Piper TTS
-WORKDIR /app
-RUN wget https://github.com/rhasspy/piper/releases/download/2023.11.14-2/piper_linux_aarch64.tar.gz && \
-    tar -xzf piper_linux_aarch64.tar.gz && \
-    mv piper/piper /usr/local/bin/ && \
-    rm -r piper piper_linux_aarch64.tar.gz
+RUN apt-get update && \
+    apt-get install -y \
+        wget \
+        alsa-utils \
+        pulseaudio-utils \
+        libasound2 \
+        libsndfile1-dev && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the built application from the builder stage
 WORKDIR /app
