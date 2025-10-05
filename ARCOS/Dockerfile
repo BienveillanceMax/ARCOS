@@ -37,8 +37,9 @@ WORKDIR /home/${USER_NAME}/app
 
 COPY --from=builder /app/target/ARCOS-0.0.1-SNAPSHOT.jar ./application.jar
 
-# Create necessary directories
+# Create necessary directories and files
 RUN mkdir -p /home/${USER_NAME}/.config/pulse && \
+    touch /home/${USER_NAME}/.config/pulse/cookie && \
     chown -R ${USER_NAME}:${USER_NAME} /home/${USER_NAME}
 
 # Create PulseAudio client config to prevent autospawn
@@ -48,4 +49,4 @@ RUN echo "autospawn = no" > /home/${USER_NAME}/.config/pulse/client.conf && \
 
 USER ${USER_NAME}
 
-ENTRYPOINT ["java", "-jar", "application.jar"]
+ENTRYPOINT ["/opt/java/openjdk/bin/java", "-jar", "application.jar"]

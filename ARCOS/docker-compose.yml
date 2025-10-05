@@ -45,19 +45,20 @@ services:
       - HOST_GID=${GID:-1000}
       # Disable PulseAudio autospawn (we use host's server)
       - PULSE_NO_AUTOSPAWN=1
+      # Disable cookie authentication (use socket permissions instead)
+      - PULSE_COOKIE=/dev/null
 
     volumes:
       - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
       - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
       - /var/run/dbus:/var/run/dbus:ro
-
+      
       # Use variable UID consistently
       - /run/user/${UID:-1000}/pipewire-0:/run/user/${UID:-1000}/pipewire-0
       - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
-
-      # Pulse cookie with variable user
-      - ${HOME}/.config/pulse/cookie:/home/appuser/.config/pulse/cookie:ro
-
+      
+      # Don't mount cookie - rely on socket permissions instead
+      
       - /dev/snd:/dev/snd
 
     devices:
