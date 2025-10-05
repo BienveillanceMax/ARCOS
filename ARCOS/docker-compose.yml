@@ -38,31 +38,39 @@ services:
     privileged: true
 
     environment:
-      # Point to host PulseAudio socket
       - PULSE_SERVER=unix:/run/user/${UID:-1000}/pulse/native
       - PIPEWIRE_SOCKET=/run/user/${UID:-1000}/pipewire-0
       - HOST_UID=${UID:-1000}
       - HOST_GID=${GID:-1000}
-      # Disable PulseAudio autospawn (we use host's server)
       - PULSE_NO_AUTOSPAWN=1
-      # Disable cookie authentication (use socket permissions instead)
-      - PULSE_COOKIE=/dev/null
+      # Variables pour D-Bus (nécessaire pour Bluetooth)
+      - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${UID:-1000}/bus
 
     volumes:
       - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
       - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
-      - /var/run/dbus:/var/run/dbus:ro
       
-      # Use variable UID consistently
+      # D-Bus - CRITIQUE pour Bluetooth
+      - /var/run/dbus:/var/run/dbus
+      - /run/user/${UID:-1000}/bus:/run/user/${UID:-1000}/bus
+      
+      # PipeWire/PulseAudio
       - /run/user/${UID:-1000}/pipewire-0:/run/user/${UID:-1000}/pipewire-0
       - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
       
-      # Don't mount cookie - rely on socket permissions instead
-      
+      # Devices audio
       - /dev/snd:/dev/snd
+      
+      # USB pour périphériques Bluetooth USB
+      - /dev/bus/usb:/dev/bus/usb
 
     devices:
       - /dev/snd:/dev/snd
+    
+    # Ajouter les groupes nécessaires
+    group_add:
+      - audio
+      - ${BLUETOOTH_GID:-996}  # GID du groupe bluetooth de l'hôte
 
 volumes:
   qdrant_storage:
