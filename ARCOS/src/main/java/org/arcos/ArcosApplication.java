@@ -22,8 +22,10 @@ public class ArcosApplication
 {
 
     public static void main(String[] args) {
-        ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
-
+       
+	    WakeWordProducer.showAudioDevices();
+	    ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
+	
 
         //Orchestrator orchestrator = context.getBean(Orchestrator.class);
         //orchestrator.start();
@@ -54,7 +56,6 @@ public class ArcosApplication
         //EventLoopRunner eventLoopRunner = new EventLoopRunner(orchestrator);
         //eventLoopRunner.run();
 
-        WakeWordProducer.showAudioDevices();
     }
 
 }
