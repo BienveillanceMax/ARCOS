@@ -59,11 +59,12 @@ public class WakeWordProducer implements Runnable {
         log.info("Initializing WakeWordProducer with resampling logic.");
         this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
+        String keywordNameRasp = "Calcifer.ppn";
         String porcupineModelName = "porcupine_params_fr.pv";
         String[] keywordPaths;
 
         try {
-            keywordPaths = new String[]{getKeywordPath("Calcifer.ppn")};
+            keywordPaths = new String[]{getKeywordPath(keywordNameRasp)};
         } catch (IllegalArgumentException e) {
             keywordPaths = new String[]{getKeywordPath(keywordName)};
         }
