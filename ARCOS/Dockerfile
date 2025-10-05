@@ -48,4 +48,4 @@ RUN echo "autospawn = no" > /home/${USER_NAME}/.config/pulse/client.conf && \
 
 USER ${USER_NAME}
 
-ENTRYPOINT ["java", "-jar", "application.jar"]l
+ENTRYPOINT ["java", "-jar", "application.jar"]
