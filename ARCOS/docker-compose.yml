@@ -1,11 +1,7 @@
 version: '3.8'
 
 services:
-  # Qdrant service for the vector database
-
-
   qdrant:
-    #image: qdrant/qdrant:latest
     image: y0mg/qdrant-raspberry-pi
     container_name: qdrant_memory
     ports:
@@ -25,9 +21,6 @@ services:
       retries: 3
       start_period: 40s
 
-
-
-  # ArCoS Application Service
   arcos-app:
     build:
       context: .
@@ -41,43 +34,31 @@ services:
 
     env_file: .env
 
-    # --- Hardware Access Configuration ---
     network_mode: "host"
     privileged: true
 
     environment:
-      # tell clients inside container where to find host PulseAudio socket
-      - PULSE_SERVER=unix:/run/user/${UID}/pulse/native
-      # If you run PipeWire and want to point to a specific socket (optional)
-      - PIPEWIRE_SOCKET=/run/user/${UID}/pipewire-0
-      # helpful to debug permissions inside container
-      - HOST_UID=${UID}
-      - HOST_GID=${GID}
+      # Point to host PulseAudio socket
+      - PULSE_SERVER=unix:/run/user/${UID:-1000}/pulse/native
+      - PIPEWIRE_SOCKET=/run/user/${UID:-1000}/pipewire-0
+      - HOST_UID=${UID:-1000}
+      - HOST_GID=${GID:-1000}
+      # Disable PulseAudio autospawn (we use host's server)
+      - PULSE_NO_AUTOSPAWN=1
 
     volumes:
-      # Mount the Google Calendar credentials file (read-only).
       - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
-
-      # Mount the Piper TTS voice models (read-only).
       - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
-
-      # Mount the D-Bus socket to allow communication with the host's Bluetooth service.
       - /var/run/dbus:/var/run/dbus:ro
 
-      # Mount the PipeWire socket for audio input/output (keep your existing PipeWire mount).
-      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+      # Use variable UID consistently
+      - /run/user/${UID:-1000}/pipewire-0:/run/user/${UID:-1000}/pipewire-0
+      - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
 
-      # Mount host PulseAudio socket (systemd user path). Use your actual UID if different.
-      - /run/user/${UID}/pulse:/run/user/${UID}/pulse:ro
+      # Pulse cookie with variable user
+      - ${HOME}/.config/pulse/cookie:/home/appuser/.config/pulse/cookie:ro
 
-      # Mount the Pulse cookie for authentication if the host uses cookie auth (optional but often required)
-      - /home/${USER}/.config/pulse/cookie:/home/appuser/.config/pulse/cookie:ro
-
-      # Mount the sound devices directly for ALSA access (mic/speakers)
       - /dev/snd:/dev/snd
-
-      # mount your local jar instead of copying into image (optional)
-      # - ./target/ARCOS-0.0.1-SNAPSHOT.jar:/home/appuser/app/application.jar:ro
 
     devices:
       - /dev/snd:/dev/snd
