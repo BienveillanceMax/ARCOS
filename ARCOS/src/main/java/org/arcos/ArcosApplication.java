@@ -22,6 +22,13 @@ public class ArcosApplication
 {
 
     public static void main(String[] args) {
+
+
+        System.out.println("ArcosApplication available audio devices : ");
+        WakeWordProducer.showAudioDevices();
+        System.out.println("\n");
+
+
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
 
 
@@ -53,8 +60,6 @@ public class ArcosApplication
         //System.out.println(orchestrator.processQuery("Te rappelle-tu de la question que je t'ai posé précédemment ?"));
         //EventLoopRunner eventLoopRunner = new EventLoopRunner(orchestrator);
         //eventLoopRunner.run();
-
-        WakeWordProducer.showAudioDevices();
     }
 
 }

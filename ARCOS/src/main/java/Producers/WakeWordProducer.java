@@ -38,6 +38,7 @@ public class WakeWordProducer implements Runnable {
     private final SpeechToText speechToText;
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
+    private volatile boolean isTranscribing = false;
 
     private static final float SOURCE_SAMPLE_RATE = 44100f;
     private static final int TARGET_SAMPLE_RATE = 16000;
@@ -179,7 +180,11 @@ public class WakeWordProducer implements Runnable {
 
         while (!Thread.currentThread().isInterrupted()) {
             final CompletableFuture<Void> detectionCompleter = new CompletableFuture<>();
-            final AudioDispatcher dispatcher = new AudioDispatcher(new JVMAudioInputStream(new AudioInputStream(micDataLine)), sourceBufferSize, 0);
+            final AudioDispatcher dispatcher = new AudioDispatcher(
+                    new JVMAudioInputStream(new AudioInputStream(micDataLine)),
+                    sourceBufferSize,
+                    0
+            );
 
             RateTransposer rateTransposer = new RateTransposer(resampleFactor);
             dispatcher.addAudioProcessor(rateTransposer);
@@ -188,7 +193,7 @@ public class WakeWordProducer implements Runnable {
 
                 @Override
                 public boolean process(AudioEvent audioEvent) {
-                    if(dispatcher.isStopped()){
+                    if(dispatcher.isStopped() || isTranscribing){
                         return false;
                     }
 
@@ -203,8 +208,12 @@ public class WakeWordProducer implements Runnable {
                             log.info("[{}] Detected '{}'",
                                     LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                                     keywords[result]);
+
+                            isTranscribing = true;
                             dispatcher.stop();
 
+                            // Start transcription with the same audio line
+                            // The audioForwarder will read fresh audio coming from the mic
                             CompletableFuture<String> messageFuture = audioForwarder.startForwarding();
                             messageFuture.whenComplete((message, throwable) -> {
                                 if (throwable != null) {
@@ -218,6 +227,7 @@ public class WakeWordProducer implements Runnable {
                                         log.info(">>> No speech detected or transcription failed");
                                     }
                                 }
+                                isTranscribing = false;
                                 detectionCompleter.complete(null);
                             });
                         }
