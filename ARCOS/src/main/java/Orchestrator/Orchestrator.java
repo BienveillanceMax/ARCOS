@@ -121,10 +121,8 @@ public class Orchestrator
 
 
         // 2. Appel à Mistral pour planification
-        waitRightAmountBetweenCalls(lastCall);
         String planningResponse = llmClient.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
         log.debug("Planning response:\n{}", planningResponse);
-        lastCall = LocalDateTime.now();
 
 
         // 3. Parsing avec retry spécifique Mistral
@@ -141,17 +139,14 @@ public class Orchestrator
         log.debug("Action execution results: {}", results);
 
         // 5. Prompt de formulation
-        waitRightAmountBetweenCalls(lastCall);
         String formulationPrompt = promptBuilder.buildFormulationPrompt(
                 userQuery, plan, results, context
         );
         log.debug("Formulation prompt:\n{}", formulationPrompt);
-        lastCall = LocalDateTime.now();
 
 
 
         // 6. Appel à Mistral pour formulation
-        waitRightAmountBetweenCalls(lastCall);
         String finalResponse = llmClient.generateFormulationResponse(formulationPrompt);
         log.info("Final response: {}", finalResponse);
 
@@ -163,22 +158,6 @@ public class Orchestrator
         lastInteracted = LocalDateTime.now();
         return finalResponse;
     }
-
-    public void waitRightAmountBetweenCalls(LocalDateTime lastCall) {
-
-        Duration elapsedTimeBetweenCalls = Duration.between(lastCall, LocalDateTime.now());
-
-        if (elapsedTimeBetweenCalls.toMillis() <= 1000) {                         //avoid rejection due to api limits
-            try {
-                long timeToWait = 1050 - elapsedTimeBetweenCalls.toMillis();
-                log.debug("Waiting for {} ms", timeToWait);
-                Thread.sleep(timeToWait);
-            } catch (InterruptedException e) {
-                log.error("Thread interrupted while sleeping", e);
-            }
-        }
-    }
-
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
         CompletableFuture.runAsync(() -> {

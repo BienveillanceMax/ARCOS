@@ -12,7 +12,6 @@
 /app/ARCOS/src/main/java/IO/InputHandling/AudioForwarder.java
 /app/ARCOS/src/main/java/IO/InputHandling/SpeechToText.java
 /app/ARCOS/src/main/java/IO/OuputHandling/PiperEmbeddedTTSModule.java
-/app/ARCOS/src/main/java/IO/OuputHandling/TTSHandler.java
 /app/ARCOS/src/main/java/LLM/LLMClient.java
 /app/ARCOS/src/main/java/LLM/LLMResponseParser.java
 /app/ARCOS/src/main/java/LLM/Prompts/PromptBuilder.java

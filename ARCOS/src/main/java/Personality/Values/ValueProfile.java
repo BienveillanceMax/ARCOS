@@ -25,7 +25,7 @@ public class ValueProfile
 
 
     public ValueProfile() {
-        initializeProfile(PredefinedProfile.CALCIFER);
+        initializeProfile(PredefinedProfile.DEFAULT);
     }
 
     private void initializeProfile(PredefinedProfile profile) {
