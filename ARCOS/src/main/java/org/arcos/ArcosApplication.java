@@ -1,6 +1,8 @@
 package org.arcos;
 
 import EventBus.EventQueue;
+import EventBus.Events.Event;
+import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.Subject;
@@ -31,6 +33,8 @@ public class ArcosApplication
 
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
 
+        EventQueue eventQueue = context.getBean(EventQueue.class);
+        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Marches-tu ?","home"));
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
         orchestrator.start();
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
