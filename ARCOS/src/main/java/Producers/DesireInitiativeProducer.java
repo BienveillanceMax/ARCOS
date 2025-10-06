@@ -32,7 +32,7 @@ public class DesireInitiativeProducer {
         this.memoryService = memoryService;
     }
 
-    @Scheduled(fixedRate = 60000) // Check every 60 seconds
+    @Scheduled(fixedRate = 6000000) // Check every hour
     public void checkDesiresAndInitiate() {
         log.info("Checking for high-intensity desires...");
         List<DesireEntry> pendingDesires = memoryService.getPendingDesires();
