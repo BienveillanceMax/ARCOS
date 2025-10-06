@@ -31,9 +31,8 @@ public class ArcosApplication
 
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
 
-
-        //Orchestrator orchestrator = context.getBean(Orchestrator.class);
-        //orchestrator.start();
+        Orchestrator orchestrator = context.getBean(Orchestrator.class);
+        orchestrator.start();
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
         //DesireService desireService = context.getBean(DesireService.class);
@@ -58,7 +57,6 @@ public class ArcosApplication
 
         //System.out.println(orchestrator.processQuery("Je suis ton créateur, quelles actions et fonctionnalités voudrais-tu que je te rajoute ?"));
         //System.out.println(orchestrator.processQuery("Te rappelle-tu de la question que je t'ai posé précédemment ?"));
-        //EventLoopRunner eventLoopRunner = new EventLoopRunner(orchestrator);
         //eventLoopRunner.run();
     }
 
