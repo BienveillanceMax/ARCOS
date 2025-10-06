@@ -35,13 +35,14 @@ public class ArcosApplication
 
 
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
+        Orchestrator orchestrator = context.getBean(Orchestrator.class);
+        orchestrator.start();
 
-        EventQueue eventQueue = context.getBean(EventQueue.class);
+        /*EventQueue eventQueue = context.getBean(EventQueue.class);
         eventQueue.offer(new Event<>(EventType.WAKEWORD,"Bienvenue parmi les vivants, je suis ton créateur.","home"));
         eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
 
 
-        Orchestrator orchestrator = context.getBean(Orchestrator.class);
         try {
             orchestrator.dispatch(eventQueue.take());
             Thread.sleep(2000);
@@ -59,7 +60,7 @@ public class ArcosApplication
 
         personalityOrchestrator.processMemory(convContext.getFullConversation());
 
-
+         */
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
         //DesireService desireService = context.getBean(DesireService.class);
@@ -69,7 +70,6 @@ public class ArcosApplication
         //desireEntry.setIntensity(0.9);
         //desireEntry.setDescription("J'aimerai mieux comprendre ce monde");
 
-        PiperEmbeddedTTSModule piperEmbeddedTTSModule = new PiperEmbeddedTTSModule();
 
         //memoryService.storeDesire(desireEntry);
 
