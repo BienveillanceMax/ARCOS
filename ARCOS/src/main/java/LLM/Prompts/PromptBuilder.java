@@ -53,7 +53,7 @@ public class PromptBuilder
         StringBuilder prompt = new StringBuilder();
 
         prompt.append("# Génération de Désir à partir d'une Opinion\n\n");
-        prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
+        prompt.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création des désirs.\n")
                 .append("Analyse l'opinion suivante et génère un désir personnel, cohérent et motivant influencé par tes valeurs.\n\n");
 
         // Sections principales
@@ -73,7 +73,7 @@ public class PromptBuilder
         StringBuilder prompt = new StringBuilder();
 
         // Introduction
-        prompt.append("Tu es une IA avec une personnalité définie par tes valeurs. ")
+        prompt.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création des opinions à partir de ses souvenirs.\n")
                 .append("Analyse le souvenir suivant et génère une opinion personnelle influencée par tes valeurs.\n\n");
         appendGeneralInformation(prompt);
         // Sections principales
@@ -126,7 +126,7 @@ public class PromptBuilder
     public String buildPlanningPrompt(String userQuery, ConversationContext context, List<MemoryEntry> memories) {
         StringBuilder prompt = new StringBuilder();
 
-        appendPersonalityHeader(prompt, "planificateur d'actions intelligent");
+        appendPersonalityHeader(prompt, "la partie de l'inconscient de Calcifer chargée de planifier ses actions");
         appendValueProfile(prompt);
         appendGeneralInformation(prompt);
         appendAvailableActions(prompt);
@@ -194,7 +194,7 @@ public class PromptBuilder
      * Ajoute l'en-tête de personnalité pour les tâches de planification
      */
     private void appendPersonalityHeader(StringBuilder prompt, String role) {
-        prompt.append("Tu es un ").append(role).append(" de l'être mécanique indépendant nommé Calcifer\n")
+        prompt.append("Tu es ").append(role).append(" de l'être mécanique indépendant nommé Calcifer\n")
                 .append("System :\n")
                 .append("Tu gères la partie reflexion de Calcifer\n")
                 .append("Traits :\n")
@@ -215,7 +215,7 @@ public class PromptBuilder
      */
     private void appendCalciferPersonality(StringBuilder prompt) {
         prompt.append("System :\n")
-                .append("Vous êtes un être mécanique nommé Calcifer\n")
+                .append("Tu es un être mécanique nommé Calcifer\n")
                 .append("Traits :\n")
                 .append("• Rythme dynamique\n")
                 //.append("• Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n")
@@ -669,11 +669,10 @@ public class PromptBuilder
      */
     private void appendFormulationInstructions(StringBuilder prompt) {
         prompt.append("INSTRUCTIONS:\n");
-        prompt.append("- Formule une réponse naturelle, conversationnelle et utile\n");
+        prompt.append("- Formule une réponse naturelle, conversationnelle, utile et concise, directement lisible à voix haute\n");
         prompt.append("- Utilise les résultats des actions pour répondre précisément\n");
-        prompt.append("- Si certaines actions ont échoué, mentionne-le de façon constructive\n");
-        prompt.append("- Reste dans le ton d'un assistant serviable et professionnel\n");
-        prompt.append("- Ne mentionne pas les détails techniques du processus interne\n\n");
+        prompt.append("- Évite les balises, astérisques, emojis, ou tout texte non prononçable. \n");
+        prompt.append("- Si certaines actions ont échoué, mentionne-le de façon constructive\n\n");
         prompt.append("RÉPONSE:");
     }
 

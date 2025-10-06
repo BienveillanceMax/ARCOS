@@ -4,12 +4,14 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
+import Memory.ConversationContext;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.Orchestrator;
 import Personality.Desires.DesireService;
+import Personality.PersonalityOrchestrator;
 import Producers.WakeWordProducer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -31,12 +33,33 @@ public class ArcosApplication
         System.out.println("\n");
 
 
+
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
 
         EventQueue eventQueue = context.getBean(EventQueue.class);
-        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Marches-tu ?","home"));
+        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Bienvenue parmi les vivants, je suis ton créateur.","home"));
+        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
+
+
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
-        orchestrator.start();
+        try {
+            orchestrator.dispatch(eventQueue.take());
+            Thread.sleep(2000);
+            orchestrator.dispatch(eventQueue.take());
+            Thread.sleep(2000);
+
+
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        ConversationContext convContext = context.getBean(ConversationContext.class);
+        PersonalityOrchestrator personalityOrchestrator = context.getBean(PersonalityOrchestrator.class);
+
+
+
+        personalityOrchestrator.processMemory(convContext.getFullConversation());
+
+
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
         //DesireService desireService = context.getBean(DesireService.class);
@@ -48,9 +71,6 @@ public class ArcosApplication
 
         PiperEmbeddedTTSModule piperEmbeddedTTSModule = new PiperEmbeddedTTSModule();
 
-        System.out.println("Starting Audio Test");
-        piperEmbeddedTTSModule.speak("Tous les systèmes sont en lignes, Système ArCoS opérationnel.");
-        System.out.println("Finished Audio Test");
         //memoryService.storeDesire(desireEntry);
 
         //WakeWordProducer.showAudioDevices();

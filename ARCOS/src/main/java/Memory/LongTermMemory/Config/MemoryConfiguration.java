@@ -41,14 +41,6 @@ public class MemoryConfiguration {
 
         try {
             EmbeddingService generator = new EmbeddingService(embeddingDimension, embeddingModel, true);
-
-            // Test de connectivité au démarrage
-            if (generator.testConnection()) {
-                logger.info("Mistral AI opérationnel - Embeddings haute qualité activés");
-            } else {
-                logger.warn("⚠️  Mistral AI non disponible - Fallback vers embeddings mock");
-            }
-
             return generator;
 
         } catch (Exception e) {

@@ -19,6 +19,7 @@ import Orchestrator.Entities.ExecutionPlan;
 import LLM.Prompts.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Component;
 import Personality.PersonalityOrchestrator;
 
@@ -66,7 +67,7 @@ public class Orchestrator
     }
 
 
-    private void dispatch(Event<?> event) {
+    public void dispatch(Event<?> event) {
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
             ttsHandler.speak(processQuery((String) event.getPayload()));
@@ -100,22 +101,31 @@ public class Orchestrator
     }
 
     private String processQuery(String userQuery) {
-
         log.info("Processing query: {}", userQuery);
 
+
         // Search for relevant memories
+        LocalDateTime lastCall = LocalDateTime.now();
         List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery)
                 .stream()
                 .map(SearchResult::getEntry)
                 .collect(Collectors.toList());
 
+
+
         // 1. Génération du prompt
         String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context, relevantMemories);
         log.debug("Planning prompt:\n{}", planningPrompt);
 
+
+
+
         // 2. Appel à Mistral pour planification
+        waitRightAmountBetweenCalls(lastCall);
         String planningResponse = llmClient.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
         log.debug("Planning response:\n{}", planningResponse);
+        lastCall = LocalDateTime.now();
+
 
         // 3. Parsing avec retry spécifique Mistral
         ExecutionPlan plan = null;
@@ -131,21 +141,42 @@ public class Orchestrator
         log.debug("Action execution results: {}", results);
 
         // 5. Prompt de formulation
+        waitRightAmountBetweenCalls(lastCall);
         String formulationPrompt = promptBuilder.buildFormulationPrompt(
                 userQuery, plan, results, context
         );
         log.debug("Formulation prompt:\n{}", formulationPrompt);
+        lastCall = LocalDateTime.now();
+
+
 
         // 6. Appel à Mistral pour formulation
+        waitRightAmountBetweenCalls(lastCall);
         String finalResponse = llmClient.generateFormulationResponse(formulationPrompt);
         log.info("Final response: {}", finalResponse);
 
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
         context.addAssistantMessage(finalResponse, plan);
+        log.info("Starting personality processing workflow...");
         triggerPersonalityProcessing(lastInteracted);
         lastInteracted = LocalDateTime.now();
         return finalResponse;
+    }
+
+    public void waitRightAmountBetweenCalls(LocalDateTime lastCall) {
+
+        Duration elapsedTimeBetweenCalls = Duration.between(lastCall, LocalDateTime.now());
+
+        if (elapsedTimeBetweenCalls.toMillis() <= 1000) {                         //avoid rejection due to api limits
+            try {
+                long timeToWait = 1050 - elapsedTimeBetweenCalls.toMillis();
+                log.debug("Waiting for {} ms", timeToWait);
+                Thread.sleep(timeToWait);
+            } catch (InterruptedException e) {
+                log.error("Thread interrupted while sleeping", e);
+            }
+        }
     }
 
 
@@ -154,8 +185,9 @@ public class Orchestrator
             try {
                 // On ne veut pas que la personnalité se déclenche à chaque interaction.
                 Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
-
-                if (context.getMessageHistory().size() > 2 && elapsedTime.toMinutes() > 10) {
+                log.info("Personality Processing : waiting to avoid usage limit");
+                Thread.sleep(1000);
+                if (elapsedTime.toMinutes() > 10) {
                     log.info("Triggering personality processing...");
                     String fullConversation = context.getFullConversation();
                     personalityOrchestrator.processMemory(fullConversation);
