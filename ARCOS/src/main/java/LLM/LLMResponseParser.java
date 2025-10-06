@@ -97,7 +97,7 @@ public class LLMResponseParser
         // Retire les espaces en début/fin
         response = response.trim();
 
-        // Extrait le JSON si du texte l'entoure
+        // MAINTENANT on cherche les accolades (après les regex)
         int start = response.indexOf('{');
         int end = response.lastIndexOf('}');
 
@@ -105,8 +105,14 @@ public class LLMResponseParser
             throw new ResponseParsingException("Aucun JSON valide trouvé dans la réponse");
         }
 
+        // Vérification de sécurité supplémentaire
+        if (end + 1 > response.length()) {
+            throw new ResponseParsingException("Index de fin invalide lors de l'extraction du JSON");
+        }
+
         return response.substring(start, end + 1);
     }
+
 
     /**
      * Valide l'ExecutionPlan parsé

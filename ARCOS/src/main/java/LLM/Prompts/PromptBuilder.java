@@ -648,6 +648,8 @@ public class PromptBuilder
                 4. Respecte les types et contraintes des paramètres
                 5. Pour référencer le résultat d'une action précédente, utilise: {{RESULT_FROM_nom_action}}
                 
+                
+                
                 RÉPONDS UNIQUEMENT avec ce JSON (sans markdown, sans explication):
                 {
                   "reasoning": "ton raisonnement détaillé ici",
@@ -661,6 +663,13 @@ public class PromptBuilder
                     }
                   ]
                 }
+                
+                
+                
+                CRITIQUE : La sortie DOIT être au format JSON valide avec :
+                   - Aucun saut de ligne non échappé à l'intérieur des chaînes
+                   - Utilisation de \\\\n pour les sauts de ligne
+                   - Aucune barre oblique inversée (\\) à la fin
                 """);
     }
 
