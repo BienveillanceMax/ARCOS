@@ -121,7 +121,7 @@ public class Orchestrator
 
 
         // 2. Appel à Mistral pour planification
-        String planningResponse = llmClient.generatePlanningResponse(planningPrompt); //fallback plan is probably not valid*
+        String planningResponse = llmClient.generatePlanningResponse(planningPrompt).replace("*",""); //fallback plan is probably not valid*
         log.debug("Planning response:\n{}", planningResponse);
 
 
@@ -147,7 +147,7 @@ public class Orchestrator
 
 
         // 6. Appel à Mistral pour formulation
-        String finalResponse = llmClient.generateFormulationResponse(formulationPrompt);
+        String finalResponse = llmClient.generateFormulationResponse(formulationPrompt).replace("*","");
         log.info("Final response: {}", finalResponse);
 
         // 7. Ajout à la mémoire à court terme.
