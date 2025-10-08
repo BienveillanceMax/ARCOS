@@ -43,7 +43,12 @@ Dans un fichier .env dans le même dossier que me docker-compose.yml vous devez 
 3.  **Clé d'accès PicoVoice Porcupine**: Le projet utilise Porcupine pour détecter les "wake words" Vous devez fournir votre clé dans le fichier sous la forme :
  `PORCUPINE_ACCESS_KEY=yourkey`.
 
-Dans le dossier src/main/ressources vous devez ajouter le dossier `client_secret.json` contenant les accès à l'api Google.
+Dans le dossier src/main/ressources, vous devez ajouter le dossier `client_secret.json` contenant les accès à l'api Google.
+
+Dans le dossier src/main/ressources, vous devez ajouter votre modèle Whisper pour la reconnaissance vocale.
+
+Dans le dossier src/main/ressources, vous devez ajouter votre modèle de wakeword. Par défaut deux sont présents : `Calcifer` pour architecture ARM et `Mon ami` pour architecture x86. 
+Ces WakeWords doivent être nommés respectivement `Calcifer.ppn` ou `Mon-ami_fr_linux_v3_0_0.ppn`
 
 ### Lancement
 
