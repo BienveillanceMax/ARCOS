@@ -85,6 +85,8 @@ public class Orchestrator
 
             ttsHandler.speak(llmClient.generateResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
+        } else if (event.getType() == EventType.PARTIAL_TRANSCRIPTION) {
+            System.out.print(event.getPayload());
         }
     }
 

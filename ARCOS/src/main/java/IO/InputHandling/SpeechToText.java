@@ -12,6 +12,10 @@ import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * This class is deprecated in favor of {@link StreamedSpeechToText}, which provides better performance and real-time transcription capabilities.
+ */
+@Deprecated
 @Slf4j
 public class SpeechToText {
     private WhisperJNI whisper;

@@ -2,6 +2,7 @@
 /app/ARCOS/src/main/java/EventBus/Events/Event.java
 /app/ARCOS/src/main/java/EventBus/Events/EventPriority.java
 /app/ARCOS/src/main/java/EventBus/Events/EventType.java
+/app/ARCOS/src/main/java/EventBus/Events/PartialTranscriptionEvent.java
 /app/ARCOS/src/main/java/EventBus/Events/WakeWordEvent.java
 /app/ARCOS/src/main/java/Exceptions/DesireCreationException.java
 /app/ARCOS/src/main/java/Exceptions/GdeltClientException.java
@@ -11,6 +12,7 @@
 /app/ARCOS/src/main/java/Exceptions/SearchException.java
 /app/ARCOS/src/main/java/IO/InputHandling/AudioForwarder.java
 /app/ARCOS/src/main/java/IO/InputHandling/SpeechToText.java
+/app/ARCOS/src/main/java/IO/InputHandling/StreamedSpeechToText.java
 /app/ARCOS/src/main/java/IO/OuputHandling/PiperEmbeddedTTSModule.java
 /app/ARCOS/src/main/java/LLM/LLMClient.java
 /app/ARCOS/src/main/java/LLM/LLMResponseParser.java

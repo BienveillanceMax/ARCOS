@@ -24,6 +24,7 @@ org/arcos/ArcosApplication.class
 Orchestrator/Entities/ExecutionPlan$PlannedAction.class
 Personality/Desires/DesireService.class
 Personality/Values/Entities/ValueSchwartz.class
+IO/InputHandling/StreamedSpeechToText.class
 Memory/ContextError.class
 Tools/CalendarTool/CalendarService.class
 Personality/Opinions/OpinionService.class
@@ -55,6 +56,7 @@ Tools/SearchTool/BraveSearchService$SearchResult.class
 Memory/LongTermMemory/service/MemoryService$CombinedSearchResults.class
 Memory/Actions/Entities/Actions/ListCalendarEventsAction.class
 Memory/LongTermMemory/Models/MemoryEntry.class
+EventBus/Events/PartialTranscriptionEvent.class
 Memory/ConversationMessage$MessageType.class
 Memory/Actions/Entities/Actions/DeleteCalendarEventAction.class
 Tools/SearchTool/BraveSearchService$BraveWebResponse.class

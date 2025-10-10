@@ -2,7 +2,7 @@ package Producers;
 
 import EventBus.EventQueue;
 import EventBus.Events.WakeWordEvent;
-import IO.InputHandling.SpeechToText;
+import IO.InputHandling.StreamedSpeechToText;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
 import lombok.extern.slf4j.Slf4j;
@@ -29,7 +29,7 @@ public class WakeWordProducer implements Runnable {
     private Porcupine porcupine;
     private final String[] keywords;
     private final int audioDeviceIndex;
-    private final SpeechToText speechToText;
+    private final StreamedSpeechToText speechToText;
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
 
@@ -76,7 +76,11 @@ public class WakeWordProducer implements Runnable {
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
         if (this.micDataLine != null) {
-            this.speechToText = new SpeechToText(getWhisperModelPath());
+            try {
+                this.speechToText = new StreamedSpeechToText(getWhisperModelPath());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
         } else {
             this.speechToText = null;
         }
@@ -239,10 +243,8 @@ public class WakeWordProducer implements Runnable {
 
     private String recordAndTranscribe() {
         log.info("Started listening for speech with WhisperJNI...");
-
         speechToText.reset();
 
-        // Read audio at 16kHz for Whisper (downsample on the fly)
         final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20; // 50ms frames
         final int micFrameSize = (int) Math.ceil(whisperFrameSize * MIC_SAMPLE_RATE / (double) PORCUPINE_SAMPLE_RATE);
 
@@ -253,12 +255,13 @@ public class WakeWordProducer implements Runnable {
         long recordingStartTime = System.currentTimeMillis();
         boolean hasDetectedSpeech = false;
 
+        StringBuilder fullTranscription = new StringBuilder();
+
         try {
             while (true) {
                 int bytesRead = micDataLine.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
-                    // Convert to 16-bit samples
                     int samplesRead = bytesRead / BYTES_PER_SAMPLE;
                     short[] micSamples = new short[samplesRead];
                     ByteBuffer.wrap(micBuffer, 0, bytesRead)
@@ -266,18 +269,15 @@ public class WakeWordProducer implements Runnable {
                             .asShortBuffer()
                             .get(micSamples);
 
-                    // Downsample to 16kHz
                     int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
                     short[] downsampled = new short[whisperSamples];
                     downsample(micSamples, samplesRead, downsampled, whisperSamples);
 
-                    // Convert back to bytes
                     ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
                     for (short s : downsampled) {
                         bb.putShort(s);
                     }
 
-                    // Check for silence
                     boolean isSilent = isSilence(whisperBuffer);
 
                     if (!isSilent) {
@@ -288,10 +288,14 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    // Buffer audio for Whisper
-                    speechToText.processAudio(whisperBuffer);
+                    if (hasDetectedSpeech) {
+                        String newText = speechToText.transcribe(whisperBuffer);
+                        if (newText != null && !newText.isEmpty()) {
+                            fullTranscription.append(newText);
+                            eventQueue.offer(new EventBus.Events.PartialTranscriptionEvent(newText, "WakeWordProducer"));
+                        }
+                    }
 
-                    // Check if we should stop due to silence
                     if (hasDetectedSpeech && isSilent) {
                         long silenceDuration = System.currentTimeMillis() - lastSoundTime;
                         if (silenceDuration >= SILENCE_DURATION_MS) {
@@ -300,7 +304,6 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    // Safety timeout
                     long totalRecordingTime = System.currentTimeMillis() - recordingStartTime;
                     if (totalRecordingTime > 30000) {
                         log.info("Maximum recording time reached (30s), processing transcription...");
@@ -309,14 +312,7 @@ public class WakeWordProducer implements Runnable {
                 }
             }
 
-            // Process transcription
-            if (speechToText.hasMinimumAudio()) {
-                log.info("Processing {}ms of audio...", speechToText.getBufferedAudioDurationMs());
-                return speechToText.getTranscription();
-            } else {
-                log.info("Not enough audio data for transcription");
-                return "";
-            }
+            return fullTranscription.toString().trim();
 
         } catch (Exception e) {
             log.error("Error during transcription recording", e);
