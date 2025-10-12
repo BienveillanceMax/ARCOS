@@ -7,7 +7,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
-import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
@@ -16,7 +15,6 @@ import java.util.Random;
  * Générateur d'embeddings pour les textes utilisant Mistral AI via Spring AI.
  * Supporte un mode fallback avec embeddings mock en cas d'indisponibilité de l'API.
  */
-@Service
 public class EmbeddingService
 {
 
