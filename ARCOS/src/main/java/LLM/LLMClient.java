@@ -1,6 +1,6 @@
 package LLM;
 
-import com.google.common.util.concurrent.RateLimiter;
+import LLM.service.RateLimiterService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
@@ -9,14 +9,15 @@ public class LLMClient
 {
 
     private final ChatClient chatClient;
-    private final RateLimiter rateLimiter = RateLimiter.create(0.9);
+    private final RateLimiterService rateLimiterService;
 
-    public LLMClient(ChatClient.Builder chatClientBuilder) {
+    public LLMClient(ChatClient.Builder chatClientBuilder, RateLimiterService rateLimiterService) {
         this.chatClient = chatClientBuilder.build();
+        this.rateLimiterService = rateLimiterService;
     }
 
     private void acquirePermit() {
-        rateLimiter.acquire();
+        rateLimiterService.acquirePermit();
     }
 
     public String generatePlanningResponse(String prompt) {

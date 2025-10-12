@@ -8,6 +8,7 @@ import Memory.LongTermMemory.service.EmbeddingService;
 import Memory.LongTermMemory.service.MemoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import LLM.service.RateLimiterService;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -35,18 +36,18 @@ public class MemoryConfiguration {
      * Bean pour le générateur d'embeddings avec Mistral AI.
      */
     @Bean
-    public EmbeddingService embeddingGenerator(EmbeddingModel embeddingModel) {
+    public EmbeddingService embeddingGenerator(EmbeddingModel embeddingModel, RateLimiterService rateLimiterService) {
         logger.info("Configuration du générateur d'embeddings Mistral AI");
         logger.info("  - Dimension configurée: {}", embeddingDimension);
 
         try {
-            EmbeddingService generator = new EmbeddingService(embeddingDimension, embeddingModel, true);
+            EmbeddingService generator = new EmbeddingService(embeddingDimension, embeddingModel, true, rateLimiterService);
             return generator;
 
         } catch (Exception e) {
             logger.error("Erreur lors de la configuration de Mistral AI: {}", e.getMessage());
             logger.info("Initialisation en mode mock uniquement");
-            return new EmbeddingService(embeddingDimension);
+            return new EmbeddingService(embeddingDimension, rateLimiterService);
         }
     }
 

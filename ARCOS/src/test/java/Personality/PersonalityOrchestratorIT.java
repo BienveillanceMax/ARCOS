@@ -4,6 +4,7 @@ import EventBus.EventQueue;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
+import LLM.service.RateLimiterService;
 import Memory.Actions.ActionRegistry;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -110,11 +111,12 @@ public class PersonalityOrchestratorIT {
                 .build();
 
         ChatClient.Builder chatClientBuilder = ChatClient.builder(mistralAiChatModel);
-        llmClient = new LLMClient(chatClientBuilder);
+        RateLimiterService rateLimiterService = new RateLimiterService();
+        llmClient = new LLMClient(chatClientBuilder, rateLimiterService);
 
         EventQueue queue = new EventQueue();
 
-        embeddingService = new EmbeddingService(EMBEDDING_DIMENSION);
+        embeddingService = new EmbeddingService(EMBEDDING_DIMENSION, rateLimiterService);
 
         QdrantClient qdrantClient = new QdrantClient(QDRANT_HOST, QDRANT_PORT);
         memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);

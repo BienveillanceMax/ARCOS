@@ -1,11 +1,13 @@
 package Memory.LongTermMemory.service;
 
 
+import LLM.service.RateLimiterService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.embedding.EmbeddingRequest;
 import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Random;
@@ -14,6 +16,7 @@ import java.util.Random;
  * Générateur d'embeddings pour les textes utilisant Mistral AI via Spring AI.
  * Supporte un mode fallback avec embeddings mock en cas d'indisponibilité de l'API.
  */
+@Service
 public class EmbeddingService
 {
 
@@ -23,22 +26,24 @@ public class EmbeddingService
     private final EmbeddingModel embeddingModel;
     private final boolean fallbackToMock;
     private final Random random;
+    private final RateLimiterService rateLimiterService;
 
     /**
      * Constructeur avec modèle Mistral AI.
      */
-    public EmbeddingService(int embeddingDimension, EmbeddingModel embeddingModel) {
-        this(embeddingDimension, embeddingModel, true);
+    public EmbeddingService(int embeddingDimension, EmbeddingModel embeddingModel, RateLimiterService rateLimiterService) {
+        this(embeddingDimension, embeddingModel, true, rateLimiterService);
     }
 
     /**
      * Constructeur complet avec option de fallback.
      */
-    public EmbeddingService(int embeddingDimension, EmbeddingModel embeddingModel, boolean fallbackToMock) {
+    public EmbeddingService(int embeddingDimension, EmbeddingModel embeddingModel, boolean fallbackToMock, RateLimiterService rateLimiterService) {
         this.embeddingDimension = embeddingDimension;
         this.embeddingModel = embeddingModel;
         this.fallbackToMock = fallbackToMock;
         this.random = new Random();
+        this.rateLimiterService = rateLimiterService;
 
         logger.info("EmbeddingGenerator initialisé avec Mistral AI - dimension: {}, fallback: {}",
                 embeddingDimension, fallbackToMock);
@@ -47,11 +52,12 @@ public class EmbeddingService
     /**
      * Constructeur pour mode mock uniquement (compatibilité descendante).
      */
-    public EmbeddingService(int embeddingDimension) {
+    public EmbeddingService(int embeddingDimension, RateLimiterService rateLimiterService) {
         this.embeddingDimension = embeddingDimension;
         this.embeddingModel = null;
         this.fallbackToMock = true;
         this.random = new Random();
+        this.rateLimiterService = rateLimiterService;
 
         logger.warn("EmbeddingGenerator initialisé en mode MOCK uniquement - dimension: {}", embeddingDimension);
     }
@@ -97,6 +103,7 @@ public class EmbeddingService
         EmbeddingRequest request = new EmbeddingRequest(List.of(text), null);
 
         // Appel à l'API Mistral
+        rateLimiterService.acquirePermit();
         EmbeddingResponse response = embeddingModel.call(request);
 
         if (response.getResults().isEmpty()) {
@@ -189,6 +196,7 @@ public class EmbeddingService
         logger.debug("Génération d'embeddings batch Mistral AI pour {} textes", texts.size());
 
         EmbeddingRequest request = new EmbeddingRequest(texts, null);
+        rateLimiterService.acquirePermit();
         EmbeddingResponse response = embeddingModel.call(request);
 
         if (response.getResults().size() != texts.size()) {
