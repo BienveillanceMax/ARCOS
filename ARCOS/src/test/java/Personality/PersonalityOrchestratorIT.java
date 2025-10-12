@@ -22,7 +22,6 @@ import Tools.SearchTool.BraveSearchService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.client.ChatClient;
@@ -51,7 +50,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * 2. Provide a valid Mistral AI API key as an environment variable (e.g., MISTRAL_API_KEY).
  * 3. Remove or comment out the @Disabled annotation below.
  */
-@Disabled("Requires a running Qdrant instance and a valid API key.")
 public class PersonalityOrchestratorIT {
 
     // Services
