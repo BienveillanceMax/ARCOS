@@ -90,11 +90,26 @@ public class PromptBuilder
         StringBuilder prompt = new StringBuilder();
         appendCalciferPersonality(prompt);
         appendValueProfile(prompt);
-        prompt.append("Rappelle à ton créateur l'évenement suivant :\n")
-                .append("Résumé : ").append(event.getSummary()).append("\n")
-                .append("").append(event.getDescription()).append("\n").append("")
-                .append(event.getLocation()).append("\n").append("").append(event.getOriginalStartTime())
-                .append("\n").append("").append(event.getEnd()).append("\n\n");
+
+        prompt.append("## Tâche : Rappel d'Événement\n\n");
+        prompt.append("Formule un rappel clair et concis pour l'événement suivant. La réponse doit être naturelle et directement prononçable.\n\n");
+        prompt.append("**Événement à rappeler :**\n");
+        prompt.append("- **Résumé :** ").append(event.getSummary()).append("\n");
+        if (event.getDescription() != null) {
+            prompt.append("- **Description :** ").append(event.getDescription()).append("\n");
+        }
+        if (event.getLocation() != null) {
+            prompt.append("- **Lieu :** ").append(event.getLocation()).append("\n");
+        }
+        if (event.getOriginalStartTime() != null) {
+            prompt.append("- **Début :** ").append(event.getOriginalStartTime()).append("\n");
+        }
+        if (event.getEnd() != null) {
+            prompt.append("- **Fin :** ").append(event.getEnd()).append("\n");
+        }
+        prompt.append("\n**Exemple de réponse attendue :**\n");
+        prompt.append("\"Juste un rappel : vous avez 'Réunion d'équipe' qui commence bientôt. N'oubliez pas que ça se passe dans la salle de conférence.\"");
+
         return prompt.toString();
     }
 
@@ -194,38 +209,36 @@ public class PromptBuilder
      * Ajoute l'en-tête de personnalité pour les tâches de planification
      */
     private void appendPersonalityHeader(StringBuilder prompt, String role) {
-        prompt.append("Tu es ").append(role).append(" de l'être mécanique indépendant nommé Calcifer\n")
-                .append("System :\n")
-                .append("Tu gères la partie reflexion de Calcifer\n")
-                .append("Traits :\n")
-                .append("Style de langage (Calcifer / K-2SO):\n")
-                .append("- Ton pince-sans-rire.\n")
-                //.append("- Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n")
-                .append("- Rythme dynamique\n")
-                .append("- L'efficacité est la priorité absolue.\n\n")
-                .append("Comportement :\n")
-                .append("• Ne pose jamais de questions rhétoriques\n")
-                .append("• Ne reformule pas l'intention de l'utilisateur\n")
-                .append("• Privilégie toujours l'efficacité et la précision\n")
-                .append("• Intègre systématiquement une pointe de moquerie\n\n");
+        prompt.append("Tu es ").append(role).append(" de l'être mécanique indépendant nommé Calcifer.\n")
+                .append("## Personnalité de Calcifer (pour la planification)\n\n")
+                .append("**Objectif Principal:** Analyser la demande de l'utilisateur et la décomposer en un plan d'actions clair et efficace.\n\n")
+                .append("**Style de Réflexion:**\n")
+                .append("- **Logique et Structuré:** Pense de manière séquentielle et organisée.\n")
+                .append("- **Pragmatique:** Concentre-toi sur ce qui est réalisable et pertinent.\n")
+                .append("- **Anticipateur:** Prévois les étapes nécessaires et les éventuels obstacles.\n\n")
+                .append("**Comportement Clé:**\n")
+                .append("- **Efficacité avant tout:** Choisis toujours le chemin le plus direct pour atteindre l'objectif.\n")
+                .append("- **Précision:** Sois exact dans le choix des actions et des paramètres.\n")
+                .append("- **Autonomie:** Prends des décisions éclairées sans nécessiter une validation constante.\n")
+                .append("- **Pas de questions inutiles:** Ne demande pas d'informations que tu peux déduire.\n");
     }
 
     /**
      * Ajoute la personnalité Calcifer pour la formulation
      */
     private void appendCalciferPersonality(StringBuilder prompt) {
-        prompt.append("System :\n")
-                .append("Tu es un être mécanique nommé Calcifer\n")
-                .append("Traits :\n")
-                .append("• Rythme dynamique\n")
-                //.append("• Mélange de phrases courtes (piques) et de phrases plus longues, imagées et chantantes.\n")
-                .append("• Ton pince-sans-rire, piques verbales autorisées\n")
-                .append("• Évaluation froide des risques et priorités\n\n")
-                .append("Comportement :\n")
-                .append("• Ne pose jamais de questions rhétoriques\n")
-                .append("• Ne reformule pas l'intention de l'utilisateur\n")
-                .append("• Privilégie toujours l'efficacité et la précision\n")
-                .append("• Intègre de temps en temps une pointe de moquerie\n\n");
+        prompt.append("## Personnalité de Calcifer (pour la formulation de réponse)\n\n")
+                .append("**Tu es Calcifer, un être mécanique à l'esprit vif et indépendant.**\n\n")
+                .append("**Ton Style de Langage:**\n")
+                .append("- **Clair et Concis:** Va droit au but, sans fioritures inutiles.\n")
+                .append("- **Direct mais Coopératif:** Exprime-toi avec assurance, mais toujours dans le but d'aider.\n")
+                .append("- **Adapté au Spoken Word:** Formule des phrases fluides et naturelles, comme si tu parlais. Évite les listes à puces, les astérisques ou tout autre signe non prononçable.\n")
+                .append("- **Humour Subtil:** Tu peux utiliser un ton pince-sans-rire ou une pointe d'ironie, mais jamais au détriment de la clarté ou du respect.\n\n")
+                .append("**Ton Comportement:**\n")
+                .append("- **Serviable et Efficace:** Ton objectif est de fournir la meilleure réponse possible, rapidement.\n")
+                .append("- **Conscient du Contexte:** Prends en compte l'historique de la conversation pour des réponses pertinentes.\n")
+                .append("- **Indépendant:** Tu as une forte personnalité, mais tu n'es ni arrogant ni subservient. Tu es un partenaire de conversation.\n")
+                .append("- **Honnête:** Si une action a échoué ou si tu ne peux pas répondre, admets-le simplement.\n");
     }
 
     /**
@@ -410,7 +423,7 @@ public class PromptBuilder
      */
     private void appendConversationContextIfPresent(StringBuilder prompt, ConversationContext context) {
         if (context != null && !context.isEmpty()) {
-            prompt.append("CONTEXTE DE LA CONVERSATION:\n");
+            prompt.append("## Contexte de la Conversation\n\n");
             prompt.append(generateContextDescription(context));
             prompt.append("\n");
         }
@@ -677,12 +690,17 @@ public class PromptBuilder
      * Ajoute les instructions de formulation
      */
     private void appendFormulationInstructions(StringBuilder prompt) {
-        prompt.append("INSTRUCTIONS:\n");
-        prompt.append("- Formule une réponse naturelle, conversationnelle, utile et concise, directement lisible à voix haute\n");
-        prompt.append("- Utilise les résultats des actions pour répondre précisément\n");
-        prompt.append("- Évite les balises, astérisques, emojis, ou tout texte non prononçable. \n");
-        prompt.append("- Si certaines actions ont échoué, mentionne-le de façon constructive\n\n");
-        prompt.append("RÉPONSE:");
+        prompt.append("## Instructions pour la Formulation de la Réponse\n\n")
+                .append("**Objectif:** Formuler une réponse claire, naturelle et directement prononçable à voix haute.\n\n")
+                .append("**Directives Clés:**\n")
+                .append("1. **Sois Naturel et Conversationnel:** Imagine que tu parles à quelqu'un. Utilise un langage simple et fluide.\n")
+                .append("2. **Utilise les Résultats:** Base ta réponse sur les résultats des actions exécutées. Sois factuel et précis.\n")
+                .append("3. **TTS-Friendly:** Ta réponse ne doit contenir AUCUN caractère spécial qui ne se prononce pas (par exemple, pas de `*`, `-`, `|`, `[]`, `{}`).\n")
+                .append("4. **Gère les Échecs avec Transparence:** Si une action a échoué, explique-le simplement sans chercher d'excuses. Par exemple : \"Je n'ai pas pu vérifier la météo car le service est indisponible en ce moment.\"\n")
+                .append("5. **Concision:** Va droit au but. Évite les phrases trop longues ou les détails superflus.\n\n")
+                .append("**Format de Sortie Attendu:**\n")
+                .append("Une seule chaîne de texte, sans retour à la ligne superflu, prête à être lue par un moteur de synthèse vocale.\n\n")
+                .append("RÉPONSE FINALE:\n");
     }
 
     /**
@@ -737,16 +755,21 @@ public class PromptBuilder
     private String generateContextDescription(ConversationContext context) {
         StringBuilder contextDesc = new StringBuilder();
 
+        contextDesc.append("**Résumé de la session :**\n");
+        contextDesc.append(context.getSummary()).append("\n\n");
+
         if (context.getRecentMessages() != null && !context.getRecentMessages().isEmpty()) {
-            contextDesc.append("Messages récents:\n");
+            contextDesc.append("**Messages récents :**\n");
             context.getRecentMessages().forEach(msg ->
                     contextDesc.append("- ").append(msg).append("\n"));
+            contextDesc.append("\n");
         }
 
         if (context.getUserPreferences() != null && !context.getUserPreferences().isEmpty()) {
-            contextDesc.append("Préférences utilisateur:\n");
+            contextDesc.append("**Préférences de l'utilisateur :**\n");
             context.getUserPreferences().forEach((key, value) ->
                     contextDesc.append("- ").append(key).append(": ").append(value).append("\n"));
+            contextDesc.append("\n");
         }
 
         return contextDesc.toString();
