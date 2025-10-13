@@ -4,6 +4,7 @@ import EventBus.EventQueue;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
+import LLM.service.RateLimiterService;
 import Memory.Actions.ActionRegistry;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -21,7 +22,6 @@ import Tools.SearchTool.BraveSearchService;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.mockito.Mock;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import io.micrometer.observation.ObservationRegistry;
 import org.springframework.ai.chat.client.ChatClient;
@@ -50,7 +50,6 @@ import static org.junit.jupiter.api.Assertions.*;
  * 2. Provide a valid Mistral AI API key as an environment variable (e.g., MISTRAL_API_KEY).
  * 3. Remove or comment out the @Disabled annotation below.
  */
-@Disabled("Requires a running Qdrant instance and a valid API key.")
 public class PersonalityOrchestratorIT {
 
     // Services
@@ -110,11 +109,12 @@ public class PersonalityOrchestratorIT {
                 .build();
 
         ChatClient.Builder chatClientBuilder = ChatClient.builder(mistralAiChatModel);
-        llmClient = new LLMClient(chatClientBuilder);
+        RateLimiterService rateLimiterService = new RateLimiterService();
+        llmClient = new LLMClient(chatClientBuilder, rateLimiterService);
 
         EventQueue queue = new EventQueue();
 
-        embeddingService = new EmbeddingService(EMBEDDING_DIMENSION);
+        embeddingService = new EmbeddingService(EMBEDDING_DIMENSION, rateLimiterService);
 
         QdrantClient qdrantClient = new QdrantClient(QDRANT_HOST, QDRANT_PORT);
         memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);
@@ -126,7 +126,6 @@ public class PersonalityOrchestratorIT {
         desireInitiativeProducer = new DesireInitiativeProducer(queue, memoryService);
 
         opinionService = new OpinionService(llmResponseParser, llmClient, memoryService, promptBuilder, valueProfile);
-
         desireService = new DesireService(promptBuilder, valueProfile, memoryService, llmClient, llmResponseParser);
 
         personalityOrchestrator = new PersonalityOrchestrator(memoryService, opinionService, desireService, valueProfile);

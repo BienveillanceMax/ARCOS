@@ -15,6 +15,7 @@
 /app/ARCOS/src/main/java/LLM/LLMClient.java
 /app/ARCOS/src/main/java/LLM/LLMResponseParser.java
 /app/ARCOS/src/main/java/LLM/Prompts/PromptBuilder.java
+/app/ARCOS/src/main/java/LLM/service/RateLimiterService.java
 /app/ARCOS/src/main/java/Memory/Actions/ActionRegistry.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/ActionResult.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/Action.java

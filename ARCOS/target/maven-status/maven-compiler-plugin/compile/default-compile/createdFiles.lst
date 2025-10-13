@@ -2,6 +2,7 @@ Producers/WakeWordProducer.class
 Memory/Actions/Entities/Actions/DefaultAction.class
 Memory/Actions/Entities/Actions/SearchAction.class
 EventBus/Events/EventType.class
+LLM/service/RateLimiterService.class
 Exceptions/SearchException.class
 Tools/SearchTool/BraveSearchService$SafeSearch.class
 Memory/Actions/Entities/Actions/SearchCalendarEventsAction.class
