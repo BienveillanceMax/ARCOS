@@ -126,7 +126,6 @@ public class PersonalityOrchestratorIT {
         desireInitiativeProducer = new DesireInitiativeProducer(queue, memoryService);
 
         opinionService = new OpinionService(llmResponseParser, llmClient, memoryService, promptBuilder, valueProfile);
-
         desireService = new DesireService(promptBuilder, valueProfile, memoryService, llmClient, llmResponseParser);
 
         personalityOrchestrator = new PersonalityOrchestrator(memoryService, opinionService, desireService, valueProfile);
