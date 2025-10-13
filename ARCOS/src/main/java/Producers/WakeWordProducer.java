@@ -7,6 +7,7 @@ import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -53,7 +54,7 @@ public class WakeWordProducer implements Runnable {
     }
 
     @Autowired
-    public WakeWordProducer(EventQueue eventQueue) {
+    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl) {
         log.info("Initializing WakeWordProducer");
         this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
@@ -76,7 +77,7 @@ public class WakeWordProducer implements Runnable {
         initializePorcupine(keywordPaths, porcupineModelPath);
         initializeAudio();
         if (this.micDataLine != null) {
-            this.speechToText = new SpeechToText(getWhisperModelPath());
+            this.speechToText = new SpeechToText(fasterWhisperUrl);
         } else {
             this.speechToText = null;
         }
@@ -96,10 +97,6 @@ public class WakeWordProducer implements Runnable {
         } catch (IOException e) {
             throw new RuntimeException("Failed to extract resource: " + resourceName, e);
         }
-    }
-
-    private String getWhisperModelPath() {
-        return extractResource("ggml-small.bin");
     }
 
     private String getKeywordPath(String keyword) {

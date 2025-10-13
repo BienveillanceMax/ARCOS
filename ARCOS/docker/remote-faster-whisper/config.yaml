@@ -1,0 +1,9 @@
+daemon:
+  listen: "0.0.0.0"
+  port: 9876
+
+faster_whisper:
+  model: "base"
+  device: "cpu"
+  language: "fr"
+  compute_type: "int8"

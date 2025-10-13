@@ -21,6 +21,14 @@ services:
       retries: 3
       start_period: 40s
 
+  faster-whisper:
+    build:
+      context: ./docker/remote-faster-whisper
+    container_name: faster-whisper-container
+    ports:
+      - "9876:9876"
+    restart: unless-stopped
+
   arcos-app:
     build:
       context: .
@@ -31,6 +39,7 @@ services:
     restart: unless-stopped
     depends_on:
       - qdrant
+      - faster-whisper
 
     env_file: .env
 

@@ -1,170 +1,177 @@
 package IO.InputHandling;
 
-import io.github.givimad.whisperjni.WhisperJNI;
-import io.github.givimad.whisperjni.WhisperContext;
-import io.github.givimad.whisperjni.WhisperFullParams;
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
+import okhttp3.*;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 public class SpeechToText {
-    private WhisperJNI whisper;
-    private WhisperContext context;
-    private WhisperFullParams params;
 
-    // Audio parameters - Whisper expects 16kHz mono PCM
     private static final int SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2; // 16-bit
+    private static final int CHANNELS = 1; // Mono
 
-    // Buffer to accumulate audio data
-    private ByteArrayOutputStream audioBuffer;
+    private final String remoteUrl;
+    private final OkHttpClient httpClient;
+    private final Gson gson;
+    private final ByteArrayOutputStream audioBuffer;
     private boolean isInitialized = false;
 
-    public SpeechToText(String modelPath) {
-        try {
-            // Load WhisperJNI library
-            WhisperJNI.loadLibrary();
-            WhisperJNI.setLibraryLogger(null); // Disable whisper.cpp logging
-
-            this.whisper = new WhisperJNI();
-
-            // Initialize Whisper context with the model
-            Path modelFile = Paths.get(modelPath);
-            this.context = whisper.init(modelFile);
-
-            if (this.context == null) {
-                throw new RuntimeException("Failed to initialize Whisper context with model: " + modelPath);
-            }
-
-            // Configure Whisper parameters
-            this.params = new WhisperFullParams();
-            this.params.printRealtime = false;
-            this.params.printProgress = false;
-            this.params.printTimestamps = false;
-            this.params.printSpecial = false;
-            this.params.translate = false; // Set to true if you want English translation
-            this.params.language = "fr"; // French language
-            this.params.nThreads = Runtime.getRuntime().availableProcessors();
-            this.params.offsetMs = 0;
-            this.params.durationMs = 0; // Process entire audio
-
-            // Initialize audio buffer
-            this.audioBuffer = new ByteArrayOutputStream();
-            this.isInitialized = true;
-
-            log.info("WhisperJNI initialized successfully with French language model");
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to initialize WhisperJNI: " + e.getMessage(), e);
-        }
+    public SpeechToText(String remoteUrl) {
+        this.remoteUrl = remoteUrl;
+        this.httpClient = new OkHttpClient.Builder()
+                .callTimeout(30, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .build();
+        this.gson = new Gson();
+        this.audioBuffer = new ByteArrayOutputStream();
+        this.isInitialized = true;
+        log.info("SpeechToText initialized to use remote server at: {}", remoteUrl);
     }
 
-    /**
-     * Process incoming audio data by buffering it
-     */
     public void processAudio(byte[] audioData) {
         if (!isInitialized) {
             log.error("SpeechToText not initialized");
             return;
         }
-
         try {
-            // Buffer the audio data
             this.audioBuffer.write(audioData);
         } catch (IOException e) {
             log.error("Error buffering audio data", e);
         }
     }
 
-    /**
-     * Transcribe all buffered audio and return the result
-     */
     public String getTranscription() {
         if (!isInitialized) {
             log.error("SpeechToText not initialized");
             return "";
         }
 
-        try {
-            byte[] audioBytes = this.audioBuffer.toByteArray();
-
-            if (audioBytes.length == 0) {
-                return "";
-            }
-
-            // Convert byte array to float array (Whisper expects float samples)
-            float[] samples = convertBytesToFloatSamples(audioBytes);
-
-            if (samples.length == 0) {
-                return "";
-            }
-
-            log.info("Processing {} audio samples with Whisper...", samples.length);
-
-            // Run Whisper transcription
-            int result = whisper.full(context, params, samples, samples.length);
-
-            if (result != 0) {
-                log.error("Whisper transcription failed with code: {}", result);
-                return "";
-            }
-
-            // Extract transcribed text from all segments
-            int numSegments = whisper.fullNSegments(context);
-            StringBuilder transcription = new StringBuilder();
-
-            for (int i = 0; i < numSegments; i++) {
-                String segmentText = whisper.fullGetSegmentText(context, i);
-                if (segmentText != null && !segmentText.trim().isEmpty()) {
-                    transcription.append(segmentText.trim()).append(" ");
-                }
-            }
-
-            return cleanTranscript(transcription.toString().trim());
-
-        } catch (Exception e) {
-            log.error("Error during Whisper transcription", e);
+        byte[] audioBytes = this.audioBuffer.toByteArray();
+        if (audioBytes.length == 0) {
             return "";
         }
+
+        File tempWavFile = null;
+        try {
+            // Create a temporary WAV file
+            tempWavFile = createTempWavFile(audioBytes);
+
+            // Build the request
+            RequestBody requestBody = new MultipartBody.Builder()
+                    .setType(MultipartBody.FORM)
+                    .addFormDataPart("audio_file", tempWavFile.getName(),
+                            RequestBody.create(tempWavFile, MediaType.parse("audio/wav")))
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url(this.remoteUrl + "/api/v0/transcribe")
+                    .post(requestBody)
+                    .build();
+
+            log.info("Sending {} bytes of audio data for transcription...", audioBytes.length);
+
+            // Execute the request
+            try (Response response = httpClient.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    log.error("Transcription request failed with code: {} and message: {}", response.code(), response.body() != null ? response.body().string() : "null");
+                    return "";
+                }
+
+                String responseBody = Objects.requireNonNull(response.body()).string();
+                JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
+                String transcript = jsonResponse.has("text") ? jsonResponse.get("text").getAsString() : "";
+                return cleanTranscript(transcript);
+            }
+        } catch (IOException e) {
+            log.error("Error during transcription request", e);
+            return "";
+        } finally {
+            if (tempWavFile != null) {
+                if (!tempWavFile.delete()) {
+                    log.warn("Failed to delete temporary WAV file: {}", tempWavFile.getAbsolutePath());
+                }
+            }
+        }
+    }
+
+    private File createTempWavFile(byte[] pcmData) throws IOException {
+        File tempFile = File.createTempFile("speech", ".wav");
+        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+            writeWavHeader(fos, pcmData.length);
+            fos.write(pcmData);
+        }
+        return tempFile;
+    }
+
+    private void writeWavHeader(FileOutputStream fos, int pcmDataLength) throws IOException {
+        int totalDataLen = pcmDataLength + 36;
+        long longSampleRate = SAMPLE_RATE;
+        int channels = CHANNELS;
+        long byteRate = BYTES_PER_SAMPLE * SAMPLE_RATE * channels;
+
+        byte[] header = new byte[44];
+        header[0] = 'R'; // RIFF/WAVE header
+        header[1] = 'I';
+        header[2] = 'F';
+        header[3] = 'F';
+        header[4] = (byte) (totalDataLen & 0xff);
+        header[5] = (byte) ((totalDataLen >> 8) & 0xff);
+        header[6] = (byte) ((totalDataLen >> 16) & 0xff);
+        header[7] = (byte) ((totalDataLen >> 24) & 0xff);
+        header[8] = 'W';
+        header[9] = 'A';
+        header[10] = 'V';
+        header[11] = 'E';
+        header[12] = 'f'; // 'fmt ' chunk
+        header[13] = 'm';
+        header[14] = 't';
+        header[15] = ' ';
+        header[16] = 16; // 4 bytes: size of 'fmt ' chunk
+        header[17] = 0;
+        header[18] = 0;
+        header[19] = 0;
+        header[20] = 1; // format = 1 (PCM)
+        header[21] = 0;
+        header[22] = (byte) channels;
+        header[23] = 0;
+        header[24] = (byte) (longSampleRate & 0xff);
+        header[25] = (byte) ((longSampleRate >> 8) & 0xff);
+        header[26] = (byte) ((longSampleRate >> 16) & 0xff);
+        header[27] = (byte) ((longSampleRate >> 24) & 0xff);
+        header[28] = (byte) (byteRate & 0xff);
+        header[29] = (byte) ((byteRate >> 8) & 0xff);
+        header[30] = (byte) ((byteRate >> 16) & 0xff);
+        header[31] = (byte) ((byteRate >> 24) & 0xff);
+        header[32] = (byte) (channels * BYTES_PER_SAMPLE); // block align
+        header[33] = 0;
+        header[34] = 16; // bits per sample
+        header[35] = 0;
+        header[36] = 'd';
+        header[37] = 'a';
+        header[38] = 't';
+        header[39] = 'a';
+        header[40] = (byte) (pcmDataLength & 0xff);
+        header[41] = (byte) ((pcmDataLength >> 8) & 0xff);
+        header[42] = (byte) ((pcmDataLength >> 16) & 0xff);
+        header[43] = (byte) ((pcmDataLength >> 24) & 0xff);
+
+        fos.write(header, 0, 44);
     }
 
     private String cleanTranscript(String transcript) {
         if (transcript == null) return null;
-        // Supprime tout ce qui est entre crochets [ ... ]
         return transcript.replaceAll("\\[.*?\\]", "").trim();
     }
 
-    /**
-     * Convert 16-bit PCM byte array to float samples
-     * Whisper expects float samples in range [-1.0, 1.0]
-     */
-    private float[] convertBytesToFloatSamples(byte[] audioBytes) {
-        int numSamples = audioBytes.length / BYTES_PER_SAMPLE;
-        float[] samples = new float[numSamples];
-
-        ByteBuffer buffer = ByteBuffer.wrap(audioBytes);
-        buffer.order(ByteOrder.LITTLE_ENDIAN);
-
-        for (int i = 0; i < numSamples; i++) {
-            if (buffer.remaining() >= BYTES_PER_SAMPLE) {
-                short sample = buffer.getShort();
-                // Convert to float in range [-1.0, 1.0]
-                samples[i] = sample / 32768.0f;
-            }
-        }
-
-        return samples;
-    }
-
-    /**
-     * Reset the audio buffer for a new transcription session
-     */
     public void reset() {
         if (this.audioBuffer != null) {
             this.audioBuffer.reset();
@@ -172,47 +179,29 @@ public class SpeechToText {
         log.info("SpeechToText reset for new session");
     }
 
-    /**
-     * Get the minimum audio duration (in milliseconds) needed for reasonable transcription
-     */
     public long getMinimumAudioDurationMs() {
         return 500; // 0.5 seconds minimum
     }
 
-    /**
-     * Get current buffered audio duration in milliseconds
-     */
     public long getBufferedAudioDurationMs() {
         if (audioBuffer == null) return 0;
-
         int audioBytes = audioBuffer.size();
         int numSamples = audioBytes / BYTES_PER_SAMPLE;
         return (long) ((double) numSamples / SAMPLE_RATE * 1000);
     }
 
-    /**
-     * Check if we have enough audio data for transcription
-     */
     public boolean hasMinimumAudio() {
         return getBufferedAudioDurationMs() >= getMinimumAudioDurationMs();
     }
 
-    /**
-     * Close and cleanup resources
-     */
     public void close() {
         try {
-            if (this.context != null) {
-                this.context.close();
-                this.context = null;
-            }
             if (this.audioBuffer != null) {
                 this.audioBuffer.close();
-                this.audioBuffer = null;
             }
             this.isInitialized = false;
-            log.info("WhisperJNI resources cleaned up");
-        } catch (Exception e) {
+            log.info("SpeechToText resources cleaned up");
+        } catch (IOException e) {
             log.error("Error closing SpeechToText", e);
         }
     }
