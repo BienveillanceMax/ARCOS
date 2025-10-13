@@ -3,7 +3,7 @@ daemon:
   port: 9876
 
 faster_whisper:
-  model: "base"
+  model: "small"
   device: "cpu"
-  language: "fr"
+  language: "f"
   compute_type: "int8"
