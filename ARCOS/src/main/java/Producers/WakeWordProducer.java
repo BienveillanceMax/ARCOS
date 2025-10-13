@@ -235,7 +235,7 @@ public class WakeWordProducer implements Runnable {
     }
 
     private String recordAndTranscribe() {
-        log.info("Started listening for speech with WhisperJNI...");
+        log.info("Started listening for speech with Faster Whisper...");
 
         speechToText.reset();
 

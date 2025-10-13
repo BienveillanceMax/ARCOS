@@ -23,4 +23,4 @@ COPY config.yaml .
 EXPOSE 9876
 
 # Run the application
-CMD ["python", "remote_faster_whisper.py"]
+CMD ["python", "remote_faster_whisper.py", "-c", "config.yaml"]
