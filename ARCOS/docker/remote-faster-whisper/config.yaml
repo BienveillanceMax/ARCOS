@@ -5,5 +5,5 @@ daemon:
 faster_whisper:
   model: "small"
   device: "cpu"
-  language: "f"
+  language: "fr"
   compute_type: "int8"
