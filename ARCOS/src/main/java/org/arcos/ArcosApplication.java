@@ -18,7 +18,6 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
-
 //might need to setup time because of dual boot : timedatectl set-time "2014-05-26 11:13:54"
 @SpringBootApplication(scanBasePackages = {"EventBus", "Producers", "LLM", "Orchestrator", "Memory", "org.arcos", "Personality", "Tools"})
 @EnableScheduling
@@ -31,8 +30,6 @@ public class ArcosApplication
         System.out.println("ArcosApplication available audio devices : ");
         WakeWordProducer.showAudioDevices();
         System.out.println("\n");
-
-
 
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);

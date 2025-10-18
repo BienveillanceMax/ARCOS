@@ -162,7 +162,6 @@ public class PromptBuilder
         appendCalciferPersonality(prompt);
 
         appendValueProfile(prompt);
-
         appendGeneralInformation(prompt);
         appendOriginalQuery(prompt, originalQuery);
         appendConversationContextIfPresent(prompt, context);
