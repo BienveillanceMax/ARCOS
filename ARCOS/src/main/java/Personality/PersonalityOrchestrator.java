@@ -48,17 +48,9 @@ public class PersonalityOrchestrator
     }
 
     private MemoryEntry tryMemorizing(String conversation) {
-        MemoryEntry memoryEntry = null;
-        int retries = 0;
-        while (retries < ALLOWED_RETRIES) {
-            try {
-                memoryEntry = memoryService.memorizeConversation(conversation);
-                break;
-            } catch (ResponseParsingException e) {
-                log.error("Error memorizing conversation", e);
-                retries++;
-            }
-        }
+        MemoryEntry memoryEntry = new MemoryEntry();
+        memoryEntry.setContent(conversation);
+        memoryService.storeMemory(memoryEntry);
         return memoryEntry;
     }
 

@@ -4,7 +4,6 @@ import Exceptions.DesireCreationException;
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
-import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.service.MemoryService;
@@ -19,7 +18,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 @Slf4j
 public class DesireService
 {
-    private final PromptBuilder promptBuilder;
     private final ValueProfile valueProfile;
     private final MemoryService memoryService;
     private final LLMClient llmClient;
@@ -28,8 +26,7 @@ public class DesireService
     public static final double D_UPDATE_THRESHOLD = 0.2;
 
     @Autowired
-    public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
-        this.promptBuilder = promptBuilder;
+    public DesireService(ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
         this.valueProfile = valueProfile;
         this.memoryService = memoryService;
         this.llmClient = llmClient;
@@ -50,29 +47,8 @@ public class DesireService
                     log.error("Failed to create desire for opinion {}", opinionEntry.getId(), e);
                     return null;
                 }
-                boolean stored = memoryService.storeDesire(createdDesire);
-                if (stored) {
-                    try {
-                        opinionEntry.setAssociatedDesire(createdDesire.getId());
-                        memoryService.storeOpinion(opinionEntry);
-                        return createdDesire;
-                    } catch (Exception e) {
-                        log.error("Failed to update opinion {} with new desire {}. Deleting desire to prevent orphan.", opinionEntry.getId(), createdDesire.getId(), e);
-                        memoryService.deleteDesire(createdDesire.getId());
-                        return null;
-                    }
-                } else {
-                    log.error("Failed to store desire for opinion {}", opinionEntry.getId());
-                    return null;
-                }
 
             }
-        } else {
-
-            createdDesire = updateDesire(opinionEntry);
-            opinionEntry.setAssociatedDesire(createdDesire.getId());
-            memoryService.storeOpinion(opinionEntry);
-            return createdDesire;
         }
 
         return null;
@@ -84,13 +60,12 @@ public class DesireService
     }
 
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) throws DesireCreationException {
-        String prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
         DesireEntry createdDesire;
 
         int retries = 3;            //bit of a magic number, todo move retry logic to orchestator
         for(int i = 0; i < retries; i++) {
             try {
-                createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
+                createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generate(opinionEntry.getSummary()), opinionEntry.getId());
                 return createdDesire;
             } catch (ResponseParsingException e) {
                 log.error("Error parsing desire from response, retry {}/{}", i + 1, retries, e);
@@ -101,13 +76,6 @@ public class DesireService
     }
 
 
-    private DesireEntry updateDesire(OpinionEntry opinionEntry) {
-        DesireEntry desireEntry = memoryService.getDesire(opinionEntry.getAssociatedDesire());
-
-        desireEntry = updateStats(desireEntry, opinionEntry);
-        memoryService.storeDesire(desireEntry);
-        return desireEntry;
-    }
 
     private DesireEntry updateStats(DesireEntry desireEntry, OpinionEntry opinionEntry) {
 

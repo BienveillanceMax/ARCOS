@@ -34,17 +34,7 @@ public class DesireInitiativeProducer {
 
     @Scheduled(fixedRate = 6000000) // Check every hour
     public void checkDesiresAndInitiate() {
-        log.info("Checking for high-intensity desires...");
-        List<DesireEntry> pendingDesires = memoryService.getPendingDesires();
-        log.info("High intensity desires found: {}", pendingDesires.size());
-        for (DesireEntry desire : pendingDesires) {
-            if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
-                if (isGoodMomentToInitiate(desire)) {
-                    log.info("High-intensity desire found, initiating... {}", desire.getLabel());
-                    initiateDesireAction(desire);
-                }
-            }
-        }
+        // This feature is temporarily disabled due to the refactoring.
     }
 
     private boolean isGoodMomentToInitiate(DesireEntry desire) {
@@ -71,7 +61,6 @@ public class DesireInitiativeProducer {
 
         // Update the desire's status to ACTIVE
         desire.setStatus(DesireEntry.Status.ACTIVE);
-        memoryService.storeDesire(desire);
     }
 }
 

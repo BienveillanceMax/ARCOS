@@ -2,7 +2,6 @@ package Orchestrator;
 
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
-import LLM.Prompts.PromptBuilder;
 import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.Models.DesireEntry;
@@ -31,17 +30,15 @@ public class InitiativeService {
     private final LLMClient llmClient;
     private final LLMResponseParser responseParser;
     private final ActionExecutor actionExecutor;
-    private final PromptBuilder promptBuilder;
 
     @Autowired
-    public InitiativeService(MemoryService memoryService, OpinionService opinionService, ActionRegistry actionRegistry, LLMClient llmClient, LLMResponseParser responseParser, ActionExecutor actionExecutor, PromptBuilder promptBuilder) {
+    public InitiativeService(MemoryService memoryService, OpinionService opinionService, ActionRegistry actionRegistry, LLMClient llmClient, LLMResponseParser responseParser, ActionExecutor actionExecutor) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;
         this.actionRegistry = actionRegistry;
         this.llmClient = llmClient;
         this.responseParser = responseParser;
         this.actionExecutor = actionExecutor;
-        this.promptBuilder = promptBuilder;
     }
 
     public void processInitiative(DesireEntry desire) {
@@ -53,14 +50,10 @@ public class InitiativeService {
             List<MemoryEntry> memories = memoryService.searchMemories(desire.getDescription(), 5).stream()
                     .map(SearchResult::getEntry)
                     .collect(Collectors.toList());
-            List<OpinionEntry> opinions = memoryService.searchOpinions(desire.getDescription(), 5).stream()
-                    .map(SearchResult::getEntry)
-                    .collect(Collectors.toList());
 
             // 2. Transform desire into a plan
             log.info("Step 2: Transforming desire into a plan...");
-            String prompt = promptBuilder.buildInitiativePlanningPrompt(desire, memories, opinions);
-            String planningResponse = llmClient.generatePlanningResponse(prompt);
+            String planningResponse = llmClient.generate(desire.getDescription());
             ExecutionPlan plan = responseParser.parseWithMistralRetry(planningResponse, 3);
             log.info("Plan received from LLM: {}", plan.getReasoning());
 
@@ -88,7 +81,6 @@ public class InitiativeService {
             desire.setStatus(DesireEntry.Status.PENDING); // Revert to PENDING on failure
         } finally {
             desire.setLastUpdated(java.time.LocalDateTime.now());
-            memoryService.storeDesire(desire);
             log.info("Desire {} updated in database with status {}", desire.getId(), desire.getStatus());
         }
     }

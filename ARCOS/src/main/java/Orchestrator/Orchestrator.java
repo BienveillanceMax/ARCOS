@@ -5,18 +5,17 @@ import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import Exceptions.ResponseParsingException;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
-import LLM.LLMResponseParser;
 import Memory.LongTermMemory.Models.DesireEntry;
+import org.springframework.ai.chat.client.ChatClient;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import LLM.LLMClient;
 import java.util.List;
 import java.util.stream.Collectors;
-import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
+import org.springframework.ai.chat.memory.ChatMemory;
 import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.Entities.ExecutionPlan;
-import LLM.Prompts.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cglib.core.Local;
@@ -35,11 +34,8 @@ import java.util.concurrent.CompletableFuture;
 public class Orchestrator
 {
     private final EventQueue eventQueue;
-    private final LLMClient llmClient;
-    private final PromptBuilder promptBuilder;
-    private final LLMResponseParser responseParser;
-    private final ActionExecutor actionExecutor;
-    private final ConversationContext context;
+    private final ChatClient chatClient;
+    private final ChatMemory chatMemory;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
     private final PiperEmbeddedTTSModule ttsHandler;
@@ -48,17 +44,14 @@ public class Orchestrator
     private LocalDateTime lastInteracted;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, ChatClient chatClient, ChatMemory chatMemory, MemoryService memoryService, InitiativeService initiativeService) {
+        this(personalityOrchestrator, evenQueue, chatClient, chatMemory, memoryService, initiativeService, new PiperEmbeddedTTSModule());
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, ChatClient chatClient, ChatMemory chatMemory, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
         this.eventQueue = evenQueue;
-        this.llmClient = llmClient;
-        this.promptBuilder = promptBuilder;
-        this.responseParser = responseParser;
-        this.actionExecutor = actionExecutor;
-        this.context = context;
+        this.chatClient = chatClient;
+        this.chatMemory = chatMemory;
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
@@ -79,11 +72,10 @@ public class Orchestrator
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
                 desire.setStatus(DesireEntry.Status.PENDING);
                 desire.setLastUpdated(java.time.LocalDateTime.now());
-                memoryService.storeDesire(desire);
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
 
-            ttsHandler.speak(llmClient.generateResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+            ttsHandler.speak("Calendar event scheduler is not implemented yet.");
 
         }
     }
@@ -103,60 +95,10 @@ public class Orchestrator
     private String processQuery(String userQuery) {
         log.info("Processing query: {}", userQuery);
 
-
-        // Search for relevant memories
-        LocalDateTime lastCall = LocalDateTime.now();
-        List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery)
-                .stream()
-                .map(SearchResult::getEntry)
-                .collect(Collectors.toList());
-
-
-
-        // 1. Génération du prompt
-        String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context, relevantMemories);
-        log.debug("Planning prompt:\n{}", planningPrompt);
-
-
-
-
-        // 2. Appel à Mistral pour planification
-        String planningResponse = llmClient.generatePlanningResponse(planningPrompt).replace("*",""); //fallback plan is probably not valid*
-        log.debug("Planning response:\n{}", planningResponse);
-
-
-        // 3. Parsing avec retry spécifique Mistral
-        ExecutionPlan plan = null;
-        try {
-            plan = responseParser.parseWithMistralRetry(planningResponse, 3);
-        } catch (ResponseParsingException e) {
-            log.error("Error parsing planning response", e);
-            throw new RuntimeException(e);
-        }
-
-        // 4. Exécution des actions
-        Map<String, ActionResult> results = actionExecutor.executeActions(plan);    //TODO
-        log.debug("Action execution results: {}", results);
-
-        // 5. Prompt de formulation
-        String formulationPrompt = promptBuilder.buildFormulationPrompt(
-                userQuery, plan, results, context
-        );
-        log.debug("Formulation prompt:\n{}", formulationPrompt);
-
-
-
-        // 6. Appel à Mistral pour formulation
-        String finalResponse = llmClient.generateFormulationResponse(formulationPrompt).replace("*","");
-        log.info("Final response: {}", finalResponse);
-
-        // 7. Ajout à la mémoire à court terme.
-        context.addUserMessage(userQuery);
-        context.addAssistantMessage(finalResponse, plan);
-        log.info("Starting personality processing workflow...");
-        triggerPersonalityProcessing(lastInteracted);
-        lastInteracted = LocalDateTime.now();
-        return finalResponse;
+        return chatClient.prompt()
+                .user(userQuery)
+                .call()
+                .content();
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
@@ -168,7 +110,7 @@ public class Orchestrator
                 Thread.sleep(1000);
                 if (elapsedTime.toMinutes() > 10) {
                     log.info("Triggering personality processing...");
-                    String fullConversation = context.getFullConversation();
+                    String fullConversation = chatMemory.toString();
                     personalityOrchestrator.processMemory(fullConversation);
                 }
             } catch (Exception e) {

@@ -2,7 +2,6 @@ package Personality.Opinions;
 
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
-import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
@@ -25,7 +24,6 @@ public class OpinionService
 {
 
     private final ValueProfile valueProfile;
-    private final PromptBuilder promptBuilder;
     private final MemoryService memoryService;
     private final LLMClient llmClient;
     private final LLMResponseParser llmResponseParser;
@@ -47,11 +45,10 @@ public class OpinionService
     private static final double RHO_NETWORK = 0.25; // poids du réseau dans expEffective
 
 
-    public OpinionService(LLMResponseParser llmResponseParser, LLMClient llmClient, MemoryService memoryService, PromptBuilder promptBuilder, ValueProfile valueProfile) {
+    public OpinionService(LLMResponseParser llmResponseParser, LLMClient llmClient, MemoryService memoryService, ValueProfile valueProfile) {
         this.llmResponseParser = llmResponseParser;
         this.llmClient = llmClient;
         this.memoryService = memoryService;
-        this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
     }
 
@@ -84,9 +81,8 @@ public class OpinionService
         //gotta make a call, build a new prompt and parse the return
 
         OpinionEntry opinionEntry;
-        String prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
-            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry);
+            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generate(memoryEntry.getContent()), memoryEntry);
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;
@@ -108,16 +104,8 @@ public class OpinionService
         }
 
         // Logique de tri d'opinion
-        List<SearchResult<OpinionEntry>> similarOpinions = memoryService.searchOpinions(opinionEntry.getSubject());
         boolean similarOpinionsFound = false;
 
-        for (SearchResult<OpinionEntry> searchResult : similarOpinions) {
-
-            if (searchResult.getSimilarityScore() >= 0.85) {            //TODO HANDLE LESSER SIMILARITY ? HANDLE SUBJECT DIFFERENTIATION
-                similarOpinionsFound = true;
-                opinionEntries.add(updateOpinion(searchResult, opinionEntry));
-            }
-        }
         if (!similarOpinionsFound) {
             opinionEntries.add(addOpinion(opinionEntry, memory));
         }
@@ -190,25 +178,6 @@ public class OpinionService
         return normVp * newOpinionEntry.getPolarity();
     }
 
-    private OpinionEntry updateOpinion(SearchResult<OpinionEntry> searchResult, OpinionEntry newOpinion) {
-        OpinionEntry opinionEntry = searchResult.getEntry();
-
-        double networkConsistencyScore = getNetworkConsistencyScore(newOpinion);
-        double newOpinionImportance = valueProfile.averageByDimension(opinionEntry.getMainDimension());
-        double coherency = (valueProfile.averageByDimension(opinionEntry.getMainDimension()) - valueProfile.dimensionAverage()) / 100;
-
-        opinionEntry.setStability(updateStabilityScore(opinionEntry, networkConsistencyScore, newOpinionImportance, newOpinion));
-        if (opinionEntry.getStability() <= 0) {
-            memoryService.deleteOpinion(opinionEntry.getId());
-            return null; //Opinion deleted -> nothing more to do
-        }
-        opinionEntry.setConfidence(updateConfidenceScore(opinionEntry, networkConsistencyScore, newOpinionImportance));
-        opinionEntry.setPolarity(updatePolarityScore(opinionEntry, networkConsistencyScore, coherency));
-
-
-        memoryService.storeOpinion(opinionEntry);
-        return opinionEntry;
-    }
 
 
     private double calculateStabilityScore(OpinionEntry opinionEntry) {
@@ -228,7 +197,6 @@ public class OpinionService
         opinionEntry.setCreatedAt(LocalDateTime.now());
         opinionEntry.setUpdatedAt(LocalDateTime.now());
 
-        memoryService.storeOpinion(opinionEntry);
         return opinionEntry;
 
     }
