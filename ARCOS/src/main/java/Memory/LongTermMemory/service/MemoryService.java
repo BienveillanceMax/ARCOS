@@ -14,6 +14,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
@@ -24,6 +25,7 @@ import java.util.stream.Collectors;
  * Service principal pour la gestion de la mémoire à long terme.
  * Orchestre les interactions entre le client Qdrant et le générateur d'embeddings.
  */
+@Component
 @Slf4j
 public class MemoryService
 {
