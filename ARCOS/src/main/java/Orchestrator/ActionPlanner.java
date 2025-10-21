@@ -2,7 +2,6 @@ package Orchestrator;
 
 import Exceptions.PlanningException;
 import LLM.LLMClient;
-import Memory.Actions.ActionRegistry;
 import Memory.ConversationContext;
 import Orchestrator.Entities.ExecutionPlan;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -5,7 +5,6 @@ import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import LLM.service.RateLimiterService;
-import Memory.Actions.ActionRegistry;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;

@@ -1,6 +1,5 @@
 package Orchestrator;
 
-import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.ActionResult;
 import Memory.Actions.Entities.Actions.Action;
 import Orchestrator.Entities.ExecutionPlan;

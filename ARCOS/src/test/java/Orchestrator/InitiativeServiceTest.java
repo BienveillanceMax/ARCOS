@@ -3,12 +3,8 @@ package Orchestrator;
 import LLM.LLMClient;
 import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
-import Memory.Actions.ActionRegistry;
 import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.Entities.ExecutionPlan;
 import Personality.Opinions.OpinionService;
@@ -21,7 +17,6 @@ import org.mockito.MockitoAnnotations;
 
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;

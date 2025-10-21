@@ -1,6 +1,5 @@
 package LLM.Prompts;
 
-import Memory.Actions.ActionRegistry;
 import Memory.ConversationContext;
 import Memory.Actions.Entities.ActionResult;
 import Memory.Actions.Entities.Actions.Action;
@@ -14,7 +13,6 @@ import Personality.Values.Entities.ValueSchwartz;
 import Personality.Values.ValueProfile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.api.client.util.DateTime;
 import com.google.api.services.calendar.model.Event;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
