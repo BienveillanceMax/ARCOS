@@ -178,7 +178,6 @@ public class ActionRegistry
                 actionsArray.add(actionNode);
             }
 
-            // Retourne le JSON formaté pour être lisible
             return objectMapper.writerWithDefaultPrettyPrinter()
                     .writeValueAsString(actionsArray);
 

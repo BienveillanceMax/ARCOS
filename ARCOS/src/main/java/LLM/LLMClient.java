@@ -62,12 +62,4 @@ public class LLMClient
                 .content();
     }
 
-    public reactor.core.publisher.Flux<String> generateStreamingResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt)
-                .stream()
-                .content();
-    }
-
-
 }

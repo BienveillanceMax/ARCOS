@@ -498,21 +498,4 @@ public class PiperEmbeddedTTSModule {
             executor.shutdownNow();
         }
     }
-
-    public static void main(String[] args) {
-        try {
-            PiperEmbeddedTTSModule tts = new PiperEmbeddedTTSModule();
-
-            // Test synchronous speech
-            tts.speak("Bonjour, ceci est un test de synthèse vocale.");
-
-            // Test asynchronous speech
-            Future<Void> future = tts.speakAsync("Test asynchrone terminé.");
-            future.get(); // Wait for completion
-
-            tts.shutdown();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 }
