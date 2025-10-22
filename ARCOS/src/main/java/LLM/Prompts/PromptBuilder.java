@@ -499,7 +499,7 @@ public class PromptBuilder
      */
     private void appendAvailableToolsForInitiative(StringBuilder prompt) {
         prompt.append("ACTIONS DISPONIBLES (OUTILS):\n");
-        prompt.append(actionRegistry.getActionsAsJson());
+        prompt.append(generateActionsDescription());
         prompt.append("\n\n");
     }
 

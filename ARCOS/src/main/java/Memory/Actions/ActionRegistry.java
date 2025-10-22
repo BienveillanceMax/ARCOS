@@ -185,6 +185,4 @@ public class ActionRegistry
             throw new RuntimeException("Erreur lors de la génération du JSON des actions", e);
         }
     }
-
-
 }
