@@ -1,4 +1,4 @@
-package Orchestrator.Entities;
+package Memory.Actions.Entities;
 
 public class Parameter
 {

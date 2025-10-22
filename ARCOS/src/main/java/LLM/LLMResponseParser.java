@@ -8,9 +8,8 @@ import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Models.Subject;
 import Orchestrator.Entities.ExecutionPlan;
-import Orchestrator.Entities.Parameter;
+import Memory.Actions.Entities.Parameter;
 import Personality.Values.Entities.DimensionSchwartz;
-import Personality.Values.Entities.ValueSchwartz;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -18,11 +17,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Component
 public class LLMResponseParser

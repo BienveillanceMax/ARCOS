@@ -8,7 +8,7 @@ import Memory.Actions.Entities.Actions.DeepSearchAction;
 import Memory.Actions.Entities.Actions.ListCalendarEventsAction;
 import Memory.Actions.Entities.Actions.DeleteCalendarEventAction;
 import Memory.Actions.Entities.Actions.SearchCalendarEventsAction;
-import Orchestrator.Entities.Parameter;
+import Memory.Actions.Entities.Parameter;
 import Tools.CalendarTool.CalendarService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,22 +27,22 @@ public class ActionRegistry
 {
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final BraveSearchService braveSearchService;
-    private final CalendarService calendarService;
+     private final BraveSearchService braveSearchService;
+     private final CalendarService calendarService;
 
     @Autowired
-    public ActionRegistry(BraveSearchService braveSearchService, CalendarService calendarService) {
-        this.braveSearchService = braveSearchService;
-        this.calendarService = calendarService;
+    public ActionRegistry(BraveSearchService braveSearchService, CalendarService calendarService ) {
+         this.braveSearchService = braveSearchService;
+         this.calendarService = calendarService;
         //registerAction("Parler", new RespondAction()); As of now of little use and not implemented (the speaking execution part, the rest is fine)
-        registerAction("Rechercher sur internet", new SearchAction(braveSearchService));
-        registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
-        registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
-        registerAction("Ajouter un événement au calendrier", new AddCalendarEventAction(calendarService));
-        registerAction("Supprimer un événement du calendrier", new DeleteCalendarEventAction(calendarService));
-        registerAction("Rechercher des événements dans le calendrier", new SearchCalendarEventsAction(calendarService));
-        registerAction("Action par défaut", new DefaultAction());
-    }
+         registerAction("Rechercher sur internet", new SearchAction(braveSearchService) );
+         registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
+         registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
+         registerAction("Ajouter un événement au calendrier", new AddCalendarEventAction(calendarService));
+         registerAction("Supprimer un événement du calendrier", new DeleteCalendarEventAction(calendarService));
+         registerAction("Rechercher des événements dans le calendrier", new SearchCalendarEventsAction(calendarService));
+         registerAction("Action par défaut", new DefaultAction());
+     }
 
     public void registerAction(String name, Action action) {
         actions.put(name, action);
@@ -95,13 +95,9 @@ public class ActionRegistry
      * Ajoute des contraintes de validation au nœud de paramètre
      */
     private void addValidationConstraints(ObjectNode paramNode, Parameter parameter) {
-        // Cette méthode peut être étendue pour ajouter des contraintes spécifiques
-        // comme min/max pour les nombres, longueur pour les strings, etc.
-
         Class<?> type = parameter.getType();
 
         if (type == String.class) {
-            // Pourrait ajouter min_length, max_length, pattern, etc.
             paramNode.put("accepts", "any string value");
         } else if (type == Integer.class || type == int.class) {
             paramNode.put("accepts", "integer numbers");

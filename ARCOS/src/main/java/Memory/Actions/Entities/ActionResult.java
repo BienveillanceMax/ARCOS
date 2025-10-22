@@ -6,10 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.LocalDateTime;
 import java.util.*;
 
-/**
- * Classe représentant le résultat d'une exécution d'action.
- * Encapsule le succès/échec, les données, les messages et les métadonnées.
- */
+
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ActionResult {
 

@@ -1,7 +1,7 @@
 package Memory.Actions.Entities.Actions;
 
 import Memory.Actions.Entities.ActionResult;
-import Orchestrator.Entities.Parameter;
+import Memory.Actions.Entities.Parameter;
 import Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
 

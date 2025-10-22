@@ -2,7 +2,7 @@ package Memory.Actions.Entities.Actions;
 
 import Exceptions.SearchException;
 import Memory.Actions.Entities.ActionResult;
-import Orchestrator.Entities.Parameter;
+import Memory.Actions.Entities.Parameter;
 import Tools.SearchTool.BraveSearchService;
 
 import java.util.ArrayList;
