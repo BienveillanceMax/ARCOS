@@ -27,22 +27,22 @@ public class ActionRegistry
 {
     private final Map<String, Action> actions = new HashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
-     private final BraveSearchService braveSearchService;
-     private final CalendarService calendarService;
+    private final BraveSearchService braveSearchService;
+    private final CalendarService calendarService;
 
     @Autowired
-    public ActionRegistry(BraveSearchService braveSearchService, CalendarService calendarService ) {
-         this.braveSearchService = braveSearchService;
-         this.calendarService = calendarService;
+    public ActionRegistry(BraveSearchService braveSearchService, CalendarService calendarService) {
+        this.braveSearchService = braveSearchService;
+        this.calendarService = calendarService;
         //registerAction("Parler", new RespondAction()); As of now of little use and not implemented (the speaking execution part, the rest is fine)
-         registerAction("Rechercher sur internet", new SearchAction(braveSearchService) );
-         registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
-         registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
-         registerAction("Ajouter un événement au calendrier", new AddCalendarEventAction(calendarService));
-         registerAction("Supprimer un événement du calendrier", new DeleteCalendarEventAction(calendarService));
-         registerAction("Rechercher des événements dans le calendrier", new SearchCalendarEventsAction(calendarService));
-         registerAction("Action par défaut", new DefaultAction());
-     }
+        registerAction("Rechercher sur internet", new SearchAction(braveSearchService));
+        registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
+        registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
+        registerAction("Ajouter un événement au calendrier", new AddCalendarEventAction(calendarService));
+        registerAction("Supprimer un événement du calendrier", new DeleteCalendarEventAction(calendarService));
+        registerAction("Rechercher des événements dans le calendrier", new SearchCalendarEventsAction(calendarService));
+        registerAction("Action par défaut", new DefaultAction());
+    }
 
     public void registerAction(String name, Action action) {
         actions.put(name, action);
