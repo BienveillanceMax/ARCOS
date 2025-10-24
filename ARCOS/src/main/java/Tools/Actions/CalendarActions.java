@@ -1,19 +1,19 @@
 package Tools.Actions;
 import Memory.Actions.Entities.ActionResult;
 import Memory.Actions.Entities.Actions.AddCalendarEventAction;
-import Orchestrator.Entities.Parameter;
 import Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
@@ -52,7 +52,7 @@ public class CalendarActions
             "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?([+-]\\d{2}:\\d{2}|Z)?$"
     );
 
-    @Tool(name = "Ajouter un évenement au calendrier", description = "ajoute un évenement au calendrier")
+    @Tool(name = "Ajouter un évenement au calendrier", description = "Ajoute un évenement au calendrier")
     public ActionResult AddCalendarEvent(String title, String description, String location, String startDateTimeStr, String endDateTimeStr) {
         try {
 
@@ -87,6 +87,40 @@ public class CalendarActions
             return ActionResult.failure("Erreur lors de la création de l'événement : " + e.getMessage(), e);
         }
     }
+
+
+    @Tool(name = "Supprimer un évenement", description = "Supprime un évenement aujourd'hui")
+    public ActionResult deleteCalendarEvent(String title) {
+        try {
+            // We need to search for the event to get its ID.
+            // We will search for today's events. A better implementation would be to ask the user for a date.
+            LocalDate today = LocalDate.now();
+            LocalDateTime startOfDay = today.atStartOfDay();
+            LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+            List<Event> events = calendarService.listEventsBetweenDates(startOfDay, endOfDay, 100);
+
+            Event eventToDelete = null;
+            for (Event event : events) {
+                if (event.getSummary().equalsIgnoreCase(title)) {
+                    eventToDelete = event;
+                    break;
+                }
+            }
+
+            if (eventToDelete != null) {
+                calendarService.deleteEvent(eventToDelete.getId());
+                return ActionResult.successWithMessage("L'événement '" + title + "' a été supprimé avec succès.");
+            } else {
+                return ActionResult.failure("Aucun événement trouvé avec le titre '" + title + "' pour aujourd'hui.", null);
+            }
+        } catch (Exception e) {
+            return ActionResult.failure("Erreur lors de la suppression de l'événement : " + e.getMessage(), e);
+        }
+    }
+
+
+
 
     /**
      * Parses and validates a date/time string, converting it to LocalDateTime.

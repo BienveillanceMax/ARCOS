@@ -24,7 +24,7 @@ public class SearchActions
 
     @Tool(name = "Chercher sur Internet", description = "Recherche des informations sur le web. " +
             "Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats.")
-    public String searchTheWeb(Map<String, Object> params) {
+    public ActionResult searchTheWeb(Map<String, Object> params) {
 
         long startTime = System.currentTimeMillis();
         String query = (String) params.get("query");
