@@ -14,8 +14,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Component
 public class CalendarActions
@@ -88,6 +90,24 @@ public class CalendarActions
         }
     }
 
+    @Tool(name = "Lister les évenements à venir", description = "Liste les évenements à venir du calendrier de l'utilisateur")
+    public ActionResult listCalendarEvents(int maxResults) {
+        try {
+            List<Event> events = calendarService.listUpcomingEvents(maxResults);
+            if (events.isEmpty()) {
+                return ActionResult.successWithMessage("Aucun événement à venir trouvé.");
+            }
+            List<String> eventSummaries = events.stream()
+                    .map(event -> {
+                        String start = event.getStart().getDateTime() != null ? event.getStart().getDateTime().toString() : event.getStart().getDate().toString();
+                        return String.format("%s (%s)", event.getSummary(), start);
+                    })
+                    .collect(Collectors.toList());
+            return ActionResult.success(eventSummaries, "Voici les prochains événements de votre calendrier.");
+        } catch (Exception e) {
+            return ActionResult.failure("Erreur lors de la récupération des événements du calendrier: " + e.getMessage(), e);
+        }
+    }
 
     @Tool(name = "Supprimer un évenement", description = "Supprime un évenement aujourd'hui")
     public ActionResult deleteCalendarEvent(String title) {

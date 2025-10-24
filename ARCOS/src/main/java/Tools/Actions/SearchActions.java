@@ -33,7 +33,9 @@ public class SearchActions
         try {
             result = searchService.search(query);
         } catch (SearchException e) {
-            return "Erreur de recherche";
+            return ActionResult.failure("Erreur de Recherche: " + e.getMessage(), e)
+                    .withExecutionTime(System.currentTimeMillis() - startTime);
+
         }
 
         List<String> processedResults = new ArrayList<>();
@@ -58,8 +60,9 @@ public class SearchActions
             processedResults.add(builder.toString());
             builder.append('\n' + '\t');
         }
-
-        return processedResults.toString();
+        return ActionResult.success(processedResults, "Recherche effectuée avec succès")
+                .addMetadata("query", query)
+                .withExecutionTime(System.currentTimeMillis() - startTime);
     }
 
 
