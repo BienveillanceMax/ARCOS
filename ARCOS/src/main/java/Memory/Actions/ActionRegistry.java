@@ -35,17 +35,17 @@ public class ActionRegistry
         this.braveSearchService = braveSearchService;
         this.calendarService = calendarService;
         //registerAction("Parler", new RespondAction()); As of now of little use and not implemented (the speaking execution part, the rest is fine)
-        registerAction("Rechercher sur internet", new SearchAction(braveSearchService));
-        registerAction("Recherche approfondie sur internet", new DeepSearchAction(braveSearchService));
-        registerAction("Lister les événements du calendrier", new ListCalendarEventsAction(calendarService));
-        registerAction("Ajouter un événement au calendrier", new AddCalendarEventAction(calendarService));
-        registerAction("Supprimer un événement du calendrier", new DeleteCalendarEventAction(calendarService));
-        registerAction("Rechercher des événements dans le calendrier", new SearchCalendarEventsAction(calendarService));
-        registerAction("Action par défaut", new DefaultAction());
+        registerAction(new SearchAction(braveSearchService));
+        registerAction(new DeepSearchAction(braveSearchService));
+        registerAction(new ListCalendarEventsAction(calendarService));
+        registerAction(new AddCalendarEventAction(calendarService));
+        registerAction(new DeleteCalendarEventAction(calendarService));
+        registerAction(new SearchCalendarEventsAction(calendarService));
+        registerAction(new DefaultAction());
     }
 
-    public void registerAction(String name, Action action) {
-        actions.put(name, action);
+    public void registerAction( Action action) {
+        actions.put(action.getName(), action);
     }
 
     public Action getAction(String name) {
