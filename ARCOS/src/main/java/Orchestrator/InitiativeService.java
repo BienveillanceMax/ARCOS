@@ -1,23 +1,13 @@
 package Orchestrator;
 
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
-import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.service.MemoryService;
-import Orchestrator.Entities.ExecutionPlan;
 import Personality.Opinions.OpinionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @Slf4j
@@ -25,24 +15,19 @@ public class InitiativeService {
 
     private final MemoryService memoryService;
     private final OpinionService opinionService;
-    private final ActionRegistry actionRegistry;
     private final LLMClient llmClient;
-    private final LLMResponseParser responseParser;
-    private final ActionExecutor actionExecutor;
     private final PromptBuilder promptBuilder;
 
     @Autowired
-    public InitiativeService(MemoryService memoryService, OpinionService opinionService, ActionRegistry actionRegistry, LLMClient llmClient, LLMResponseParser responseParser, ActionExecutor actionExecutor, PromptBuilder promptBuilder) {
+    public InitiativeService(MemoryService memoryService, OpinionService opinionService, LLMClient llmClient, PromptBuilder promptBuilder) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;
-        this.actionRegistry = actionRegistry;
         this.llmClient = llmClient;
-        this.responseParser = responseParser;
-        this.actionExecutor = actionExecutor;
         this.promptBuilder = promptBuilder;
     }
 
     public void processInitiative(DesireEntry desire) {
+        /*
         try {
             log.info("Processing initiative for desire: {}", desire.getLabel());
 
@@ -89,5 +74,7 @@ public class InitiativeService {
             memoryService.storeDesire(desire);
             log.info("Desire {} updated in database with status {}", desire.getId(), desire.getStatus());
         }
+
+        */
     }
 }

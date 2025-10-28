@@ -3,7 +3,6 @@ package Memory.LongTermMemory.service;
 
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.*;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
@@ -11,7 +10,6 @@ import Memory.LongTermMemory.Qdrant.QdrantClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
 import java.util.function.Function;
@@ -39,20 +37,17 @@ public class MemoryService
     private final EmbeddingService embeddingService;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
-    private final LLMResponseParser llmResponseParser;
-
     private final int embeddingDimension;
 
     /**
      * Constructeur principal du service de mémoire.
      */
-    public MemoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+    public MemoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder) {
         this.embeddingDimension = embeddingService.getEmbeddingDimension();
         this.qdrantClient = qdrantClient;
         this.embeddingService = embeddingService;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
-        this.llmResponseParser = llmResponseParser;
 
         // Log du type d'embedding utilisé
         if (embeddingService.isMistralAvailable()) {
@@ -295,7 +290,7 @@ public class MemoryService
 
     public MemoryEntry memorizeConversation(String conversation) throws ResponseParsingException {
 
-        MemoryEntry memoryEntry = llmResponseParser.parseMemoryFromMistralResponse(llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation)));
+        MemoryEntry memoryEntry = new MemoryEntry(); //llmResponseParser.parseMemoryFromMistralResponse(llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation)));
         memoryEntry.setEmbedding(embeddingService.generateEmbedding(memoryEntry.getContent()));
         storeMemory(memoryEntry);
         return memoryEntry;

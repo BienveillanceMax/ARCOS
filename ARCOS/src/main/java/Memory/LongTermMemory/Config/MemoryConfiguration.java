@@ -1,7 +1,6 @@
 package Memory.LongTermMemory.Config;
 
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Memory.LongTermMemory.service.EmbeddingService;
@@ -61,11 +60,11 @@ public class MemoryConfiguration {
      * Bean pour le service principal de mémoire.
      */
     @Bean
-    public MemoryService memoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser llmResponseParser) {
+    public MemoryService memoryService(QdrantClient qdrantClient, EmbeddingService embeddingService, LLMClient llmClient, PromptBuilder promptBuilder) {
         logger.info("Configuration du service de mémoire");
         logger.info("  - Dimension embeddings: {}", embeddingDimension);
 
-        MemoryService memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder, llmResponseParser);
+        MemoryService memoryService = new MemoryService(qdrantClient, embeddingService, llmClient, promptBuilder);
 
         // Initialisation des collections au démarrage
         try {

@@ -1,7 +1,6 @@
 package Personality.Opinions;
 
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -28,8 +27,6 @@ public class OpinionService
     private final PromptBuilder promptBuilder;
     private final MemoryService memoryService;
     private final LLMClient llmClient;
-    private final LLMResponseParser llmResponseParser;
-
 
     // ---- Hyperparamètres ----
     private static final double W_EXPERIENCE = 0.70;   // poids experience dans polarity
@@ -47,8 +44,7 @@ public class OpinionService
     private static final double RHO_NETWORK = 0.25; // poids du réseau dans expEffective
 
 
-    public OpinionService(LLMResponseParser llmResponseParser, LLMClient llmClient, MemoryService memoryService, PromptBuilder promptBuilder, ValueProfile valueProfile) {
-        this.llmResponseParser = llmResponseParser;
+    public OpinionService(LLMClient llmClient, MemoryService memoryService, PromptBuilder promptBuilder, ValueProfile valueProfile) {
         this.llmClient = llmClient;
         this.memoryService = memoryService;
         this.promptBuilder = promptBuilder;
@@ -86,7 +82,7 @@ public class OpinionService
         OpinionEntry opinionEntry;
         String prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
-            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry);
+            opinionEntry = null;//llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry); //TODO adapt
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;

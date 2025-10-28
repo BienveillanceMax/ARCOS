@@ -54,7 +54,7 @@ public class CalendarActions
             "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?([+-]\\d{2}:\\d{2}|Z)?$"
     );
 
-    @Tool(name = "Ajouter un évenement au calendrier", description = "Ajoute un évenement au calendrier")
+    @Tool(name = "Ajouter_un_evenement_au_calendrier", description = "Ajoute_un_évenement_au_calendrier")
     public ActionResult AddCalendarEvent(String title, String description, String location, String startDateTimeStr, String endDateTimeStr) {
         try {
 
@@ -90,7 +90,7 @@ public class CalendarActions
         }
     }
 
-    @Tool(name = "Lister les évenements à venir", description = "Liste les évenements à venir du calendrier de l'utilisateur")
+    @Tool(name = "Lister_les_evenements_a_venir", description = "Liste les évenements à venir du calendrier de l'utilisateur")
     public ActionResult listCalendarEvents(int maxResults) {
         try {
             List<Event> events = calendarService.listUpcomingEvents(maxResults);
@@ -109,7 +109,7 @@ public class CalendarActions
         }
     }
 
-    @Tool(name = "Supprimer un évenement", description = "Supprime un évenement aujourd'hui")
+    @Tool(name = "Supprimer_un_evenement", description = "Supprime un évenement aujourd'hui")
     public ActionResult deleteCalendarEvent(String title) {
         try {
             // We need to search for the event to get its ID.

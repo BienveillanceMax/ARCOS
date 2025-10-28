@@ -13,7 +13,7 @@ public class PythonActions
 {
     PythonExecutor pythonExecutor = new PythonExecutor();
 
-    @Tool(name = "Executeur Python", description = "Execute du code python et retourne le contenu de stdout" )
+    @Tool(name = "Executeur_Python", description = "Execute du code python et retourne le contenu de stdout" )
     public ActionResult executePythonCode(String code) {
         long startTime = System.currentTimeMillis();
         PythonExecutor.ExecutionResult result = pythonExecutor.execute(code);

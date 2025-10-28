@@ -32,12 +32,10 @@ import java.util.stream.Collectors;
 public class PromptBuilder
 {
 
-    private final ActionRegistry actionRegistry;
     private final ValueProfile valueProfile;
 
     @Autowired
-    public PromptBuilder(ActionRegistry actionRegistry, ValueProfile valueProfile) {
-        this.actionRegistry = actionRegistry;
+    public PromptBuilder(ValueProfile valueProfile) {
         this.valueProfile = valueProfile;
     }
 
@@ -142,7 +140,6 @@ public class PromptBuilder
         appendPersonalityHeader(prompt, "la partie de l'inconscient de Calcifer chargée de planifier ses actions");
         appendValueProfile(prompt);
         appendGeneralInformation(prompt);
-        appendAvailableActions(prompt);
         appendConversationContextIfPresent(prompt, context);
         appendRelevantMemories(prompt, memories);
         appendUserQuery(prompt, userQuery);
@@ -163,8 +160,6 @@ public class PromptBuilder
         appendGeneralInformation(prompt);
         appendOriginalQuery(prompt, originalQuery);
         appendConversationContextIfPresent(prompt, context);
-        appendExecutionPlan(prompt, plan);
-        appendActionResults(prompt, plan, results);
         appendFormulationInstructions(prompt);
 
         return prompt.toString();
@@ -181,7 +176,6 @@ public class PromptBuilder
         appendDesireContext(prompt, desire);
         appendRelevantMemories(prompt, memories);
         appendRelevantOpinions(prompt, opinions);
-        appendAvailableToolsForInitiative(prompt);
         appendInitiativeInstructions(prompt);
         appendInitiativeJsonFormat(prompt);
 
@@ -482,43 +476,6 @@ public class PromptBuilder
         prompt.append("\n\n");
     }
 
-    // ==================== SECTIONS ACTIONS ====================
-
-    /**
-     * Ajoute les actions disponibles
-     */
-    private void appendAvailableActions(StringBuilder prompt) {
-        prompt.append("ACTIONS DISPONIBLES:\n");
-        prompt.append(generateActionsDescription());
-        prompt.append("\n");
-    }
-
-    /**
-     * Ajoute les outils disponibles pour l'initiative
-     */
-    private void appendAvailableToolsForInitiative(StringBuilder prompt) {
-        prompt.append("ACTIONS DISPONIBLES (OUTILS):\n");
-        prompt.append(actionRegistry.getActionsAsJson());
-        prompt.append("\n\n");
-    }
-
-    /**
-     * Ajoute le plan d'exécution
-     */
-    private void appendExecutionPlan(StringBuilder prompt, ExecutionPlan plan) {
-        prompt.append("PLAN EXÉCUTÉ:\n");
-        prompt.append("Raisonnement: ").append(plan.getReasoning()).append("\n");
-        prompt.append("Actions effectuées: ").append(plan.getActionCount()).append("\n\n");
-    }
-
-    /**
-     * Ajoute les résultats des actions
-     */
-    private void appendActionResults(StringBuilder prompt, ExecutionPlan plan, Map<String, ActionResult> results) {
-        prompt.append("RÉSULTATS DES ACTIONS:\n");
-        prompt.append(generateResultsDescription(plan, results));
-        prompt.append("\n\n");
-    }
 
     // ==================== FORMATS JSON ====================
 
@@ -712,15 +669,6 @@ public class PromptBuilder
     }
 
     // ==================== MÉTHODES UTILITAIRES ====================
-
-    /**
-     * Génère la description des actions disponibles
-     */
-    private String generateActionsDescription() {
-        return actionRegistry.getActions().entrySet().stream()
-                .map(entry -> generateSingleActionDescription(entry.getValue()))
-                .collect(Collectors.joining("\n"));
-    }
 
     /**
      * Génère la description d'une seule action

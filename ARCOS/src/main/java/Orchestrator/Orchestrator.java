@@ -3,9 +3,7 @@ package Orchestrator;
 import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
-import Exceptions.ResponseParsingException;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
-import LLM.LLMResponseParser;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
@@ -13,21 +11,16 @@ import LLM.LLMClient;
 import java.util.List;
 import java.util.stream.Collectors;
 import Memory.ConversationContext;
-import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.service.MemoryService;
-import Orchestrator.Entities.ExecutionPlan;
 import LLM.Prompts.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Component;
 import Personality.PersonalityOrchestrator;
 
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.Period;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -37,8 +30,6 @@ public class Orchestrator
     private final EventQueue eventQueue;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
-    private final LLMResponseParser responseParser;
-    private final ActionExecutor actionExecutor;
     private final ConversationContext context;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
@@ -48,16 +39,14 @@ public class Orchestrator
     private LocalDateTime lastInteracted;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
+        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
-        this.responseParser = responseParser;
-        this.actionExecutor = actionExecutor;
         this.context = context;
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
@@ -105,7 +94,6 @@ public class Orchestrator
 
 
         // Search for relevant memories
-        LocalDateTime lastCall = LocalDateTime.now();
         List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery)
                 .stream()
                 .map(SearchResult::getEntry)
@@ -113,50 +101,15 @@ public class Orchestrator
 
 
 
-        // 1. Génération du prompt
-        String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context, relevantMemories);
-        log.debug("Planning prompt:\n{}", planningPrompt);
-
-
-
-
-        // 2. Appel à Mistral pour planification
-        String planningResponse = llmClient.generatePlanningResponse(planningPrompt).replace("*",""); //fallback plan is probably not valid*
-        log.debug("Planning response:\n{}", planningResponse);
-
-
-        // 3. Parsing avec retry spécifique Mistral
-        ExecutionPlan plan = null;
-        try {
-            plan = responseParser.parseWithMistralRetry(planningResponse, 3);
-        } catch (ResponseParsingException e) {
-            log.error("Error parsing planning response", e);
-            throw new RuntimeException(e);
-        }
-
-        // 4. Exécution des actions
-        Map<String, ActionResult> results = actionExecutor.executeActions(plan);    //TODO
-        log.debug("Action execution results: {}", results);
-
-        // 5. Prompt de formulation
-        String formulationPrompt = promptBuilder.buildFormulationPrompt(
-                userQuery, plan, results, context
-        );
-        log.debug("Formulation prompt:\n{}", formulationPrompt);
-
-
-
-        // 6. Appel à Mistral pour formulation
-        String finalResponse = llmClient.generateFormulationResponse(formulationPrompt).replace("*","");
-        log.info("Final response: {}", finalResponse);
+        String answer = llmClient.generateChatResponse(userQuery);
+        log.info("Answer: {}", answer);
 
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
-        context.addAssistantMessage(finalResponse, plan);
-        log.info("Starting personality processing workflow...");
-        triggerPersonalityProcessing(lastInteracted);
-        lastInteracted = LocalDateTime.now();
-        return finalResponse;
+        //context.addAssistantMessage(finalResponse, plan);
+        //log.info("Starting personality processing workflow...");
+        //triggerPersonalityProcessing(lastInteracted);
+        return answer;
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {

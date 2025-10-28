@@ -3,7 +3,6 @@ package Personality.Desires;
 import Exceptions.DesireCreationException;
 import Exceptions.ResponseParsingException;
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -23,17 +22,15 @@ public class DesireService
     private final ValueProfile valueProfile;
     private final MemoryService memoryService;
     private final LLMClient llmClient;
-    private final LLMResponseParser llmResponseParser;
     public static final double D_CREATE_THRESHOLD = 0.5;
     public static final double D_UPDATE_THRESHOLD = 0.2;
 
     @Autowired
-    public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient, LLMResponseParser llmResponseParser) {
+    public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, MemoryService memoryService, LLMClient llmClient) {
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
         this.memoryService = memoryService;
         this.llmClient = llmClient;
-        this.llmResponseParser = llmResponseParser;
     }
 
     public DesireEntry processOpinion(OpinionEntry opinionEntry) {
@@ -89,12 +86,8 @@ public class DesireService
 
         int retries = 3;            //bit of a magic number, todo move retry logic to orchestator
         for(int i = 0; i < retries; i++) {
-            try {
-                createdDesire = llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
-                return createdDesire;
-            } catch (ResponseParsingException e) {
-                log.error("Error parsing desire from response, retry {}/{}", i + 1, retries, e);
-            }
+            createdDesire = null; // TODO llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
+            return createdDesire;
 
         }
         throw new DesireCreationException("Failed to create desire for opinion " + opinionEntry.getId() + " after " + retries + " retries.");

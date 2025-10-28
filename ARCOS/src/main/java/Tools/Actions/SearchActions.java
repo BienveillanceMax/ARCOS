@@ -22,7 +22,7 @@ public class SearchActions
         this.searchService = searchService;
     }
 
-    @Tool(name = "Chercher sur Internet", description = "Recherche des informations sur le web. " +
+    @Tool(name = "Chercher_sur_Internet", description = "Recherche des informations sur le web. " +
             "Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats.")
     public ActionResult searchTheWeb(Map<String, Object> params) {
 
