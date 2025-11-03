@@ -9,6 +9,7 @@ import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.ValueProfile;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -80,9 +81,12 @@ public class OpinionService
         //gotta make a call, build a new prompt and parse the return
 
         OpinionEntry opinionEntry;
-        String prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
+        Prompt prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
-            opinionEntry = null;//llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry); //TODO adapt
+            opinionEntry = llmClient.generateOpinionResponse(prompt);
+            opinionEntry.setId(UUID.randomUUID().toString());
+            opinionEntry.getAssociatedMemories().add(memoryEntry.getId());
+            //llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry); //TODO adapt
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;

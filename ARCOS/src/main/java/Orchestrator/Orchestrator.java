@@ -14,6 +14,7 @@ import Memory.ConversationContext;
 import Memory.LongTermMemory.service.MemoryService;
 import LLM.Prompts.PromptBuilder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import Personality.PersonalityOrchestrator;
@@ -72,9 +73,12 @@ public class Orchestrator
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
 
-            ttsHandler.speak(llmClient.generateResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+            ttsHandler.speak(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
         }
+        triggerPersonalityProcessing(lastInteracted);
+        lastInteracted = LocalDateTime.now();
+
     }
 
     public void start() {
@@ -99,14 +103,17 @@ public class Orchestrator
                 .map(SearchResult::getEntry)
                 .collect(Collectors.toList());
 
-
-
-        String answer = llmClient.generateChatResponse(userQuery);
+        // Create the prompt
+        Prompt prompt = promptBuilder.buildConversationnalPrompt(context,userQuery);
+        log.info("Prompt: {}", prompt);
+        String answer = llmClient.generateChatResponse(prompt);
         log.info("Answer: {}", answer);
+
 
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
-        //context.addAssistantMessage(finalResponse, plan);
+        context.addAssistantMessage(answer);
+
         //log.info("Starting personality processing workflow...");
         //triggerPersonalityProcessing(lastInteracted);
         return answer;

@@ -89,8 +89,8 @@ public class ConversationContext {
     /**
      * Ajoute une réponse de l'assistant au contexte
      */
-    public void addAssistantMessage(String content, ExecutionPlan executionPlan) {
-        addMessage(ConversationMessage.MessageType.ASSISTANT, content, executionPlan);
+    public void addAssistantMessage(String content) {
+        addMessage(ConversationMessage.MessageType.ASSISTANT, content, null);
     }
 
     /**
@@ -101,7 +101,7 @@ public class ConversationContext {
     }
 
     private void addMessage(ConversationMessage.MessageType type, String content, ExecutionPlan plan) {
-        ConversationMessage message = new ConversationMessage(type, content, plan);
+        ConversationMessage message = new ConversationMessage(type, content, null);
         messageHistory.add(message);
 
         // Maintient la taille de l'historique

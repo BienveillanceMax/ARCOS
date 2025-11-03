@@ -9,6 +9,7 @@ import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Personality.Values.ValueProfile;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
 
@@ -81,14 +82,14 @@ public class DesireService
     }
 
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) throws DesireCreationException {
-        String prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
+        Prompt prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
         DesireEntry createdDesire;
 
         int retries = 3;            //bit of a magic number, todo move retry logic to orchestator
         for(int i = 0; i < retries; i++) {
-            createdDesire = null; // TODO llmResponseParser.parseDesireFromResponse(llmClient.generateDesireResponse(prompt), opinionEntry.getId());
+            createdDesire = llmClient.generateDesireResponse(prompt);
+            createdDesire.setOpinionId(opinionEntry.getId());
             return createdDesire;
-
         }
         throw new DesireCreationException("Failed to create desire for opinion " + opinionEntry.getId() + " after " + retries + " retries.");
     }

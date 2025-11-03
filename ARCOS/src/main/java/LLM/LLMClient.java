@@ -1,10 +1,14 @@
 package LLM;
 
 import LLM.service.RateLimiterService;
+import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
 import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
 import Tools.Actions.SearchActions;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -30,46 +34,42 @@ public class LLMClient
         rateLimiterService.acquirePermit();
     }
 
-    public String generatePlanningResponse(String prompt) {
+    public String generateChatResponse(Prompt prompt) {
+        acquirePermit();
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .call()
+                .content();
+    }
+
+    public String generateToollessResponse(Prompt prompt) {
         acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
                 .content();
     }
 
-    public String generateChatResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt).tools(calendarActions, pythonActions, searchActions)
-                .call()
-                .content();
-    }
 
-    public String generateMemoryResponse(String prompt) {
+    public MemoryEntry generateMemoryResponse(Prompt prompt) {
         acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
-                .content();
+                .entity(MemoryEntry.class);
     }
 
-    public String generateOpinionResponse(String prompt) {
+    public OpinionEntry generateOpinionResponse(Prompt prompt) {
+        acquirePermit();
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .call()
+                .entity(OpinionEntry.class);
+    }
+
+    public DesireEntry generateDesireResponse(Prompt prompt) {
         acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
-                .content();
-    }
-
-    public String generateDesireResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt)
-                .call()
-                .content();
-    }
-
-    public String generateResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt)
-                .call()
-                .content();
+                .entity(DesireEntry.class);
     }
 
 
