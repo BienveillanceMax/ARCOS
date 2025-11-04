@@ -124,8 +124,6 @@ public class Orchestrator
             try {
                 // On ne veut pas que la personnalité se déclenche à chaque interaction.
                 Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
-                log.info("Personality Processing : waiting to avoid usage limit");
-                Thread.sleep(1000);
                 if (elapsedTime.toMinutes() > 10) {
                     log.info("Triggering personality processing...");
                     String fullConversation = context.getFullConversation();
