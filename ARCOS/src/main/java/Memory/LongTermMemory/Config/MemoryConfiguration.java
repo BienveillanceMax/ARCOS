@@ -2,7 +2,6 @@ package Memory.LongTermMemory.Config;
 
 import LLM.LLMClient;
 import LLM.Prompts.PromptBuilder;
-import Memory.LongTermMemory.Qdrant.QdrantClient;
 import Memory.LongTermMemory.service.EmbeddingService;
 import Memory.LongTermMemory.service.MemoryService;
 import org.slf4j.Logger;

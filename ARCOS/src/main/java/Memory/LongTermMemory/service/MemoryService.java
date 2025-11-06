@@ -6,7 +6,6 @@ import LLM.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.*;
 import Memory.LongTermMemory.Models.SearchResult.SearchResult;
-import Memory.LongTermMemory.Qdrant.QdrantClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;

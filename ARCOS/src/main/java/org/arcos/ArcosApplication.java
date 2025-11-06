@@ -1,17 +1,6 @@
 package org.arcos;
 
-import EventBus.EventQueue;
-import EventBus.Events.Event;
-import EventBus.Events.EventType;
-import IO.OuputHandling.PiperEmbeddedTTSModule;
-import Memory.ConversationContext;
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.Subject;
-import Memory.LongTermMemory.Qdrant.QdrantClient;
-import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.Orchestrator;
-import Personality.Desires.DesireService;
-import Personality.PersonalityOrchestrator;
 import Producers.WakeWordProducer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
