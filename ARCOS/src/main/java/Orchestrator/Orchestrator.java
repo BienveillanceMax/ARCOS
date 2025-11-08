@@ -13,6 +13,7 @@ import java.util.stream.Collectors;
 import Memory.ConversationContext;
 import Memory.LongTermMemory.service.MemoryService;
 import LLM.Prompts.PromptBuilder;
+import Personality.Desires.DesireService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,10 +39,12 @@ public class Orchestrator
     private final PersonalityOrchestrator personalityOrchestrator;
 
     private LocalDateTime lastInteracted;
+    private DesireService desireService;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService) {
         this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
+        this.desireService = desireService;
     }
 
     public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
@@ -69,7 +72,7 @@ public class Orchestrator
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
                 desire.setStatus(DesireEntry.Status.PENDING);
                 desire.setLastUpdated(java.time.LocalDateTime.now());
-                memoryService.storeDesire(desire);
+                desireService.storeDesire(desire);
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
 
@@ -98,10 +101,7 @@ public class Orchestrator
 
 
         // Search for relevant memories
-        List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery)
-                .stream()
-                .map(SearchResult::getEntry)
-                .collect(Collectors.toList());
+        List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery);
 
         // Create the prompt
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context,userQuery);

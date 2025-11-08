@@ -5,7 +5,9 @@ import EventBus.Events.Event;
 import EventBus.Events.EventPriority;
 import EventBus.Events.EventType;
 import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.Repositories.DesireRepository;
 import Memory.LongTermMemory.service.MemoryService;
+import Personality.Desires.DesireService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.EnableScheduling;
@@ -24,18 +26,18 @@ public class DesireInitiativeProducer {
     private static final double INITIATIVE_THRESHOLD = 0.8;
 
     private final EventQueue eventQueue;
-    private final MemoryService memoryService;
+    private final DesireService desireService;
 
     @Autowired
-    public DesireInitiativeProducer(EventQueue eventQueue, MemoryService memoryService) {
+    public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService) {
         this.eventQueue = eventQueue;
-        this.memoryService = memoryService;
+        this.desireService = desireService;
     }
 
     @Scheduled(fixedRate = 6000000) // Check every hour
     public void checkDesiresAndInitiate() {
         log.info("Checking for high-intensity desires...");
-        List<DesireEntry> pendingDesires = memoryService.getPendingDesires();
+        List<DesireEntry> pendingDesires = desireService.getPendingDesires();
         log.info("High intensity desires found: {}", pendingDesires.size());
         for (DesireEntry desire : pendingDesires) {
             if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
@@ -71,7 +73,7 @@ public class DesireInitiativeProducer {
 
         // Update the desire's status to ACTIVE
         desire.setStatus(DesireEntry.Status.ACTIVE);
-        memoryService.storeDesire(desire);
+        desireService.storeDesire(desire);
     }
 }
 

@@ -104,7 +104,7 @@ public class PromptBuilder {
         return new PromptTemplate(templateText).create(model);
     }
 
-    public Prompt buildMemoryPrompt(ConversationContext conversationContext) {
+    public Prompt buildMemoryPrompt(String fullConversation) {
         StringBuilder system = new StringBuilder();
 
         system.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel, chargé d'extraire UN SOUVENIR structuré et concis à partir du contexte")
@@ -112,7 +112,7 @@ public class PromptBuilder {
                 .append(" l'événement/interaction principal(e), les acteurs, le ton, et si cela mérite d'être")
                 .append(" conservé comme souvenir long-terme.\n\n");
 
-        system.append(conversationContext.toString());
+        system.append(fullConversation);
         appendMemoryJsonFormat(system);
         appendMemoryRules(system);
 
