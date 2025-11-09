@@ -1,11 +1,11 @@
 package Memory.LongTermMemory.Models;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -134,9 +134,8 @@ public class MemoryEntry implements QdrantEntry {
     }
 
     @Override
-    public ObjectNode getPayload() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectNode payload = objectMapper.createObjectNode();
+    public Map<String, Object> getPayload() {
+        Map<String, Object> payload = new HashMap<>();
         payload.put("content", this.getContent());
         payload.put("subject", this.getSubject().getValue());
         payload.put("satisfaction", this.getSatisfaction());

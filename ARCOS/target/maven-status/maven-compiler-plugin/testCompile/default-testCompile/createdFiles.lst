@@ -1,9 +1,0 @@
-Personality/Values/ValueProfileTest.class
-Producers/DesireInitiativeProducerTest.class
-Personality/Desires/DesireServiceTest.class
-Memory/Actions/DeepSearchActionTest.class
-Orchestrator/InitiativeServiceTest.class
-Memory/MemoryServiceTests.class
-Personality/PersonalityOrchestratorIT.class
-Personality/Opinions/OpinionServiceTest.class
-Orchestrator/OrchestratorTests.class

@@ -6,13 +6,13 @@ import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.Repositories.MemoryRepository;
-import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -24,7 +24,8 @@ public class MemoryService {
     private final MemoryRepository memoryRepository;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
-    private final Gson gson = new Gson();
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
 
     public MemoryService(MemoryRepository memoryRepository, LLMClient llmClient, PromptBuilder promptBuilder) {
         this.memoryRepository = memoryRepository;
@@ -47,11 +48,11 @@ public class MemoryService {
 
     public List<MemoryEntry> searchMemories(String query, int topK) {
         SearchRequest searchRequest = SearchRequest.builder().query(query).topK(topK).build();
-        return (List<MemoryEntry>) memoryRepository.search(searchRequest).stream().map(doc -> this.fromDocument((Document) doc)).collect(Collectors.toList()); //TODO test
+        return memoryRepository.search(searchRequest).stream().map(this::fromDocument).collect(Collectors.toList());
     }
 
     public MemoryEntry getMemory(String memoryId) {
-        return (MemoryEntry) memoryRepository.findById(memoryId).map(doc -> this.fromDocument((Document) doc)).orElse(null); //TODO test
+        return memoryRepository.findById(memoryId).map(this::fromDocument).orElse(null);
     }
 
     public void deleteMemory(String memoryId) {
@@ -67,15 +68,25 @@ public class MemoryService {
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("entry", gson.toJson(memoryEntry));
-        return new Document(memoryEntry.getId(), memoryEntry.getContent(), metadata);
+        return new Document(memoryEntry.getId(), memoryEntry.getContent(), memoryEntry.getPayload());
     }
 
-    private MemoryEntry fromDocument(Document document) {
-        String json = (String) document.getMetadata().get("entry");
-        return gson.fromJson(json, MemoryEntry.class);
+    public MemoryEntry fromDocument(Document document) {
+        Map<String, Object> metadata = document.getMetadata();
+        String id = document.getId();
+        String content = document.getText();
+        Subject subject = Subject.fromString((String) metadata.get("subject"));
+        double satisfaction = (double) metadata.get("satisfaction");
+        LocalDateTime timestamp = LocalDateTime.parse((String) metadata.get("timestamp"), TIMESTAMP_FORMATTER);
+        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
+        float[] embedding = null;
+        if (embeddingDouble != null) {
+            embedding = new float[embeddingDouble.size()];
+            for (int i = 0; i < embeddingDouble.size(); i++) {
+                embedding[i] = embeddingDouble.get(i).floatValue();
+            }
+        }
+
+        return new MemoryEntry(id, content, subject, satisfaction, timestamp, embedding);
     }
-
-
 }

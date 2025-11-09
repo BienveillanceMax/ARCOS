@@ -8,7 +8,6 @@ import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Repositories.DesireRepository;
 import Memory.LongTermMemory.Repositories.OpinionRepository;
 import Personality.Values.ValueProfile;
-import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
@@ -17,6 +16,8 @@ import org.springframework.stereotype.Service;
 
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 
@@ -29,7 +30,8 @@ public class DesireService
     private final LLMClient llmClient;
     private final DesireRepository desireRepository;
     private final OpinionRepository opinionRepository;
-    private final Gson gson = new Gson();
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
 
     public static final double D_CREATE_THRESHOLD = 0.5;
     public static final double D_UPDATE_THRESHOLD = 0.2;
@@ -83,12 +85,9 @@ public class DesireService
     }
 
     public List<DesireEntry> getPendingDesires() {
-        List<DesireEntry> pendingDesiresList = new ArrayList<>();
-        List<Document> pendingDocumentList = desireRepository.findPendingDesires();
-        for (Document document : pendingDocumentList) {
-            pendingDesiresList.add(fromDocument(document));
-        }
-        return pendingDesiresList;
+        return desireRepository.findPendingDesires().stream()
+                .map(this::fromDocument)
+                .collect(ArrayList::new, ArrayList::add, ArrayList::addAll);
     }
 
     public void storeDesire(DesireEntry desire) {
@@ -114,8 +113,8 @@ public class DesireService
     }
 
     private DesireEntry updateDesire(OpinionEntry opinionEntry) {
-        DesireEntry desireEntry = (DesireEntry) desireRepository.findById(opinionEntry.getAssociatedDesire())       //TODO Test
-                .map(obj -> fromDocument((Document) obj))  // Cast explicite
+        DesireEntry desireEntry = desireRepository.findById(opinionEntry.getAssociatedDesire())
+                .map(this::fromDocument)
                 .orElse(null);
 
         if (desireEntry == null) {
@@ -160,24 +159,36 @@ public class DesireService
 
     private Document toDocument(DesireEntry desireEntry) {
         String content = desireEntry.getLabel() + ". " + desireEntry.getDescription();
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("entry", gson.toJson(desireEntry));
-        return new Document(desireEntry.getId(), content, metadata);
+        return new Document(desireEntry.getId(), content, desireEntry.getPayload());
     }
 
     private Document toDocument(OpinionEntry opinionEntry) {
         String content = opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject();
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("entry", gson.toJson(opinionEntry));
-        return new Document(opinionEntry.getId(), content, metadata);
+        return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
     }
 
     private DesireEntry fromDocument(Document document) {
-        String json = (String) document.getMetadata().get("entry");
-        return gson.fromJson(json, DesireEntry.class);
+        Map<String, Object> metadata = document.getMetadata();
+        DesireEntry desireEntry = new DesireEntry();
+        desireEntry.setId(document.getId());
+        desireEntry.setLabel((String) metadata.get("label"));
+        desireEntry.setDescription((String) metadata.get("description"));
+        desireEntry.setReasoning((String) metadata.get("reasoning"));
+        desireEntry.setIntensity((Double) metadata.get("intensity"));
+        desireEntry.setOpinionId((String) metadata.get("opinionId"));
+        desireEntry.setStatus(DesireEntry.Status.valueOf((String) metadata.get("status")));
+        desireEntry.setCreatedAt(LocalDateTime.parse((String) metadata.get("createdAt"), TIMESTAMP_FORMATTER));
+        desireEntry.setLastUpdated(LocalDateTime.parse((String) metadata.get("lastUpdated"), TIMESTAMP_FORMATTER));
+        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
+        if (embeddingDouble != null) {
+            float[] embeddingFloat = new float[embeddingDouble.size()];
+            for (int i = 0; i < embeddingDouble.size(); i++) {
+                embeddingFloat[i] = embeddingDouble.get(i).floatValue();
+            }
+            desireEntry.setEmbedding(embeddingFloat);
+        }
+        return desireEntry;
     }
-
-
 }
 
 

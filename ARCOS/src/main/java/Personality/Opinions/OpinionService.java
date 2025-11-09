@@ -7,7 +7,6 @@ import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Repositories.OpinionRepository;
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.ValueProfile;
-import com.google.gson.Gson;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
@@ -15,9 +14,9 @@ import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -31,7 +30,8 @@ public class OpinionService {
     private final PromptBuilder promptBuilder;
     private final OpinionRepository opinionRepository;
     private final LLMClient llmClient;
-    private final Gson gson = new Gson();
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
 
     // ---- Hyperparamètres ----
     private static final double W_EXPERIENCE = 0.70;   // poids experience dans polarity
@@ -198,13 +198,32 @@ public class OpinionService {
 
     private Document toDocument(OpinionEntry opinionEntry) {
         String content = opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject();
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("entry", gson.toJson(opinionEntry));
-        return new Document(opinionEntry.getId(), content, metadata);
+        return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
     }
 
     private OpinionEntry fromDocument(Document document) {
-        String json = (String) document.getMetadata().get("entry");
-        return gson.fromJson(json, OpinionEntry.class);
+        Map<String, Object> metadata = document.getMetadata();
+        OpinionEntry opinionEntry = new OpinionEntry();
+        opinionEntry.setId(document.getId());
+        opinionEntry.setSubject((String) metadata.get("subject"));
+        opinionEntry.setSummary((String) metadata.get("summary"));
+        opinionEntry.setNarrative((String) metadata.get("narrative"));
+        opinionEntry.setPolarity((Double) metadata.get("polarity"));
+        opinionEntry.setConfidence((Double) metadata.get("confidence"));
+        opinionEntry.setStability((Double) metadata.get("stability"));
+        opinionEntry.setAssociatedMemories((List<String>) metadata.get("associatedMemories"));
+        opinionEntry.setAssociatedDesire((String) metadata.get("associatedDesire"));
+        opinionEntry.setMainDimension((DimensionSchwartz) metadata.get("mainDimension"));
+        opinionEntry.setCreatedAt(LocalDateTime.parse((String) metadata.get("createdAt"), TIMESTAMP_FORMATTER));
+        opinionEntry.setUpdatedAt(LocalDateTime.parse((String) metadata.get("updatedAt"), TIMESTAMP_FORMATTER));
+        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
+        if (embeddingDouble != null) {
+            float[] embeddingFloat = new float[embeddingDouble.size()];
+            for (int i = 0; i < embeddingDouble.size(); i++) {
+                embeddingFloat[i] = embeddingDouble.get(i).floatValue();
+            }
+            opinionEntry.setEmbedding(embeddingFloat);
+        }
+        return opinionEntry;
     }
 }

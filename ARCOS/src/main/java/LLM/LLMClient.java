@@ -1,5 +1,7 @@
 package LLM;
 
+import Exceptions.DesireCreationException;
+import Exceptions.ResponseParsingException;
 import LLM.service.RateLimiterService;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -50,7 +52,7 @@ public class LLMClient
     }
 
 
-    public MemoryEntry generateMemoryResponse(Prompt prompt) {
+    public MemoryEntry generateMemoryResponse(Prompt prompt) throws ResponseParsingException {
         acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
@@ -65,7 +67,7 @@ public class LLMClient
                 .entity(OpinionEntry.class);
     }
 
-    public DesireEntry generateDesireResponse(Prompt prompt) {
+    public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
         acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
