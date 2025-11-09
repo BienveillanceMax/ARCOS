@@ -1,5 +1,6 @@
-Personality/Values/ValueProfileTest.class
 Producers/DesireInitiativeProducerTest.class
+Personality/Values/ValueProfileTest.class
+Memory/LongTermMemory/Qdrant/QdrantClientIT.class
 Personality/Desires/DesireServiceTest.class
 Memory/Actions/DeepSearchActionTest.class
 Orchestrator/InitiativeServiceTest.class
@@ -7,3 +8,4 @@ Memory/MemoryServiceTests.class
 Personality/PersonalityOrchestratorIT.class
 Personality/Opinions/OpinionServiceTest.class
 Orchestrator/OrchestratorTests.class
+Memory/LongTermMemory/service/MemoryServiceTest.class

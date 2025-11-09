@@ -115,7 +115,10 @@ public class OpinionService
 
             if (searchResult.getSimilarityScore() >= 0.85) {            //TODO HANDLE LESSER SIMILARITY ? HANDLE SUBJECT DIFFERENTIATION
                 similarOpinionsFound = true;
-                opinionEntries.add(updateOpinion(searchResult, opinionEntry));
+                OpinionEntry updatedOpinion = updateOpinion(searchResult, opinionEntry);
+                if (updatedOpinion != null) {
+                    opinionEntries.add(updatedOpinion);
+                }
             }
         }
         if (!similarOpinionsFound) {

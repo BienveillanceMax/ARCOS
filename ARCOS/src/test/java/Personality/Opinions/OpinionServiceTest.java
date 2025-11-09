@@ -136,4 +136,69 @@ class OpinionServiceTest {
         // Assert
         assertNull(result);
     }
+
+    @Test
+    void testProcessInteraction_addOpinion_stabilityCalculation() throws Exception {
+        // Arrange
+        MemoryEntry memoryEntry = new MemoryEntry();
+        memoryEntry.setId("memory1");
+        memoryEntry.setContent("Test content");
+
+        OpinionEntry opinionEntry = new OpinionEntry();
+        opinionEntry.setSubject("Test subject");
+        opinionEntry.setMainDimension(DimensionSchwartz.OPENNESS_TO_CHANGE);
+
+        when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn("prompt");
+        when(llmClient.generateOpinionResponse(anyString())).thenReturn("response");
+        when(llmResponseParser.parseOpinionFromResponse(anyString(), any(MemoryEntry.class))).thenReturn(opinionEntry);
+        when(memoryService.searchOpinions(anyString())).thenReturn(new ArrayList<>());
+        when(valueProfile.averageByDimension(DimensionSchwartz.OPENNESS_TO_CHANGE)).thenReturn(70.0);
+
+        // Act
+        List<OpinionEntry> result = opinionService.processInteraction(memoryEntry);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(0.85, result.get(0).getStability(), 0.01); // 0.5 + (70 / 200)
+    }
+
+    @Test
+    void testProcessInteraction_updateOpinion_deleteOnLowStability() throws Exception {
+        // Arrange
+        MemoryEntry memoryEntry = new MemoryEntry();
+        memoryEntry.setId("memory1");
+        memoryEntry.setContent("Test content");
+
+        OpinionEntry newOpinionEntry = new OpinionEntry();
+        newOpinionEntry.setSubject("Test subject");
+        newOpinionEntry.setPolarity(-0.8);
+        newOpinionEntry.setMainDimension(DimensionSchwartz.CONSERVATION);
+
+        OpinionEntry existingOpinion = new OpinionEntry();
+        existingOpinion.setId("opinion1");
+        existingOpinion.setSubject("Test subject");
+        existingOpinion.setPolarity(0.8);
+        existingOpinion.setConfidence(0.5);
+        existingOpinion.setStability(0.1); // Low stability
+        existingOpinion.setMainDimension(DimensionSchwartz.CONSERVATION);
+
+        SearchResult<OpinionEntry> searchResult = new SearchResult<>(existingOpinion, 0.9f);
+        List<SearchResult<OpinionEntry>> searchResults = Collections.singletonList(searchResult);
+
+        when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn("prompt");
+        when(llmClient.generateOpinionResponse(anyString())).thenReturn("response");
+        when(llmResponseParser.parseOpinionFromResponse(anyString(), any(MemoryEntry.class))).thenReturn(newOpinionEntry);
+        when(memoryService.searchOpinions(anyString())).thenReturn(searchResults);
+        when(valueProfile.averageByDimension()).thenReturn(new EnumMap<>(Map.of(DimensionSchwartz.CONSERVATION, 20.0)));
+        when(valueProfile.averageByDimension(DimensionSchwartz.CONSERVATION)).thenReturn(20.0);
+        when(valueProfile.dimensionAverage()).thenReturn(50.0);
+
+        // Act
+        List<OpinionEntry> result = opinionService.processInteraction(memoryEntry);
+
+        // Assert
+        assertTrue(result.isEmpty());
+        verify(memoryService, times(1)).deleteOpinion("opinion1");
+    }
 }

@@ -1,4 +1,6 @@
 /app/ARCOS/src/test/java/Memory/Actions/DeepSearchActionTest.java
+/app/ARCOS/src/test/java/Memory/LongTermMemory/Qdrant/QdrantClientIT.java
+/app/ARCOS/src/test/java/Memory/LongTermMemory/service/MemoryServiceTest.java
 /app/ARCOS/src/test/java/Memory/MemoryServiceTests.java
 /app/ARCOS/src/test/java/Orchestrator/InitiativeServiceTest.java
 /app/ARCOS/src/test/java/Orchestrator/OrchestratorTests.java

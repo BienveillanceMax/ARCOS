@@ -18,15 +18,13 @@ import Personality.Values.Entities.DimensionSchwartz;
 
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 class DesireServiceTest {
-
-    @Mock
-    private DesireInitiativeProducer desireInitativeProducer;
 
     @Mock
     private PromptBuilder promptBuilder;
@@ -105,7 +103,7 @@ class DesireServiceTest {
         desireService.processOpinion(opinionEntry);
 
         // Assert
-        verify(desireInitativeProducer, never()).checkDesiresAndInitiate();
+        verify(memoryService, times(1)).getDesire("desire1");
     }
 
     @Test
@@ -126,5 +124,32 @@ class DesireServiceTest {
         // The code is designed to catch the parsing exception and return null after retries.
         // The test should assert this behavior, not expect a RuntimeException.
         assertNull(desireService.processOpinion(opinionEntry));
+    }
+
+    @Test
+    void testProcessOpinion_updateDesire() {
+        // Arrange
+        OpinionEntry opinionEntry = new OpinionEntry();
+        opinionEntry.setId("opinion1");
+        opinionEntry.setAssociatedDesire("desire1");
+        opinionEntry.setPolarity(0.6);
+        opinionEntry.setStability(0.7);
+        opinionEntry.setMainDimension(DimensionSchwartz.OPENNESS_TO_CHANGE);
+
+        DesireEntry desireEntry = new DesireEntry();
+        desireEntry.setId("desire1");
+        desireEntry.setIntensity(0.5);
+
+        when(memoryService.getDesire("desire1")).thenReturn(desireEntry);
+        when(valueProfile.averageByDimension(any(DimensionSchwartz.class))).thenReturn(70.0);
+        when(valueProfile.calculateValueAlignment(any(DimensionSchwartz.class))).thenReturn(1.2);
+
+        // Act
+        desireService.processOpinion(opinionEntry);
+
+        // Assert
+        verify(memoryService, times(1)).storeDesire(any(DesireEntry.class));
+        verify(memoryService, times(1)).storeOpinion(any(OpinionEntry.class));
+        assertEquals("desire1", opinionEntry.getAssociatedDesire());
     }
 }

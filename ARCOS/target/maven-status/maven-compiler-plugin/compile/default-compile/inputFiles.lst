@@ -28,6 +28,7 @@
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/RespondAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/SearchAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/SearchCalendarEventsAction.java
+/app/ARCOS/src/main/java/Memory/Actions/Entities/Parameter.java
 /app/ARCOS/src/main/java/Memory/ConversationContext.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Config/MemoryConfiguration.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/DesireEntry.java
@@ -40,9 +41,7 @@
 /app/ARCOS/src/main/java/Memory/LongTermMemory/service/EmbeddingService.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/service/MemoryService.java
 /app/ARCOS/src/main/java/Orchestrator/ActionExecutor.java
-/app/ARCOS/src/main/java/Orchestrator/ActionPlanner.java
 /app/ARCOS/src/main/java/Orchestrator/Entities/ExecutionPlan.java
-/app/ARCOS/src/main/java/Orchestrator/Entities/Parameter.java
 /app/ARCOS/src/main/java/Orchestrator/InitiativeService.java
 /app/ARCOS/src/main/java/Orchestrator/Orchestrator.java
 /app/ARCOS/src/main/java/Personality/Desires/DesireService.java
