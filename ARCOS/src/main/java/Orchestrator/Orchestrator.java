@@ -85,6 +85,7 @@ public class Orchestrator
     }
 
     public void start() {
+        log.info("Orchestrator starting");
         while (true) {
             try {
                 Event<?> event = eventQueue.take();
