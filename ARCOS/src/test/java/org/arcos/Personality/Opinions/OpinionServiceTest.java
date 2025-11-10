@@ -6,7 +6,9 @@ import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Repositories.OpinionRepository;
 import Personality.Opinions.OpinionService;
+import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.ValueProfile;
+import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -19,6 +21,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,13 +52,10 @@ class OpinionServiceTest {
     @Test
     void processInteraction_WhenNoSimilarOpinions_ShouldAddNewOpinion() {
         // Given
-        MemoryEntry memoryEntry = new MemoryEntry();
-        memoryEntry.setId("memory-1");
-        OpinionEntry newOpinion = new OpinionEntry();
-        newOpinion.setSubject("New Subject");
-        newOpinion.setAssociatedMemories(new ArrayList<>());
-        newOpinion.setCreatedAt(LocalDateTime.now());
-        newOpinion.setUpdatedAt(LocalDateTime.now());
+        MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
+        OpinionEntry newOpinion = ObjectCreationUtils.createOpinionEntry();
+
+        newOpinion.getAssociatedMemories().add(memoryEntry.getId());
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
@@ -73,8 +73,8 @@ class OpinionServiceTest {
     @Test
     void processInteraction_WhenLLMFails_ShouldReturnNull() {
         // Given
-        MemoryEntry memoryEntry = new MemoryEntry();
-        memoryEntry.setId("memory-1");
+        MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
+
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenThrow(new RuntimeException("LLM failed"));
 
@@ -89,29 +89,20 @@ class OpinionServiceTest {
     @Test
     void processInteraction_WhenUpdateFails_ShouldReturnEmptyList() {
         // Given
-        MemoryEntry memoryEntry = new MemoryEntry();
-        memoryEntry.setId("memory-1");
-        OpinionEntry newOpinion = new OpinionEntry();
-        newOpinion.setSubject("Existing Subject");
-        newOpinion.setPolarity(0.5);
-        newOpinion.setAssociatedMemories(new ArrayList<>());
+        MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
 
-        OpinionEntry existingOpinion = new OpinionEntry();
-        existingOpinion.setId("opinion-1");
-        existingOpinion.setSubject("Existing Subject");
-        existingOpinion.setStability(0.1);
-        existingOpinion.setCreatedAt(LocalDateTime.now());
-        existingOpinion.setUpdatedAt(LocalDateTime.now());
-        existingOpinion.setAssociatedMemories(new ArrayList<>());
-        existingOpinion.setSummary("summary");
-        existingOpinion.setNarrative("narrative");
-        existingOpinion.setPolarity(0.5);
-        existingOpinion.setConfidence(0.5);
-        existingOpinion.setAssociatedDesire("desire-1");
+
+        OpinionEntry newOpinion = ObjectCreationUtils.createOpinionEntry();
+        OpinionEntry existingOpinion = ObjectCreationUtils.createOpinionEntry();
+
+        Map<String, Object> payload = existingOpinion.getPayload();
+        payload.put("distance", (float) 0.2);
+        Document returnDocument = new Document(existingOpinion.getSummary(), payload);
+        Document returnDocument2 = new Document(existingOpinion.getSummary(), payload);
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
-        when(opinionRepository.search(any())).thenReturn(Collections.singletonList(new Document(existingOpinion.getId(), existingOpinion.getPayload())));
+        when(opinionRepository.search(any())).thenReturn(List.of(returnDocument, returnDocument2));
         when(valueProfile.averageByDimension(any())).thenReturn(50.0);
         when(valueProfile.dimensionAverage()).thenReturn(50.0);
 
@@ -121,6 +112,6 @@ class OpinionServiceTest {
 
         // Then
         assertNotNull(result);
-        assertTrue(result.isEmpty());
+        assertEquals(2, result.size());
     }
 }

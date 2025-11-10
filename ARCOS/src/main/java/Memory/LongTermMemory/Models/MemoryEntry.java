@@ -37,6 +37,8 @@ public class MemoryEntry implements QdrantEntry {
 
     // Constructeur par défaut pour Jackson
     public MemoryEntry() {
+        this.id = UUID.randomUUID().toString();
+        this.timestamp = LocalDateTime.now();
     }
 
     /**
