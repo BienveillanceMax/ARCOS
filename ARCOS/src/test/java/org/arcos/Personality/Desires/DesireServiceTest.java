@@ -9,6 +9,7 @@ import Memory.LongTermMemory.Repositories.DesireRepository;
 import Memory.LongTermMemory.Repositories.OpinionRepository;
 import Personality.Desires.DesireService;
 import Personality.Values.ValueProfile;
+import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -97,23 +98,8 @@ class DesireServiceTest {
     @Test
     void processOpinion_WhenAssociatedDesireExists_ShouldUpdateDesire() {
         // Given
-        OpinionEntry opinionEntry = new OpinionEntry();
-        opinionEntry.setId("opinion-1");
-        opinionEntry.setAssociatedDesire("desire-1");
-        opinionEntry.setAssociatedMemories(new ArrayList<>());
-        opinionEntry.setCreatedAt(LocalDateTime.now());
-        opinionEntry.setUpdatedAt(LocalDateTime.now());
-
-        DesireEntry desireEntry = new DesireEntry();
-        desireEntry.setId("desire-1");
-        desireEntry.setIntensity(0.5);
-        desireEntry.setStatus(DesireEntry.Status.PENDING);
-        desireEntry.setCreatedAt(LocalDateTime.now());
-        desireEntry.setLastUpdated(LocalDateTime.now());
-        desireEntry.setLabel("label");
-        desireEntry.setDescription("description");
-        desireEntry.setReasoning("reasoning");
-        desireEntry.setOpinionId("opinion-1");
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
+        DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(opinionEntry.getId());
 
         Document desireDocument = new Document(desireEntry.getId(), "test", desireEntry.getPayload());
         when(desireRepository.findById("desire-1")).thenReturn(Optional.of(desireDocument));
