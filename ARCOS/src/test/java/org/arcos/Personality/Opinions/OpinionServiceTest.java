@@ -18,10 +18,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -94,16 +91,20 @@ class OpinionServiceTest {
 
         OpinionEntry newOpinion = ObjectCreationUtils.createOpinionEntry();
         OpinionEntry existingOpinion = ObjectCreationUtils.createOpinionEntry();
+        EnumMap<DimensionSchwartz,Double> values = ObjectCreationUtils.createAverageByDimension();
+
 
         Map<String, Object> payload = existingOpinion.getPayload();
-        payload.put("distance", (float) 0.2);
+        payload.put("distance", (float) 0.1);
         Document returnDocument = new Document(existingOpinion.getSummary(), payload);
         Document returnDocument2 = new Document(existingOpinion.getSummary(), payload);
+
+
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
         when(opinionRepository.search(any())).thenReturn(List.of(returnDocument, returnDocument2));
-        when(valueProfile.averageByDimension(any())).thenReturn(50.0);
+        when(valueProfile.averageByDimension()).thenReturn(values);
         when(valueProfile.dimensionAverage()).thenReturn(50.0);
 
 

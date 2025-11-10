@@ -9,6 +9,7 @@ import Personality.Values.Entities.DimensionSchwartz;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.UUID;
 
 public class ObjectCreationUtils
@@ -56,5 +57,14 @@ public class ObjectCreationUtils
         desireEntry.setCreatedAt(LocalDateTime.now());
         desireEntry.setLastUpdated(LocalDateTime.now());
         return desireEntry;
+    }
+
+    public static EnumMap<DimensionSchwartz, Double> createAverageByDimension() {
+        EnumMap<DimensionSchwartz,Double> values = new EnumMap<>(DimensionSchwartz.class);
+        values.put(DimensionSchwartz.CONSERVATION, 0.5);
+        values.put(DimensionSchwartz.SELF_TRANSCENDENCE, 0.1);
+        values.put(DimensionSchwartz.OPENNESS_TO_CHANGE, 0.0);
+        values.put(DimensionSchwartz.SELF_ENHANCEMENT, 0.0);
+        return values;
     }
 }
