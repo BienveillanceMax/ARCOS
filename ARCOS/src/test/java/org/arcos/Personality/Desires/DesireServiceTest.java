@@ -54,18 +54,15 @@ class DesireServiceTest {
     @Test
     void processOpinion_WhenIntensityIsHighAndNoAssociatedDesire_ShouldCreateDesire() throws DesireCreationException {
         // Given
-        OpinionEntry opinionEntry = new OpinionEntry();
-        opinionEntry.setId("opinion-1");
-        opinionEntry.setPolarity(0.8);
-        opinionEntry.setStability(0.9);
-        opinionEntry.setAssociatedMemories(new ArrayList<>());
-        opinionEntry.setCreatedAt(LocalDateTime.now());
-        opinionEntry.setUpdatedAt(LocalDateTime.now());
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
+        opinionEntry.setAssociatedDesire(null);
+        opinionEntry.setPolarity(1);
+        opinionEntry.setStability(1);
+
+        DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(opinionEntry.getId());
+        desireEntry.setOpinionId(opinionEntry.getId());
 
         when(valueProfile.averageByDimension(any())).thenReturn(80.0);
-
-        DesireEntry desireEntry = new DesireEntry();
-        desireEntry.setId("desire-1");
         when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn(new Prompt("prompt"));
         when(llmClient.generateDesireResponse(any(Prompt.class))).thenReturn(desireEntry);
 

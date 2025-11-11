@@ -40,6 +40,7 @@ public class ObjectCreationUtils
         createdOpinion.setConfidence(0.5);
         createdOpinion.setAssociatedDesire("desire-1");
         createdOpinion.setMainDimension(DimensionSchwartz.CONSERVATION);
+        createdOpinion.setEmbedding(new float[1024]);
         return createdOpinion;
     }
 
