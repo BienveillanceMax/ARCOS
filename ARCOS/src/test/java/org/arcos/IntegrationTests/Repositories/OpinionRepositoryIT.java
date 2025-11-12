@@ -5,6 +5,7 @@ import Memory.LongTermMemory.Repositories.OpinionRepository;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import common.gson.LocalDateTimeAdapter;
+import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -36,10 +37,10 @@ class OpinionRepositoryIT {
     }
 
     @Test
-    void saveAndFindById_ShouldReturnSavedEntry() {
+    void saveAndFindById_ShouldReturnSavedEntry() throws InterruptedException {
+
         // Given
-        OpinionEntry opinionEntry = new OpinionEntry();
-        opinionEntry.setSubject("test subject");
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
         opinionRepository.save(toDocument(opinionEntry));
 
         // When
@@ -50,10 +51,10 @@ class OpinionRepositoryIT {
     }
 
     @Test
-    void delete_ShouldRemoveEntry() {
+    void delete_ShouldRemoveEntry() throws InterruptedException {
+
         // Given
-        OpinionEntry opinionEntry = new OpinionEntry();
-        opinionEntry.setSubject("test subject");
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
         opinionRepository.save(toDocument(opinionEntry));
 
         // When

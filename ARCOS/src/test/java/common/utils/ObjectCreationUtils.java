@@ -28,7 +28,7 @@ public class ObjectCreationUtils
 
     public static OpinionEntry createOpinionEntry() {
         OpinionEntry createdOpinion = new OpinionEntry();
-        createdOpinion.setId("opinion-1");
+        createdOpinion.setId(UUID.randomUUID().toString());
         createdOpinion.setSubject("Existing Subject");
         createdOpinion.setStability(0.1);
         createdOpinion.setCreatedAt(LocalDateTime.now());
