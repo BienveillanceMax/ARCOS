@@ -1,4 +1,4 @@
-package org.arcos.Memory.LongTermMemory.Repositories;
+package org.arcos.IntegrationTests.Repositories;
 
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Repositories.DesireRepository;

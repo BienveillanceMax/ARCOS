@@ -1,4 +1,4 @@
-package org.arcos.Personality.Desires;
+package org.arcos.UnitTests.Personality.Desires;
 
 import Exceptions.DesireCreationException;
 import LLM.LLMClient;

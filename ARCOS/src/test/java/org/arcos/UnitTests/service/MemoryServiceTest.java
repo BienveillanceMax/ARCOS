@@ -1,4 +1,4 @@
-package org.arcos.Memory.LongTermMemory.service;
+package org.arcos.UnitTests.service;
 
 
 import Exceptions.ResponseParsingException;

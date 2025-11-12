@@ -1,4 +1,4 @@
-package org.arcos.Personality.Opinions;
+package org.arcos.UnitTests.Personality.Opinions;
 
 import LLM.LLMClient;
 import LLM.Prompts.PromptBuilder;
