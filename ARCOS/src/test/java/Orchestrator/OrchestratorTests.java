@@ -142,5 +142,57 @@ public class OrchestratorTests{
 
         orchestratorThread.interrupt();
     }
+
+    @Test
+    void testDispatch_WakewordEvent_ProcessesQueryAndSpeaks() throws InterruptedException, ResponseParsingException {
+        // Arrange
+        String userQuery = "test query";
+        String expectedResponse = "This is the final response.";
+        Event<String> wakewordEvent = new Event<>(EventType.WAKEWORD, userQuery, "Test");
+        ExecutionPlan mockPlan = new ExecutionPlan(); // Assuming a default constructor exists
+
+        when(eventQueue.take()).thenReturn((Event) wakewordEvent).thenThrow(new InterruptedException());
+        when(memoryService.searchMemories(anyString())).thenReturn(Collections.emptyList());
+        when(promptBuilder.buildPlanningPrompt(anyString(), any(), any())).thenReturn("planning prompt");
+        when(llmClient.generatePlanningResponse(anyString())).thenReturn("planning response");
+        when(responseParser.parseWithMistralRetry(anyString(), anyInt())).thenReturn(mockPlan);
+        when(actionExecutor.executeActions(any(ExecutionPlan.class))).thenReturn(Collections.emptyMap());
+        when(promptBuilder.buildFormulationPrompt(anyString(), any(), any(), any())).thenReturn("formulation prompt");
+        when(llmClient.generateFormulationResponse(anyString())).thenReturn(expectedResponse);
+
+        CountDownLatch latch = new CountDownLatch(1);
+        doAnswer(invocation -> {
+            latch.countDown();
+            return null;
+        }).when(ttsHandler).speak(anyString());
+
+        // Act
+        Thread orchestratorThread = new Thread(() -> {
+            try {
+                orchestrator.start();
+            } catch (RuntimeException e) {
+                // This is expected when the InterruptedException is thrown
+            }
+        });
+        orchestratorThread.start();
+
+        assertTrue(latch.await(2, TimeUnit.SECONDS), "ttsHandler.speak was not called within 2 seconds");
+
+        // Assert
+        ArgumentCaptor<String> responseCaptor = ArgumentCaptor.forClass(String.class);
+        verify(ttsHandler, times(1)).speak(responseCaptor.capture());
+        assertEquals(expectedResponse, responseCaptor.getValue());
+
+        // Verify other interactions
+        verify(memoryService, times(1)).searchMemories(userQuery);
+        verify(llmClient, times(1)).generatePlanningResponse(anyString());
+        verify(responseParser, times(1)).parseWithMistralRetry(anyString(), anyInt());
+        verify(actionExecutor, times(1)).executeActions(mockPlan);
+        verify(llmClient, times(1)).generateFormulationResponse(anyString());
+        verify(context, times(1)).addUserMessage(userQuery);
+        verify(context, times(1)).addAssistantMessage(expectedResponse, mockPlan);
+
+        orchestratorThread.interrupt();
+    }
 }
 
