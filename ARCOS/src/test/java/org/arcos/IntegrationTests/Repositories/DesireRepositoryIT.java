@@ -33,7 +33,8 @@ class DesireRepositoryIT {
     }
 
     @Test
-    void saveAndFindById_ShouldReturnSavedEntry() {
+    void saveAndFindById_ShouldReturnSavedEntry() throws InterruptedException {
+        Thread.sleep(2000);
         // Given
         DesireEntry desireEntry = createDesireEntry();
         desireRepository.save(toDocument(desireEntry));

@@ -9,6 +9,7 @@ import Memory.LongTermMemory.Models.OpinionEntry;
 import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
 import Tools.Actions.SearchActions;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
@@ -18,57 +19,53 @@ public class LLMClient
 {
 
     private final ChatClient chatClient;
-    private final RateLimiterService rateLimiterService;
     private final CalendarActions calendarActions;
     private final PythonActions pythonActions;
     private final SearchActions searchActions;
 
 
-    public LLMClient(ChatClient.Builder chatClientBuilder, RateLimiterService rateLimiterService, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions) {
+
+    public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions) {
         this.chatClient = chatClientBuilder.build();
-        this.rateLimiterService = rateLimiterService;
         this.calendarActions = calendarActions;
         this.pythonActions = pythonActions;
         this.searchActions = searchActions;
     }
 
-    private void acquirePermit() {
-        rateLimiterService.acquirePermit();
-    }
 
+
+    @RateLimiter(name = "mistral_free")
     public String generateChatResponse(Prompt prompt) {
-        acquirePermit();
         return chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
                 .content();
     }
 
+    @RateLimiter(name = "mistral_free")
     public String generateToollessResponse(Prompt prompt) {
-        acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
                 .content();
     }
 
-
+    @RateLimiter(name = "mistral_free")
     public MemoryEntry generateMemoryResponse(Prompt prompt) throws ResponseParsingException {
-        acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
                 .entity(MemoryEntry.class);
     }
 
+    @RateLimiter(name = "mistral_free")
     public OpinionEntry generateOpinionResponse(Prompt prompt) {
-        acquirePermit();
         return chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
                 .entity(OpinionEntry.class);
     }
 
+    @RateLimiter(name = "mistral_free")
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
-        acquirePermit();
         return chatClient.prompt(prompt)
                 .call()
                 .entity(DesireEntry.class);

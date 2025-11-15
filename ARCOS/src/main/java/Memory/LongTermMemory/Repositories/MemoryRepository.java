@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 public class MemoryRepository extends BaseVectorRepository<MemoryEntry>
 {
     @Autowired
-    public MemoryRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel, RateLimiterService rateLimiterService) {
-        super(provider.getClient(), embeddingModel, "Memories", rateLimiterService);
+    public MemoryRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel) {
+        super(provider.getClient(), embeddingModel, "Memories");
     }
 }

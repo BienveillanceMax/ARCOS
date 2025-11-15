@@ -1,6 +1,7 @@
 package Memory.LongTermMemory.Repositories;
 
 import LLM.service.RateLimiterService;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.qdrant.client.QdrantClient;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.qdrant.QdrantVectorStore;
@@ -15,18 +16,17 @@ import java.util.Optional;
 public abstract class BaseVectorRepository<T> {
 
     protected final VectorStore vectorStore;
-    protected final RateLimiterService rateLimiterService;
 
-    protected BaseVectorRepository(QdrantClient client, EmbeddingModel embeddingModel, String collectionName, RateLimiterService rateLimiterService) {
 
-        this.rateLimiterService = rateLimiterService;
+    protected BaseVectorRepository(QdrantClient client, EmbeddingModel embeddingModel, String collectionName) {
+
         this.vectorStore  = QdrantVectorStore.builder(client,embeddingModel)
                 .collectionName(collectionName)
                 .build();
     }
 
+    @RateLimiter(name = "mistral_free")
     public void save(Document document) {
-        acquirePermit();
         vectorStore.add(List.of(document));
     }
 
@@ -35,20 +35,15 @@ public abstract class BaseVectorRepository<T> {
     }
 
     public List<Document> search(SearchRequest searchRequest) {
-        acquirePermit();
         return vectorStore.similaritySearch(searchRequest);
     }
 
+    @RateLimiter(name = "mistral_free")
     public Optional<Document> findById(String id) {
-        acquirePermit();  //in case even an empty strings query needs to generate an embedding
         SearchRequest searchRequest = SearchRequest.builder().query("")
                 .topK(1)
                 .filterExpression("id == '" + id + "'").build();    //tema le scotch :((((((((((( (en vrai y a moyen que ça soit hyper okay(ou pas))
         return vectorStore.similaritySearch(searchRequest).stream().findFirst();
-    }
-
-    protected void acquirePermit() {
-        rateLimiterService.acquirePermit();
     }
 
 }

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 public class OpinionRepository extends BaseVectorRepository<OpinionEntry>
 {
     @Autowired
-    public OpinionRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel, RateLimiterService rateLimiterService) {
-        super(provider.getClient(), embeddingModel, "Opinions", rateLimiterService);
+    public OpinionRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel) {
+        super(provider.getClient(), embeddingModel, "Opinions");
     }
 }
