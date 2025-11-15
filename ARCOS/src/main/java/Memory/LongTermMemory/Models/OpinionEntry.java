@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +54,8 @@ public class OpinionEntry implements QdrantEntry
     private DimensionSchwartz mainDimension;
 
     public OpinionEntry() {
+        associatedMemories = new ArrayList<>();
+        associatedDesire = "";
     }
 
     public DimensionSchwartz getMainDimension() {
@@ -170,7 +173,9 @@ public class OpinionEntry implements QdrantEntry
         payload.put("stability", this.getStability());
         payload.put("associatedMemories", this.getAssociatedMemories());
         payload.put("associatedDesire", this.getAssociatedDesire());
-        payload.put("mainDimension", this.getMainDimension());
+        if (this.getMainDimension() != null) {
+            payload.put("mainDimension", this.getMainDimension().name());
+        }
 
         if (this.getCreatedAt() != null) {
             payload.put("createdAt", this.getCreatedAt().format(TIMESTAMP_FORMATTER));

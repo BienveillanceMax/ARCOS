@@ -213,9 +213,15 @@ public class OpinionService {
         opinionEntry.setStability((Double) metadata.get("stability"));
         opinionEntry.setAssociatedMemories((List<String>) metadata.get("associatedMemories"));
         opinionEntry.setAssociatedDesire((String) metadata.get("associatedDesire"));
-        opinionEntry.setMainDimension((DimensionSchwartz) metadata.get("mainDimension"));
+        Object mainDimensionObj = metadata.get("mainDimension");
+        if (mainDimensionObj != null) {
+            opinionEntry.setMainDimension(DimensionSchwartz.valueOf(mainDimensionObj.toString()));
+        }
         opinionEntry.setCreatedAt(LocalDateTime.parse((String) metadata.get("createdAt"), TIMESTAMP_FORMATTER));
-        opinionEntry.setUpdatedAt(LocalDateTime.parse((String) metadata.get("updatedAt"), TIMESTAMP_FORMATTER));
+        String updatedAtStr = (String) metadata.get("updatedAt");
+        if (updatedAtStr != null) {
+            opinionEntry.setUpdatedAt(LocalDateTime.parse(updatedAtStr, TIMESTAMP_FORMATTER));
+        }
         List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
         if (embeddingDouble != null) {
             float[] embeddingFloat = new float[embeddingDouble.size()];

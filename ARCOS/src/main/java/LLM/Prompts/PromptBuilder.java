@@ -67,9 +67,6 @@ public class PromptBuilder {
 
         appendValuesAnalysis(system);
         appendMemoryContext(system, memory);
-        appendOpinionJsonFormat(system);
-        appendOpinionRules(system);
-
         return new Prompt(new SystemMessage(system.toString()));
     }
 

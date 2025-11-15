@@ -18,7 +18,7 @@ public class OpinionServiceIT
     private OpinionService opinionService;
 
     @Test
-    void delete_ShouldRemoveEntry() {
+    void addValidMemory_ShouldReturnValidOpinionEntry() {
         //given
 
         MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
