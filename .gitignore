@@ -1,1 +1,3 @@
-ARCOS/target/
+ARCOS/.env
+.idea
+ARCOS/HELP.md
