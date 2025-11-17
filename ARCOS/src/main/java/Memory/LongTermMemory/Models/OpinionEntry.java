@@ -2,6 +2,8 @@ package Memory.LongTermMemory.Models;
 
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.qdrant.client.grpc.Points;
+import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -185,6 +187,11 @@ public class OpinionEntry implements QdrantEntry
         }
 
         return payload;
+    }
+    public static Document fromOpinionPoint(Points.RetrievedPoint point) {
+        //TODO
+        Document convertedDocument = new Document("todo");
+        return convertedDocument;
     }
 }
 

@@ -1,5 +1,8 @@
 package Memory.LongTermMemory.Models;
 
+import io.qdrant.client.grpc.Points;
+import org.springframework.ai.document.Document;
+
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
@@ -122,6 +125,12 @@ public class DesireEntry implements QdrantEntry
         }
 
         return payload;
+    }
+
+    public static Document fromDesirePoint(Points.RetrievedPoint point) {
+        //TODO
+        Document convertedDocument = new Document("todo");
+        return convertedDocument;
     }
 }
 

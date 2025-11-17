@@ -3,7 +3,10 @@ package Memory.LongTermMemory.Repositories;
 import LLM.service.RateLimiterService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.qdrant.client.QdrantClient;
+import io.qdrant.client.QdrantGrpcClient;
 import io.qdrant.client.grpc.Collections;
+import io.qdrant.client.grpc.Points;
+import io.qdrant.client.grpc.Points.RetrievedPoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.qdrant.QdrantVectorStore;
@@ -11,8 +14,8 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.Collections.*;
 import java.util.concurrent.ExecutionException;
 
 
@@ -71,13 +74,6 @@ public abstract class BaseVectorRepository<T>
         return vectorStore.similaritySearch(searchRequest);
     }
 
-    @RateLimiter(name = "mistral_free")
-    public Optional<Document> findById(String id) {
-        SearchRequest searchRequest = SearchRequest.builder().query("")
-                .topK(1)
-                .filterExpression("id == '" + id + "'").build();    //tema le scotch :((((((((((( (en vrai y a moyen que ça soit hyper okay(ou pas))
-        return vectorStore.similaritySearch(searchRequest).stream().findFirst();
-    }
-
+    public abstract Optional<Document> findById(String id);
 }
 
