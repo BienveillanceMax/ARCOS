@@ -2,6 +2,7 @@ package Memory.LongTermMemory.Models;
 
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.qdrant.client.grpc.JsonWithInt;
 import io.qdrant.client.grpc.Points;
 import org.springframework.ai.document.Document;
 
@@ -11,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class OpinionEntry implements QdrantEntry
 {
@@ -188,11 +190,36 @@ public class OpinionEntry implements QdrantEntry
 
         return payload;
     }
+
     public static Document fromOpinionPoint(Points.RetrievedPoint point) {
-        //TODO
-        Document convertedDocument = new Document("todo");
-        return convertedDocument;
+        Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
+
+        String narrative = payloadMap.get("narrative").getStringValue();
+
+        Map<String, Object> metadata = payloadMap.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals("narrative")) // Exclude the narrative from metadata
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    JsonWithInt.Value value = entry.getValue();
+                    switch (value.getKindCase()) {
+                        case STRING_VALUE:
+                            return value.getStringValue();
+                        case DOUBLE_VALUE:
+                            return value.getDoubleValue();
+                        case BOOL_VALUE:
+                            return value.getBoolValue();
+                        case LIST_VALUE:
+                            return value.getListValue().getValuesList().stream()
+                                    .map(JsonWithInt.Value::getStringValue)
+                                    .collect(Collectors.toList());
+                        case NULL_VALUE:
+                        default:
+                            return null;
+                    }
+                }));
+
+        List<Float> vector = point.getVectors().getVector().getDataList();
+        metadata.put("embedding", vector);
+        String id = point.getId().getUuid();
+        return new Document(id, narrative, metadata);
     }
 }
-
-

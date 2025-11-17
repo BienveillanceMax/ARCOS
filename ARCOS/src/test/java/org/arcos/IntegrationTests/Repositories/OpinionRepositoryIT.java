@@ -41,7 +41,7 @@ class OpinionRepositoryIT {
         Optional<Document> result = opinionRepository.findById(opinionEntry.getId());
 
         // Then
-        assertTrue(true);
+        assertTrue(result.isPresent() && result.get().getId().equals(opinionEntry.getId()));
     }
 
     @Test

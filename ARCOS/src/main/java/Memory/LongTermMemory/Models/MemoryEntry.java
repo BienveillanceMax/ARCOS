@@ -7,10 +7,8 @@ import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Représente un souvenir/entrée mémoire avec tous les attributs nécessaires
@@ -138,10 +136,40 @@ public class MemoryEntry implements QdrantEntry {
                 timestamp);
     }
 
+
     public static Document fromMemoryPoint(Points.RetrievedPoint point) {
-        //TODO
-        Document convertedDocument = new Document("todo");
-        return convertedDocument;
+        Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
+
+        // Extraire le contenu. Le contenu est stocké directement dans la charge utile.
+        String content = payloadMap.get("content").getStringValue();
+
+        // Créer les métadonnées à partir de la charge utile.
+        Map<String, Object> metadata = payloadMap.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals("content")) // Exclure le contenu
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    JsonWithInt.Value value = entry.getValue();
+                    switch (value.getKindCase()) {
+                        case STRING_VALUE:
+                            return value.getStringValue();
+                        case DOUBLE_VALUE:
+                            return value.getDoubleValue();
+                        case BOOL_VALUE:
+                            return value.getBoolValue();
+                        case NULL_VALUE:
+                        default:
+                            return null;
+                    }
+                }));
+
+        // Gérer le vecteur (embedding)
+        List<Float> vector = point.getVectors().getVector().getDataList();
+        metadata.put("embedding", vector);
+
+
+        // L'ID du document est l'ID du point Qdrant.
+        String id = point.getId().getUuid();
+
+        return new Document(id, content, metadata);
     }
 
     @Override
