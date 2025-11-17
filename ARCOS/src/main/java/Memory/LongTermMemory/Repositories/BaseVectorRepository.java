@@ -3,6 +3,8 @@ package Memory.LongTermMemory.Repositories;
 import LLM.service.RateLimiterService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.qdrant.client.QdrantClient;
+import io.qdrant.client.grpc.Collections;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.qdrant.QdrantVectorStore;
 import org.springframework.ai.document.Document;
@@ -11,18 +13,49 @@ import org.springframework.ai.vectorstore.VectorStore;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ExecutionException;
 
 
-public abstract class BaseVectorRepository<T> {
+@Slf4j
+public abstract class BaseVectorRepository<T>
+{
 
     protected final VectorStore vectorStore;
+    protected final QdrantClient qdrantClient;
+    protected final String collectionName;
 
 
     protected BaseVectorRepository(QdrantClient client, EmbeddingModel embeddingModel, String collectionName) {
+        Boolean collectionInitialized = false;
 
-        this.vectorStore  = QdrantVectorStore.builder(client,embeddingModel)
+        try {
+            collectionInitialized = client.collectionExistsAsync(collectionName).get();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } catch (ExecutionException e) {
+            log.error(e.getCause().getMessage());
+        }
+
+        if (!collectionInitialized) {
+            try {
+                client.createCollectionAsync(collectionName,
+                                Collections.VectorParams.newBuilder()
+                                        .setDistance(Collections.Distance.Cosine)
+                                        .setSize(1024)
+                                        .build())
+                        .get();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+
+            log.info("Created collection {}", collectionName);
+        }
+
+        this.vectorStore = QdrantVectorStore.builder(client, embeddingModel)
                 .collectionName(collectionName)
                 .build();
+        this.qdrantClient = client;
+        this.collectionName = collectionName;
     }
 
     @RateLimiter(name = "mistral_free")

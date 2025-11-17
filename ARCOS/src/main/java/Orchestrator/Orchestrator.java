@@ -6,7 +6,6 @@ import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import LLM.LLMClient;
 import java.util.List;
 import java.util.stream.Collectors;
