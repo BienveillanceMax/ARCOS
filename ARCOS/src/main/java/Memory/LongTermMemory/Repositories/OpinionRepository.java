@@ -27,14 +27,16 @@ public class OpinionRepository extends BaseVectorRepository<OpinionEntry>
         try {
             // Créer l'ID du point
             Points.PointId pointId = Points.PointId.newBuilder().setUuid(id).build();
+            Points.ReadConsistency readConsistency = Points.ReadConsistency.newBuilder()
+                    .setFactor(1)
+                    .build();
 
             // Récupérer le point de Qdrant
             List<Points.RetrievedPoint> points = qdrantClient.retrieveAsync(collectionName,
                     pointId,
                     true,
                     true,
-                    Points.ReadConsistency.newBuilder().build()).get();
-
+                    readConsistency).get();
             // Vérifier si le point existe
             if (points.isEmpty()) {
                 return Optional.empty();

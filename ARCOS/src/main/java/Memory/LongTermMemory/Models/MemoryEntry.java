@@ -141,7 +141,7 @@ public class MemoryEntry implements QdrantEntry {
         Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
 
         // Extraire le contenu. Le contenu est stocké directement dans la charge utile.
-        String content = payloadMap.get("content").getStringValue();
+        String content = payloadMap.get("doc_content").getStringValue();
 
         // Créer les métadonnées à partir de la charge utile.
         Map<String, Object> metadata = payloadMap.entrySet().stream()

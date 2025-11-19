@@ -2,19 +2,13 @@ package org.arcos.IntegrationTests.Repositories;
 
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Memory.LongTermMemory.Repositories.OpinionRepository;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import common.gson.LocalDateTimeAdapter;
 import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.ai.document.Document;
 
-import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,13 +20,12 @@ class OpinionRepositoryIT {
     private OpinionRepository opinionRepository;
 
     private Document toDocument(OpinionEntry opinionEntry) {
-        String content = opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject();
+        String content = opinionEntry.getNarrative() != null ? opinionEntry.getNarrative() : "Default content";
         return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
     }
 
     @Test
-    void saveAndFindById_ShouldReturnSavedEntry() throws InterruptedException {
-        Thread.sleep(2000); //for init api limits
+    void saveAndFindById_ShouldReturnSavedEntry() {
         // Given
         OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
         opinionRepository.save(toDocument(opinionEntry));
@@ -41,12 +34,20 @@ class OpinionRepositoryIT {
         Optional<Document> result = opinionRepository.findById(opinionEntry.getId());
 
         // Then
-        assertTrue(result.isPresent() && result.get().getId().equals(opinionEntry.getId()));
+        assertTrue(result.isPresent());
+        Document doc = result.get();
+        assertEquals(opinionEntry.getId(), doc.getId());
+        assertEquals(opinionEntry.getNarrative(), doc.getText());
+        assertEquals(opinionEntry.getSubject(), doc.getMetadata().get("subject"));
+        assertEquals(opinionEntry.getSummary(), doc.getMetadata().get("summary"));
+        assertEquals(opinionEntry.getPolarity(), (Double) doc.getMetadata().get("polarity"));
+        assertEquals(opinionEntry.getConfidence(), (Double) doc.getMetadata().get("confidence"));
+        assertEquals(opinionEntry.getStability(), (Double) doc.getMetadata().get("stability"));
+        assertEquals(opinionEntry.getMainDimension().name(), doc.getMetadata().get("mainDimension"));
     }
 
     @Test
     void delete_ShouldRemoveEntry() {
-
         // Given
         OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
         opinionRepository.save(toDocument(opinionEntry));

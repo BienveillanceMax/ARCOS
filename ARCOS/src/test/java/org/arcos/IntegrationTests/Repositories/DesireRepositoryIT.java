@@ -2,9 +2,7 @@ package org.arcos.IntegrationTests.Repositories;
 
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Repositories.DesireRepository;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import common.gson.LocalDateTimeAdapter;
+import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,22 +19,15 @@ class DesireRepositoryIT {
     @Autowired
     private DesireRepository desireRepository;
 
-    private final Gson gson = new GsonBuilder()
-            .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
-            .create();
-
     private Document toDocument(DesireEntry desireEntry) {
-        String content = desireEntry.getLabel() + ". " + desireEntry.getDescription();
-        Map<String, Object> metadata = new HashMap<>();
-        metadata.put("entry", gson.toJson(desireEntry));
-        return new Document(desireEntry.getId(), content, metadata);
+        String content = desireEntry.getDescription();
+        return new Document(desireEntry.getId(), content, desireEntry.getPayload());
     }
 
     @Test
-    void saveAndFindById_ShouldReturnSavedEntry() throws InterruptedException {
-        Thread.sleep(2000);
+    void saveAndFindById_ShouldReturnSavedEntry() {
         // Given
-        DesireEntry desireEntry = createDesireEntry();
+        DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(UUID.randomUUID().toString());
         desireRepository.save(toDocument(desireEntry));
 
         // When
@@ -44,12 +35,19 @@ class DesireRepositoryIT {
 
         // Then
         assertTrue(result.isPresent());
+        Document doc = result.get();
+        assertEquals(desireEntry.getId(), doc.getId());
+        assertEquals(desireEntry.getDescription(), doc.getText());
+        assertEquals(desireEntry.getLabel(), doc.getMetadata().get("label"));
+        assertEquals(desireEntry.getReasoning(), doc.getMetadata().get("reasoning"));
+        assertEquals(desireEntry.getIntensity(), (Double) doc.getMetadata().get("intensity"));
+        assertEquals(desireEntry.getStatus().name(), doc.getMetadata().get("status"));
     }
 
     @Test
     void delete_ShouldRemoveEntry() {
         // Given
-        DesireEntry desireEntry = createDesireEntry();
+        DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(UUID.randomUUID().toString());
         desireRepository.save(toDocument(desireEntry));
 
         // When
@@ -60,17 +58,7 @@ class DesireRepositoryIT {
         assertFalse(result.isPresent());
     }
 
-    DesireEntry createDesireEntry() {
-        DesireEntry desireEntry = new DesireEntry();
-        desireEntry.setId(UUID.randomUUID().toString());
-        desireEntry.setLabel("test label");
-        desireEntry.setDescription("description");
-        desireEntry.setEmbedding(new float[1024]); //todo change to correct embedding dimension
-        desireEntry.setReasoning("reasoning");
-        desireEntry.setIntensity(0.55);
-        desireEntry.setStatus(DesireEntry.Status.ACTIVE);
-        desireEntry.setCreatedAt(LocalDateTime.now());
-        return desireEntry;
-    }
+
 }
+
 

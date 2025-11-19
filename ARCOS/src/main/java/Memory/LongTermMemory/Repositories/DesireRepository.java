@@ -33,30 +33,30 @@ public class DesireRepository extends BaseVectorRepository<DesireEntry>
                 .filterExpression("status == 'PENDING'").build();    //TODO : implement
         return vectorStore.similaritySearch(searchRequest);
     }
-
     public Optional<Document> findById(String id) {
         try {
-            // Créer l'ID du point
             Points.PointId pointId = Points.PointId.newBuilder().setUuid(id).build();
 
-            // Récupérer le point de Qdrant
-            List<Points.RetrievedPoint> points = qdrantClient.retrieveAsync(collectionName,
+            Points.ReadConsistency readConsistency = Points.ReadConsistency.newBuilder()
+                    .setFactor(1)
+                    .build();
+
+            List<Points.RetrievedPoint> points = qdrantClient.retrieveAsync(
+                    collectionName,
                     pointId,
                     true,
                     true,
-                    Points.ReadConsistency.newBuilder().build()).get();
+                    readConsistency
+            ).get();
 
-            // Vérifier si le point existe
             if (points.isEmpty()) {
                 return Optional.empty();
             }
 
-            // Convertir le point récupéré en Document
             Points.RetrievedPoint point = points.get(0);
             Document document = DesireEntry.fromDesirePoint(point);
 
             return Optional.of(document);
-
 
         } catch (Exception e) {
             log.error("Erreur lors de la récupération du document avec l'id: " + id, e);

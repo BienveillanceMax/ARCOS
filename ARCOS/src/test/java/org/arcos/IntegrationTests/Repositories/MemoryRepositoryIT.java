@@ -3,15 +3,13 @@ package org.arcos.IntegrationTests.Repositories;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.Repositories.MemoryRepository;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import common.gson.LocalDateTimeAdapter;
+import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.ai.document.Document;
 
-import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,20 +23,18 @@ class MemoryRepositoryIT {
     @Autowired
     private MemoryRepository memoryRepository;
 
-    private final Gson gson = new GsonBuilder()
-            .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
-            .create();
-
     private Document toDocument(MemoryEntry memoryEntry) {
         Map<String, Object> metadata = new HashMap<>();
-        metadata.put("entry", gson.toJson(memoryEntry));
+        metadata.put("subject", memoryEntry.getSubject().name());
+        metadata.put("satisfaction", memoryEntry.getSatisfaction());
+        metadata.put("timestamp", memoryEntry.getTimestamp().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
         return new Document(memoryEntry.getId(), memoryEntry.getContent(), metadata);
     }
 
     @Test
     void saveAndFindById_ShouldReturnSavedEntry() {
         // Given
-        MemoryEntry memoryEntry = new MemoryEntry("test content", Subject.SELF, 0.9);
+        MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
         memoryRepository.save(toDocument(memoryEntry));
 
         // When
@@ -47,7 +43,10 @@ class MemoryRepositoryIT {
         // Then
         assertTrue(result.isPresent());
         Document doc = result.get();
-        assertEquals(memoryEntry.getContent(), doc.getMetadata().get("content"));
+        assertEquals(memoryEntry.getId(), doc.getId());
+        assertEquals(memoryEntry.getContent(), doc.getText());
+        assertEquals(memoryEntry.getSubject().name(), doc.getMetadata().get("subject"));
+        assertEquals(memoryEntry.getSatisfaction(), (Double) doc.getMetadata().get("satisfaction"));
     }
 
     @Test
@@ -64,4 +63,3 @@ class MemoryRepositoryIT {
         assertFalse(result.isPresent());
     }
 }
-
