@@ -52,7 +52,6 @@ public class PromptBuilder {
         appendOpinionContext(system, opinion, intensity);
         system.append(getValueProfile());
         appendDesireInstructions(system);
-        appendDesireJsonFormat(system);
         appendDesireConsiderations(system, opinion);
 
         return new Prompt(new SystemMessage(system.toString()));
@@ -110,7 +109,6 @@ public class PromptBuilder {
                 .append(" conservé comme souvenir long-terme.\n\n");
 
         system.append(fullConversation);
-        appendMemoryJsonFormat(system);
         appendMemoryRules(system);
 
         return new Prompt(new SystemMessage(system.toString()));
@@ -280,57 +278,7 @@ public class PromptBuilder {
         return "";
     }
 
-    // ==================== FORMATS JSON ====================
 
-    private void appendDesireJsonFormat(StringBuilder prompt) {
-        prompt.append("""
-        ## Format de Réponse Attendu
-        
-        Réponds uniquement avec un objet JSON contenant :
-        ```json
-        {
-          "label": "[Titre court et accrocheur du désir]",
-          "description": "[Description détaillée expliquant pourquoi ce désir découle de l'opinion et comment il s'aligne avec les valeurs]",
-          "intensity": [Valeur entre 0.0 et 1.0 représentant l'intensité du désir],
-          "reasoning": "[Explication du raisonnement reliant opinion, valeurs et désir généré]"
-        }
-        ```
-        
-        """);
-    }
-
-    private void appendOpinionJsonFormat(StringBuilder prompt) {
-        prompt.append("""
-        RÉPONDS UNIQUEMENT AVEC UN JSON STRICT au format suivant :
-        {
-          "subject": "Sujet principal spécifique de ton opinion",
-          "summary": "Résumé en 1-2 phrases",
-          "narrative": "Opinion détaillée (3-5 phrases), en expliquant ton raisonnement par rapport à tes valeurs",
-          "polarity": "Nombre entre -1 et 1 (-1=très négatif, 0=neutre, 1=très positif)",
-          "confidence": "Nombre entre 0 et 1 (0=ne croit pas du tout, 1=est persuadé)",
-          "mainDimension": "La dimension qui correspond le mieux à l'opinion exprimée, parmi celles déjà listées dans l'entrée. N'invente pas de nouvelle dimension."
-        }
-        
-        """);
-    }
-
-    private void appendMemoryJsonFormat(StringBuilder prompt) {
-        prompt.append("""
-        OBJECTIF :
-        - Produis UN UNIQUE OBJET JSON strict (aucun texte hors du JSON).
-        - Le JSON doit être compact, prêt à être stocké et embarqué (embedding).
-        
-        FORMAT DE SORTIE (RÉPONDS UNIQUEMENT AVEC CE JSON EXACT) :
-        {
-          "content": "Texte du souvenir (1-3 phrases, < 300 caractères) - résumé factuel prêt pour embedding",
-          "subject": "SELF|CREATOR|WORLD|OTHER",   // Choisis une des 4 valeurs EXACTES 
-          "summary": "Résumé en 1-2 phrases (objectif)",
-          "satisfaction": 0.0,         // nombre entre 0 et 10 (indique sentiment global lié à l'événement)
-          "importance": 0.0,           // nombre entre 0.0 et 1.0: importance/priority du souvenir
-        }
-        
-        """);
-    }
 
     // ==================== INSTRUCTIONS ====================
 
@@ -376,7 +324,6 @@ public class PromptBuilder {
     private void appendMemoryRules(StringBuilder prompt) {
         prompt.append("""
         RÈGLES / CONTRAINTIONS :
-        - N'invente pas d'autres clés JSON. Respecte uniquement les champs listés.
         - Le champ 'content' doit être factuel, utile pour une vectorisation (éviter discours trop long).
         - Choisis 'subject' parmi les 4 valeurs (si doute, renvoie OTHER).
         - Si la date n'est pas identifiable avec précision, pose une date approximative ISO_LOCAL_DATE_TIME.
