@@ -13,6 +13,10 @@ import Memory.ConversationContext;
 import Memory.LongTermMemory.service.MemoryService;
 import LLM.Prompts.PromptBuilder;
 import Personality.Desires.DesireService;
+import Personality.Mood.ConversationResponse;
+import Personality.Mood.MoodService;
+import Personality.Mood.MoodVoiceMapper;
+import Personality.Mood.PadState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,17 +40,19 @@ public class Orchestrator
     private final InitiativeService initiativeService;
     private final PiperEmbeddedTTSModule ttsHandler;
     private final PersonalityOrchestrator personalityOrchestrator;
+    private final MoodService moodService;
+    private final MoodVoiceMapper moodVoiceMapper;
 
     private LocalDateTime lastInteracted;
     private DesireService desireService;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule(), moodService, moodVoiceMapper);
         this.desireService = desireService;
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -55,6 +61,8 @@ public class Orchestrator
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
         this.ttsHandler = ttsHandler;
+        this.moodService = moodService;
+        this.moodVoiceMapper = moodVoiceMapper;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -62,7 +70,7 @@ public class Orchestrator
     public void dispatch(Event<?> event) {
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
-            ttsHandler.speak(processQuery((String) event.getPayload()));
+            processAndSpeak((String) event.getPayload());
         } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
@@ -96,9 +104,8 @@ public class Orchestrator
         }
     }
 
-    private String processQuery(String userQuery) {
+    private void processAndSpeak(String userQuery) {
         log.info("Processing query: {}", userQuery);
-
 
         // Search for relevant memories
         List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery);
@@ -106,17 +113,23 @@ public class Orchestrator
         // Create the prompt
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context,userQuery);
         log.info("Prompt: {}", prompt);
-        String answer = llmClient.generateChatResponse(prompt);
-        log.info("Answer: {}", answer);
 
+        ConversationResponse response = llmClient.generateConversationResponse(prompt);
+        log.info("Answer: {}", response.response);
+
+        // Update Mood
+        moodService.applyMoodUpdate(response.moodUpdate);
+
+        // Get Voice Parameters based on new Mood
+        PadState currentPad = context.getPadState();
+        MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
 
         // 7. Ajout à la mémoire à court terme.
         context.addUserMessage(userQuery);
-        context.addAssistantMessage(answer);
+        context.addAssistantMessage(response.response);
 
-        //log.info("Starting personality processing workflow...");
-        //triggerPersonalityProcessing(lastInteracted);
-        return answer;
+        // Speak with parameters
+        ttsHandler.speak(response.response, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {

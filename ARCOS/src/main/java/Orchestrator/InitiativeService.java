@@ -3,11 +3,19 @@ package Orchestrator;
 import LLM.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
+import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.service.MemoryService;
+import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
+import Personality.PersonalityOrchestrator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @Slf4j
@@ -15,66 +23,65 @@ public class InitiativeService {
 
     private final MemoryService memoryService;
     private final OpinionService opinionService;
+    private final DesireService desireService;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
+    private final PersonalityOrchestrator personalityOrchestrator;
 
     @Autowired
-    public InitiativeService(MemoryService memoryService, OpinionService opinionService, LLMClient llmClient, PromptBuilder promptBuilder) {
+    public InitiativeService(MemoryService memoryService, OpinionService opinionService, DesireService desireService, LLMClient llmClient, PromptBuilder promptBuilder, PersonalityOrchestrator personalityOrchestrator) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;
+        this.desireService = desireService;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
+        this.personalityOrchestrator = personalityOrchestrator;
     }
 
     public void processInitiative(DesireEntry desire) {
-        /*
         try {
             log.info("Processing initiative for desire: {}", desire.getLabel());
 
             // 1. Enrich context
             log.info("Step 1: Enriching context...");
-            List<MemoryEntry> memories = memoryService.searchMemories(desire.getDescription(), 5).stream()
-                    .map(SearchResult::getEntry)
-                    .collect(Collectors.toList());
-            List<OpinionEntry> opinions = memoryService.searchOpinions(desire.getDescription(), 5).stream()
-                    .map(SearchResult::getEntry)
-                    .collect(Collectors.toList());
+            List<MemoryEntry> memories = memoryService.searchMemories(desire.getDescription(), 5);
+            List<OpinionEntry> opinions = opinionService.searchOpinions(desire.getDescription());
 
-            // 2. Transform desire into a plan
-            log.info("Step 2: Transforming desire into a plan...");
-            String prompt = promptBuilder.buildInitiativePlanningPrompt(desire, memories, opinions);
-            String planningResponse = llmClient.generatePlanningResponse(prompt);
-            ExecutionPlan plan = responseParser.parseWithMistralRetry(planningResponse, 3);
-            log.info("Plan received from LLM: {}", plan.getReasoning());
+            // 2. Build Prompt and Execute
+            log.info("Step 2: Executing initiative via LLM Agent...");
+            Prompt prompt = promptBuilder.buildInitiativePrompt(desire, memories, opinions);
 
+            // The LLMClient is configured with tools, so it will autonomously execute actions
+            String result = llmClient.generateChatResponse(prompt); // This returns a String (content)
 
-            // 3. Execute the plan
-            log.info("Step 3: Executing plan...");
-            Map<String, ActionResult> results = actionExecutor.executeActions(plan);
-            log.info("Execution results: {}", results);
+            log.info("Initiative execution result: {}", result);
 
+            // 3. Update state
+            log.info("Step 3: Updating desire state...");
 
-            // 4. Update state
-            log.info("Step 4: Updating state...");
-            boolean allActionsSucceeded = results.values().stream().allMatch(ActionResult::isSuccess);
+            desire.setStatus(DesireEntry.Status.SATISFIED);
+            desire.setReasoning("Executed via initiative. Result: " + result);
+            desire.setLastUpdated(java.time.LocalDateTime.now());
 
-            if (allActionsSucceeded) {
-                desire.setStatus(DesireEntry.Status.SATISFIED);
-                log.info("Initiative '{}' was satisfied successfully.", desire.getLabel());
-            } else {
-                desire.setStatus(DesireEntry.Status.PENDING); // or a new FAILED status
-                log.warn("Initiative '{}' failed. Setting status back to PENDING.", desire.getLabel());
-            }
+            desireService.storeDesire(desire);
+            log.info("Initiative '{}' was satisfied successfully.", desire.getLabel());
+
+            // 4. Close BDI Loop (Memory -> Opinion)
+            log.info("Step 4: Forming memory of initiative...");
+            MemoryEntry memory = new MemoryEntry(
+                "I took initiative to " + desire.getDescription() + ". Result: " + result,
+                Subject.SELF,
+                0.8 // Assuming satisfaction
+            );
+            memoryService.storeMemory(memory);
+            personalityOrchestrator.processExplicitMemory(memory);
 
         } catch (Exception e) {
             log.error("An unexpected error occurred while processing initiative {}", desire.getId(), e);
             desire.setStatus(DesireEntry.Status.PENDING); // Revert to PENDING on failure
-        } finally {
             desire.setLastUpdated(java.time.LocalDateTime.now());
-            memoryService.storeDesire(desire);
-            log.info("Desire {} updated in database with status {}", desire.getId(), desire.getStatus());
+            desireService.storeDesire(desire);
+            throw new RuntimeException(e);
         }
-
-        */
     }
 }

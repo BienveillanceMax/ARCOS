@@ -11,6 +11,11 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.InitiativeService;
 import Orchestrator.Orchestrator;
+import Personality.Mood.ConversationResponse;
+import Personality.Mood.MoodService;
+import Personality.Mood.MoodUpdate;
+import Personality.Mood.MoodVoiceMapper;
+import Personality.Mood.PadState;
 import Personality.PersonalityOrchestrator;
 import Producers.WakeWordProducer;
 import Tools.SearchTool.BraveSearchService;
@@ -24,6 +29,8 @@ import org.springframework.ai.chat.prompt.Prompt;
 import java.util.Collections;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyFloat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -63,6 +70,12 @@ class OrchestratorTest {
     @Mock
     private PiperEmbeddedTTSModule piperEmbeddedTTSModule;
 
+    @Mock
+    private MoodService moodService;
+
+    @Mock
+    private MoodVoiceMapper moodVoiceMapper;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -74,7 +87,9 @@ class OrchestratorTest {
                 conversationContext,
                 memoryService,
                 initiativeService,
-                piperEmbeddedTTSModule
+                piperEmbeddedTTSModule,
+                moodService,
+                moodVoiceMapper
         );
     }
 
@@ -83,10 +98,20 @@ class OrchestratorTest {
         // Given
         String userQuery = "test query";
         Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, userQuery, "test");
+
+        ConversationResponse response = new ConversationResponse();
+        response.response = "test answer";
+        response.moodUpdate = new MoodUpdate();
+
         when(memoryService.searchMemories(userQuery)).thenReturn(Collections.emptyList());
         when(promptBuilder.buildConversationnalPrompt(any(ConversationContext.class), any(String.class))).thenReturn(new Prompt(""));
-        when(llmClient.generateChatResponse(any(Prompt.class))).thenReturn("test answer");
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class));
+        when(llmClient.generateConversationResponse(any(Prompt.class))).thenReturn(response);
+
+        // Mock MoodVoiceMapper
+        when(conversationContext.getPadState()).thenReturn(new PadState());
+        when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
+
+        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class), anyFloat(), anyFloat(), anyFloat());
 
         // When
         orchestrator.dispatch(wakeWordEvent);
@@ -94,10 +119,11 @@ class OrchestratorTest {
         // Then
         verify(memoryService).searchMemories(userQuery);
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
-        verify(llmClient).generateChatResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule).speak("test answer");
+        verify(llmClient).generateConversationResponse(any(Prompt.class));
+        verify(piperEmbeddedTTSModule).speak(eq("test answer"), anyFloat(), anyFloat(), anyFloat());
         verify(conversationContext).addUserMessage(userQuery);
         verify(conversationContext).addAssistantMessage("test answer");
+        verify(moodService).applyMoodUpdate(any(MoodUpdate.class));
     }
 
     @Test

@@ -6,6 +6,8 @@ import LLM.service.RateLimiterService;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
+import Personality.Mood.ConversationResponse;
+import Personality.Mood.MoodUpdate;
 import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
 import Tools.Actions.SearchActions;
@@ -71,5 +73,19 @@ public class LLMClient
                 .entity(DesireEntry.class);
     }
 
+    @RateLimiter(name = "mistral_free")
+    public MoodUpdate generateMoodUpdate(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .call()
+                .entity(MoodUpdate.class);
+    }
+
+    @RateLimiter(name = "mistral_free")
+    public ConversationResponse generateConversationResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .call()
+                .entity(ConversationResponse.class);
+    }
 
 }

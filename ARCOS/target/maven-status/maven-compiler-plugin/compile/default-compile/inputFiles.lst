@@ -28,7 +28,6 @@
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/MemoryEntry.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/OpinionEntry.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/QdrantEntry.java
-/app/ARCOS/src/main/java/Memory/LongTermMemory/Models/SearchResult/SearchResult.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/Subject.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Qdrant/QdrantClientProvider.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Repositories/BaseVectorRepository.java
@@ -41,6 +40,12 @@
 /app/ARCOS/src/main/java/Orchestrator/InitiativeService.java
 /app/ARCOS/src/main/java/Orchestrator/Orchestrator.java
 /app/ARCOS/src/main/java/Personality/Desires/DesireService.java
+/app/ARCOS/src/main/java/Personality/Mood/ConversationResponse.java
+/app/ARCOS/src/main/java/Personality/Mood/Mood.java
+/app/ARCOS/src/main/java/Personality/Mood/MoodService.java
+/app/ARCOS/src/main/java/Personality/Mood/MoodUpdate.java
+/app/ARCOS/src/main/java/Personality/Mood/MoodVoiceMapper.java
+/app/ARCOS/src/main/java/Personality/Mood/PadState.java
 /app/ARCOS/src/main/java/Personality/Opinions/OpinionService.java
 /app/ARCOS/src/main/java/Personality/PersonalityOrchestrator.java
 /app/ARCOS/src/main/java/Personality/Values/Entities/DimensionSchwartz.java

@@ -8,6 +8,8 @@ import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Orchestrator.Entities.ExecutionPlan;
 import Orchestrator.Entities.Parameter;
+import Personality.Mood.Mood;
+import Personality.Mood.PadState;
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.Entities.ValueSchwartz;
 import Personality.Values.ValueProfile;
@@ -100,6 +102,37 @@ public class PromptBuilder {
         return new PromptTemplate(templateText).create(model);
     }
 
+    public Prompt buildInitiativePrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
+        String templateText = """
+        Tu es Calcifer. Tu as décidé de prendre une initiative basée sur tes désirs internes.
+
+        **Ton Désir :** {desireDesc}
+        **Raisonnement :** {desireReasoning}
+
+        **Contexte Mémoriel :**
+        {memories}
+
+        **Contexte d'Opinions :**
+        {opinions}
+
+        **Ta Mission :**
+        Utilise les outils à ta disposition pour satisfaire ce désir.
+        Si tu as besoin d'informations, cherche-les.
+        Si tu dois planifier, utilise le calendrier.
+        Si tu dois exécuter du code, utilise Python.
+
+        Une fois l'action terminée, résume ce que tu as fait.
+        """;
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("desireDesc", desire.getDescription());
+        model.put("desireReasoning", desire.getReasoning());
+        model.put("memories", memories.stream().map(MemoryEntry::getContent).collect(Collectors.joining("\n")));
+        model.put("opinions", opinions.stream().map(OpinionEntry::getSummary).collect(Collectors.joining("\n")));
+
+        return new PromptTemplate(templateText).create(model);
+    }
+
     public Prompt buildMemoryPrompt(String fullConversation) {
         StringBuilder system = new StringBuilder();
 
@@ -119,14 +152,42 @@ public class PromptBuilder {
 
         StringBuilder system = new StringBuilder();
         system.append(getCalciferPersonality());
+        appendMoodInfo(system, context);
         system.append(getValueProfile());
         system.append(getGeneralInformation());
+        appendOutputFormatInstructions(system);
         system.append(getConversationContextIfPresent(context));
 
         messages.add(new SystemMessage(system.toString()));
         messages.add(new UserMessage(originalQuery));
 
         return new Prompt(messages);
+    }
+
+    public Prompt buildMoodUpdatePrompt(PadState currentState, String userMessage, String assistantMessage) {
+        String templateText = """
+        Tu es le système émotionnel de Calcifer. Ton rôle est d'ajuster l'état émotionnel (PAD) en fonction du dernier échange.
+
+        État actuel : {currentState}
+
+        Analyse l'échange suivant :
+        Utilisateur : "{userMessage}"
+        Calcifer : "{assistantMessage}"
+
+        Détermine l'impact sur les 3 axes (-0.2 à +0.2 par tour typiquement, max -0.5/+0.5 pour événements majeurs) :
+        - Pleasure (P) : Positif (Joie/Satisfaction) vs Négatif (Douleur/Insatisfaction)
+        - Arousal (A) : Élevé (Excitation/Colère) vs Bas (Calme/Ennui)
+        - Dominance (D) : Dominant (Contrôle/Confiance) vs Soumis (Doute/Peur)
+
+        Retourne UNIQUEMENT le JSON avec les deltas.
+        """;
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("currentState", currentState.toString());
+        model.put("userMessage", userMessage);
+        model.put("assistantMessage", assistantMessage);
+
+        return new PromptTemplate(templateText).create(model);
     }
 
     // ==================== SECTIONS COMMUNES ====================
@@ -156,6 +217,32 @@ public class PromptBuilder {
         - **Honnête:** Si une action a échoué ou si tu ne peux pas répondre, admets-le simplement.
         
         """;
+    }
+
+    private void appendMoodInfo(StringBuilder prompt, ConversationContext context) {
+        PadState pad = context.getPadState();
+        Mood mood = Mood.fromPadState(pad);
+        prompt.append("## Humeur Actuelle\n");
+        prompt.append("**État Émotionnel :** ").append(mood.getLabel()).append("\n");
+        prompt.append("**Description :** ").append(mood.getDescription()).append("\n");
+        prompt.append("**Indicateurs PAD :** ").append(pad.toString()).append("\n\n");
+    }
+
+    private void appendOutputFormatInstructions(StringBuilder system) {
+        system.append("""
+        ## Format de Réponse
+        Tu dois répondre UNIQUEMENT au format JSON, structuré comme suit :
+        {
+          "response": "Ta réponse textuelle à l'utilisateur ici.",
+          "mood_update": {
+            "delta_pleasure": 0.1,
+            "delta_arousal": 0.0,
+            "delta_dominance": -0.1,
+            "reasoning": "Explication de ton changement d'humeur."
+          }
+        }
+        - delta_pleasure, delta_arousal, delta_dominance : valeurs entre -0.5 et +0.5 indiquant l'impact de cet échange sur ton humeur actuelle.
+        """);
     }
 
     // ==================== SECTIONS VALEURS ====================

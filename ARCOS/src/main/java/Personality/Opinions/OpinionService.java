@@ -105,6 +105,12 @@ public class OpinionService {
         return opinionEntries;
     }
 
+    public List<OpinionEntry> searchOpinions(String query) {
+        SearchRequest searchRequest = SearchRequest.builder().query(query).topK(5).build();
+        List<Document> docs = opinionRepository.search(searchRequest);
+        return docs.stream().map(this::fromDocument).collect(Collectors.toList());
+    }
+
     private double calculateDeltaC(OpinionEntry opinionEntry, double networkConsistency, double imp, int sOld, int sExp) {
         double deltaC;
         if (sOld == 0) {

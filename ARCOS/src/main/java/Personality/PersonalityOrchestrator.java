@@ -38,6 +38,10 @@ public class PersonalityOrchestrator
         if (memoryEntry == null) {
             return;
         }
+        processExplicitMemory(memoryEntry);
+    }
+
+    public void processExplicitMemory(MemoryEntry memoryEntry) {
         List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
         if (opinionEntries == null) {
             return;
