@@ -70,6 +70,8 @@ public abstract class BaseVectorRepository<T>
         vectorStore.delete(ids);
     }
 
+
+    @RateLimiter(name = "mistral_free")
     public List<Document> search(SearchRequest searchRequest) {
         return vectorStore.similaritySearch(searchRequest);
     }
