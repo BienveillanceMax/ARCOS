@@ -73,12 +73,6 @@ public class LLMClient
                 .entity(DesireEntry.class);
     }
 
-    @RateLimiter(name = "mistral_free")
-    public MoodUpdate generateMoodUpdate(Prompt prompt) {
-        return chatClient.prompt(prompt)
-                .call()
-                .entity(MoodUpdate.class);
-    }
 
     @RateLimiter(name = "mistral_free")
     public ConversationResponse generateConversationResponse(Prompt prompt) {

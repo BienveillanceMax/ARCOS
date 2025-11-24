@@ -78,4 +78,3 @@ public abstract class BaseVectorRepository<T>
 
     public abstract Optional<Document> findById(String id);
 }
-

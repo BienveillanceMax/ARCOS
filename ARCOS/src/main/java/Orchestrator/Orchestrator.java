@@ -71,6 +71,9 @@ public class Orchestrator
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
             processAndSpeak((String) event.getPayload());
+            triggerPersonalityProcessing(lastInteracted);
+            lastInteracted = LocalDateTime.now();
+
         } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
@@ -86,8 +89,6 @@ public class Orchestrator
             ttsHandler.speak(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
         }
-        triggerPersonalityProcessing(lastInteracted);
-        lastInteracted = LocalDateTime.now();
 
     }
 
@@ -108,7 +109,7 @@ public class Orchestrator
         log.info("Processing query: {}", userQuery);
 
         // Search for relevant memories
-        List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery);
+        //List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery);
 
         // Create the prompt
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context,userQuery);
