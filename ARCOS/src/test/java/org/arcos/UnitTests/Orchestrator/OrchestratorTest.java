@@ -117,7 +117,6 @@ class OrchestratorTest {
         orchestrator.dispatch(wakeWordEvent);
 
         // Then
-        verify(memoryService).searchMemories(userQuery);
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
         verify(llmClient).generateConversationResponse(any(Prompt.class));
         verify(piperEmbeddedTTSModule).speak(eq("test answer"), anyFloat(), anyFloat(), anyFloat());

@@ -2,6 +2,7 @@ package Tools.Actions;
 
 import Memory.Actions.Entities.ActionResult;
 import Tools.PythonTool.PythonExecutor;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,7 @@ public class PythonActions
 {
     PythonExecutor pythonExecutor = new PythonExecutor();
 
+    @RateLimiter(name = "mistral_free")
     @Tool(name = "Executeur_Python", description = "Execute du code python et retourne le contenu de stdout" )
     public ActionResult executePythonCode(String code) {
         long startTime = System.currentTimeMillis();

@@ -97,9 +97,10 @@ class DesireServiceTest {
         // Given
         OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
         DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(opinionEntry.getId());
+        opinionEntry.setAssociatedDesire(desireEntry.getId());
 
         Document desireDocument = new Document(desireEntry.getId(), "test", desireEntry.getPayload());
-        when(desireRepository.findById("desire-1")).thenReturn(Optional.of(desireDocument));
+        when(desireRepository.findById(desireEntry.getId())).thenReturn(Optional.of(desireDocument));
         when(valueProfile.averageByDimension(any())).thenReturn(50.0);
         when(valueProfile.calculateValueAlignment(any())).thenReturn(1.0);
 
