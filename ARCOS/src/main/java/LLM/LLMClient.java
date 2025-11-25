@@ -15,10 +15,10 @@ import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
-public class LLMClient
-{
+public class LLMClient {
 
     private final ChatClient chatClient;
     private final CalendarActions calendarActions;
@@ -75,11 +75,10 @@ public class LLMClient
 
 
     @RateLimiter(name = "mistral_free")
-    public ConversationResponse generateConversationResponse(Prompt prompt) {
+    public Flux<String> generateConversationResponseStream(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
-                .call()
-                .entity(ConversationResponse.class);
+                .stream()
+                .content();
     }
-
 }

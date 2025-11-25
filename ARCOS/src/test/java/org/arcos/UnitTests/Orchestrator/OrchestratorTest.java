@@ -25,6 +25,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.prompt.Prompt;
+import reactor.core.publisher.Flux;
 
 import java.util.Collections;
 
@@ -32,6 +33,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -99,30 +101,33 @@ class OrchestratorTest {
         String userQuery = "test query";
         Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, userQuery, "test");
 
-        ConversationResponse response = new ConversationResponse();
-        response.response = "test answer";
-        response.moodUpdate = new MoodUpdate();
+        String mockJsonResponse = "{\"response\":\"This is a test. Another test!\",\"mood_update\":{\"pleasure\":0.1,\"arousal\":0.2,\"dominance\":0.3}}";
+        Flux<String> responseFlux = Flux.just(
+                mockJsonResponse.substring(0, 20),
+                mockJsonResponse.substring(20, 40),
+                mockJsonResponse.substring(40)
+        );
 
-        when(memoryService.searchMemories(userQuery)).thenReturn(Collections.emptyList());
         when(promptBuilder.buildConversationnalPrompt(any(ConversationContext.class), any(String.class))).thenReturn(new Prompt(""));
-        when(llmClient.generateConversationResponse(any(Prompt.class))).thenReturn(response);
-
-        // Mock MoodVoiceMapper
+        when(llmClient.generateConversationResponseStream(any(Prompt.class))).thenReturn(responseFlux);
         when(conversationContext.getPadState()).thenReturn(new PadState());
         when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
-
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class), anyFloat(), anyFloat(), anyFloat());
 
         // When
         orchestrator.dispatch(wakeWordEvent);
 
         // Then
-        verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
-        verify(llmClient).generateConversationResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule).speak(eq("test answer"), anyFloat(), anyFloat(), anyFloat());
-        verify(conversationContext).addUserMessage(userQuery);
-        verify(conversationContext).addAssistantMessage("test answer");
-        verify(moodService).applyMoodUpdate(any(MoodUpdate.class));
+        verify(promptBuilder, timeout(1000)).buildConversationnalPrompt(conversationContext, userQuery);
+        verify(llmClient, timeout(1000)).generateConversationResponseStream(any(Prompt.class));
+
+        // Verify TTS calls for each sentence
+        verify(piperEmbeddedTTSModule, timeout(1000)).speak(eq("This is a test."), anyFloat(), anyFloat(), anyFloat());
+        verify(piperEmbeddedTTSModule, timeout(1000)).speak(eq("Another test!"), anyFloat(), anyFloat(), anyFloat());
+
+        // Verify context and mood updates
+        verify(conversationContext, timeout(1000)).addUserMessage(userQuery);
+        verify(conversationContext, timeout(1000)).addAssistantMessage("This is a test. Another test!");
+        verify(moodService, timeout(1000)).applyMoodUpdate(any(MoodUpdate.class));
     }
 
     @Test

@@ -17,21 +17,35 @@ import Personality.Mood.ConversationResponse;
 import Personality.Mood.MoodService;
 import Personality.Mood.MoodVoiceMapper;
 import Personality.Mood.PadState;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.text.StringEscapeUtils;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import Personality.PersonalityOrchestrator;
 
 
+import java.io.IOException;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Component
 @Slf4j
 public class Orchestrator
 {
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final JsonFactory jsonFactory = new JsonFactory();
     private final EventQueue eventQueue;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
@@ -108,29 +122,118 @@ public class Orchestrator
     private void processAndSpeak(String userQuery) {
         log.info("Processing query: {}", userQuery);
 
-        // Search for relevant memories
-        //List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery);
+        StringBuilder fullJsonResponse = new StringBuilder();
+        Queue<String> sentencesToSpeak = new ConcurrentLinkedQueue<>();
+        AtomicBoolean streamingComplete = new AtomicBoolean(false);
 
-        // Create the prompt
-        Prompt prompt = promptBuilder.buildConversationnalPrompt(context,userQuery);
-        log.info("Prompt: {}", prompt);
-
-        ConversationResponse response = llmClient.generateConversationResponse(prompt);
-        log.info("Answer: {}", response.response);
-
-        // Update Mood
-        moodService.applyMoodUpdate(response.moodUpdate);
-
-        // Get Voice Parameters based on new Mood
         PadState currentPad = context.getPadState();
         MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
 
-        // 7. Ajout à la mémoire à court terme.
-        context.addUserMessage(userQuery);
-        context.addAssistantMessage(response.response);
+        CompletableFuture.runAsync(() -> {
+            while (!streamingComplete.get() || !sentencesToSpeak.isEmpty()) {
+                String sentence = sentencesToSpeak.poll();
+                if (sentence != null) {
+                    String unescapedSentence = StringEscapeUtils.unescapeJson(sentence);
+                    log.info("Speaking sentence: {}", unescapedSentence);
+                    ttsHandler.speak(unescapedSentence, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                } else {
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
+            }
+        });
 
-        // Speak with parameters
-        ttsHandler.speak(response.response, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+        try {
+            PipedOutputStream outputStream = new PipedOutputStream();
+            PipedInputStream inputStream = new PipedInputStream(outputStream);
+
+            // Parser thread
+            CompletableFuture<Void> parsingFuture = CompletableFuture.runAsync(() -> {
+                try (JsonParser parser = jsonFactory.createParser(inputStream)) {
+                    StringBuilder sentenceBuffer = new StringBuilder();
+                    JsonToken token;
+                    while ((token = parser.nextToken()) != null) {
+                        if (token == JsonToken.FIELD_NAME && "response".equals(parser.getCurrentName())) {
+                            while (parser.nextToken() != JsonToken.VALUE_STRING) {
+                                // Find the value token
+                            }
+                            String text = parser.getText();
+                            sentenceBuffer.append(text);
+                            processTextForSentences(sentenceBuffer, sentencesToSpeak);
+                        }
+                    }
+                } catch (IOException e) {
+                    log.error("Error while parsing JSON stream", e);
+                }
+            });
+
+            // Subscriber thread
+            Prompt prompt = promptBuilder.buildConversationnalPrompt(context, userQuery);
+            log.info("Prompt: {}", prompt);
+
+            llmClient.generateConversationResponseStream(prompt)
+                    .doOnNext(chunk -> {
+                        try {
+                            fullJsonResponse.append(chunk);
+                            outputStream.write(chunk.getBytes(StandardCharsets.UTF_8));
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    })
+                    .doOnError(error -> {
+                        log.error("Error during streaming: {}", error.getMessage());
+                        try {
+                            outputStream.close();
+                        } catch (IOException e) {
+                            // ignore
+                        }
+                        streamingComplete.set(true);
+                    })
+                    .doOnComplete(() -> {
+                        log.info("Streaming complete.");
+                        try {
+                            outputStream.close();
+                        } catch (IOException e) {
+                            // ignore
+                        }
+                        parsingFuture.join(); // Wait for parser to finish
+                        streamingComplete.set(true);
+                        try {
+                            ConversationResponse response = objectMapper.readValue(fullJsonResponse.toString(), ConversationResponse.class);
+                            if (response != null) {
+                                if (response.moodUpdate != null) {
+                                    moodService.applyMoodUpdate(response.moodUpdate);
+                                    log.info("Mood updated successfully.");
+                                }
+                                context.addUserMessage(userQuery);
+                                context.addAssistantMessage(response.response);
+                                log.info("Conversation context updated.");
+                            }
+                        } catch (Exception e) {
+                            log.error("Failed to parse final JSON response or update context", e);
+                        }
+                    })
+                    .subscribe();
+        } catch (IOException e) {
+            log.error("Failed to set up piped streams", e);
+        }
+    }
+
+    private void processTextForSentences(StringBuilder textBuffer, Queue<String> sentencesToSpeak) {
+        String[] sentences = textBuffer.toString().split("(?<=[.!?])\\s*");
+        textBuffer.setLength(0);
+        for (int i = 0; i < sentences.length; i++) {
+            String sentence = sentences[i];
+            if (i == sentences.length - 1 && !sentence.endsWith(".") && !sentence.endsWith("!") && !sentence.endsWith("?")) {
+                textBuffer.append(sentence);
+            } else if (!sentence.isEmpty()) {
+                sentencesToSpeak.add(sentence);
+            }
+        }
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
