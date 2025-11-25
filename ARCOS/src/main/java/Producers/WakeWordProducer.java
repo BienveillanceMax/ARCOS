@@ -1,7 +1,7 @@
 package Producers;
 
-import EventBus.EventQueue;
 import EventBus.Events.WakeWordEvent;
+import EventBus.PersistentEventQueue;
 import IO.InputHandling.SpeechToText;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
@@ -32,7 +32,7 @@ public class WakeWordProducer implements Runnable {
     private final int audioDeviceIndex;
     private final SpeechToText speechToText;
     private TargetDataLine micDataLine;
-    private final EventQueue eventQueue;
+    private final PersistentEventQueue eventQueue;
 
     private static final int MIC_SAMPLE_RATE = 44100;
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
@@ -54,7 +54,7 @@ public class WakeWordProducer implements Runnable {
     }
 
     @Autowired
-    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl) {
+    public WakeWordProducer(PersistentEventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl) {
         log.info("Initializing WakeWordProducer");
         this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";

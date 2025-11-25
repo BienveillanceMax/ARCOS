@@ -40,6 +40,7 @@ services:
     depends_on:
       - qdrant
       - faster-whisper
+      - postgres
 
     env_file: .env
 
@@ -81,5 +82,19 @@ services:
       - audio
       - ${BLUETOOTH_GID:-996}  # GID du groupe bluetooth de l'hôte
 
+  postgres:
+    image: postgres:13
+    container_name: arcos_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: arcos_db
+      POSTGRES_USER: arcos_user
+      POSTGRES_PASSWORD: arcos_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
 volumes:
   qdrant_storage:
+  postgres_data:

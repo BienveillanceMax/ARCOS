@@ -1,8 +1,8 @@
 package org.arcos.UnitTests.Orchestrator;
 
-import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
+import EventBus.PersistentEventQueue;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
 import LLM.LLMClient;
 import LLM.Prompts.PromptBuilder;
@@ -41,7 +41,7 @@ class OrchestratorTest {
     private Orchestrator orchestrator;
 
     @Mock
-    private EventQueue eventQueue;
+    private PersistentEventQueue eventQueue;
 
     @Mock
     private LLMClient llmClient;

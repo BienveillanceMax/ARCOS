@@ -1,8 +1,10 @@
-/app/ARCOS/src/main/java/EventBus/EventQueue.java
 /app/ARCOS/src/main/java/EventBus/Events/Event.java
 /app/ARCOS/src/main/java/EventBus/Events/EventPriority.java
 /app/ARCOS/src/main/java/EventBus/Events/EventType.java
 /app/ARCOS/src/main/java/EventBus/Events/WakeWordEvent.java
+/app/ARCOS/src/main/java/EventBus/PersistentEventQueue.java
+/app/ARCOS/src/main/java/EventBus/persistence/PersistentEvent.java
+/app/ARCOS/src/main/java/EventBus/persistence/PersistentEventRepository.java
 /app/ARCOS/src/main/java/Exceptions/DesireCreationException.java
 /app/ARCOS/src/main/java/Exceptions/ResponseParsingException.java
 /app/ARCOS/src/main/java/Exceptions/SearchException.java
@@ -58,9 +60,11 @@
 /app/ARCOS/src/main/java/Tools/Actions/CalendarActions.java
 /app/ARCOS/src/main/java/Tools/Actions/PythonActions.java
 /app/ARCOS/src/main/java/Tools/Actions/SearchActions.java
+/app/ARCOS/src/main/java/Tools/CalendarTool/CalendarEvent.java
 /app/ARCOS/src/main/java/Tools/CalendarTool/CalendarService.java
 /app/ARCOS/src/main/java/Tools/CalendarTool/CalendarToolConfig.java
 /app/ARCOS/src/main/java/Tools/PythonTool/PythonExecutor.java
 /app/ARCOS/src/main/java/Tools/SearchTool/BraveSearchConfig.java
 /app/ARCOS/src/main/java/Tools/SearchTool/BraveSearchService.java
+/app/ARCOS/src/main/java/com/arcos/config/GsonConfig.java
 /app/ARCOS/src/main/java/org/arcos/ArcosApplication.java

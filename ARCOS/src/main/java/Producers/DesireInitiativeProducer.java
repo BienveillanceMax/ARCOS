@@ -1,8 +1,8 @@
 package Producers;
 
-import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventPriority;
+import EventBus.PersistentEventQueue;
 import EventBus.Events.EventType;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Repositories.DesireRepository;
@@ -25,11 +25,11 @@ public class DesireInitiativeProducer {
 
     private static final double INITIATIVE_THRESHOLD = 0.8;
 
-    private final EventQueue eventQueue;
+    private final PersistentEventQueue eventQueue;
     private final DesireService desireService;
 
     @Autowired
-    public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService) {
+    public DesireInitiativeProducer(PersistentEventQueue eventQueue, DesireService desireService) {
         this.eventQueue = eventQueue;
         this.desireService = desireService;
     }

@@ -1,8 +1,8 @@
 package Orchestrator;
 
-import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
+import EventBus.PersistentEventQueue;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -32,7 +32,7 @@ import java.util.concurrent.CompletableFuture;
 @Slf4j
 public class Orchestrator
 {
-    private final EventQueue eventQueue;
+    private final PersistentEventQueue eventQueue;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
     private final ConversationContext context;
@@ -47,12 +47,12 @@ public class Orchestrator
     private DesireService desireService;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, PersistentEventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
         this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule(), moodService, moodVoiceMapper);
         this.desireService = desireService;
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, PersistentEventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;

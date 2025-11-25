@@ -1,8 +1,8 @@
 package Producers;
 
-import EventBus.EventQueue;
 import EventBus.Events.EventPriority;
 import EventBus.Events.EventType;
+import EventBus.PersistentEventQueue;
 import LLM.LLMClient;
 import Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
@@ -20,9 +20,9 @@ import java.util.List;
 public class CalendarEventNotificationScheduler {
 
     private final CalendarService calendarService;
-    private final EventQueue eventQueue;
+    private final PersistentEventQueue eventQueue;
 
-    public CalendarEventNotificationScheduler(CalendarService calendarService, EventQueue eventQueue ) {
+    public CalendarEventNotificationScheduler(CalendarService calendarService, PersistentEventQueue eventQueue ) {
         this.calendarService = calendarService;
         this.eventQueue = eventQueue;
     }
