@@ -32,16 +32,19 @@ public class LLMClient
     private final SearchActions searchActions;
 
 
+    private final ObjectMapper objectMapper;
+
     public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions) {
         this.chatClient = chatClientBuilder.build();
         this.calendarActions = calendarActions;
         this.pythonActions = pythonActions;
         this.searchActions = searchActions;
 
-        ObjectMapper mapper = JsonMapper.builder()
+        this.objectMapper = JsonMapper.builder()
                 .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
+                .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
                 .build();
-        converter = new BeanOutputConverter<>(MoodUpdate.class, mapper);
+        converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
     }
 
 
@@ -64,7 +67,7 @@ public class LLMClient
     public MemoryEntry generateMemoryResponse(Prompt prompt) throws ResponseParsingException {
         return chatClient.prompt(prompt)
                 .call()
-                .entity(MemoryEntry.class);
+                .entity(new BeanOutputConverter<>(MemoryEntry.class, this.objectMapper));
     }
 
     @RateLimiter(name = "mistral_free")
@@ -72,14 +75,14 @@ public class LLMClient
         return chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
-                .entity(OpinionEntry.class);
+                .entity(new BeanOutputConverter<>(OpinionEntry.class, this.objectMapper));
     }
 
     @RateLimiter(name = "mistral_free")
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
         return chatClient.prompt(prompt)
                 .call()
-                .entity(DesireEntry.class);
+                .entity(new BeanOutputConverter<>(DesireEntry.class, this.objectMapper));
     }
 
 
@@ -88,7 +91,7 @@ public class LLMClient
         return chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
-                .entity(ConversationResponse.class);
+                .entity(new BeanOutputConverter<>(ConversationResponse.class, this.objectMapper));
     }
 
     @RateLimiter(name = "mistral_free")

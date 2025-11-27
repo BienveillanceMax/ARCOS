@@ -68,6 +68,7 @@ public class PromptBuilder {
 
         appendValuesAnalysis(system);
         appendMemoryContext(system, memory);
+        appendOpinionRules(system);
         return new Prompt(new SystemMessage(system.toString()));
     }
 
@@ -405,6 +406,7 @@ public class PromptBuilder {
         - Si le souvenir les renforce, sois positif.
         - Prends en compte les tensions internes et les moyennes de dimension.
         - Ne sors QUE le JSON, sans texte additionnel.
+        - IMPORTANT : Si tu inclus des sauts de ligne dans le texte (ex: narrative), utilise '\\n' au lieu de vrais sauts de ligne.
         """);
     }
 
