@@ -11,7 +11,6 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.InitiativeService;
 import Orchestrator.Orchestrator;
-import Personality.Mood.ConversationResponse;
 import Personality.Mood.MoodService;
 import Personality.Mood.MoodUpdate;
 import Personality.Mood.MoodVoiceMapper;
@@ -28,12 +27,12 @@ import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.Collections;
 
+import reactor.core.publisher.Flux;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyFloat;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 class OrchestratorTest {
 
@@ -94,18 +93,22 @@ class OrchestratorTest {
     }
 
     @Test
-    void dispatch_WakeWordEvent_ShouldProcessQuery() {
+    void dispatch_WakeWordEvent_ShouldProcessQueryAndStreamResponse() {
         // Given
         String userQuery = "test query";
         Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, userQuery, "test");
+        String responseChunk1 = "Test ";
+        String responseChunk2 = "answer.";
+        String fullResponse = responseChunk1 + responseChunk2;
+        Flux<String> responseStream = Flux.just(responseChunk1, responseChunk2);
+        MoodUpdate moodUpdate = new MoodUpdate();
 
-        ConversationResponse response = new ConversationResponse();
-        response.response = "test answer";
-        response.moodUpdate = new MoodUpdate();
-
-        when(memoryService.searchMemories(userQuery)).thenReturn(Collections.emptyList());
         when(promptBuilder.buildConversationnalPrompt(any(ConversationContext.class), any(String.class))).thenReturn(new Prompt(""));
-        when(llmClient.generateConversationResponse(any(Prompt.class))).thenReturn(response);
+        when(llmClient.generateStreamingChatResponse(any(Prompt.class))).thenReturn(responseStream);
+
+        // For the async part
+        when(promptBuilder.buildMoodUpdatePrompt(any(), any(), any())).thenReturn(new Prompt(""));
+        when(llmClient.generateMoodUpdateResponse(any(Prompt.class))).thenReturn(moodUpdate);
 
         // Mock MoodVoiceMapper
         when(conversationContext.getPadState()).thenReturn(new PadState());
@@ -117,12 +120,20 @@ class OrchestratorTest {
         orchestrator.dispatch(wakeWordEvent);
 
         // Then
+        // Verify streaming part
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
-        verify(llmClient).generateConversationResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule).speak(eq("test answer"), anyFloat(), anyFloat(), anyFloat());
+        verify(llmClient).generateStreamingChatResponse(any(Prompt.class));
+        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
+        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk2), anyFloat(), anyFloat(), anyFloat());
+
+        // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);
-        verify(conversationContext).addAssistantMessage("test answer");
-        verify(moodService).applyMoodUpdate(any(MoodUpdate.class));
+        verify(conversationContext).addAssistantMessage(fullResponse);
+
+        // Verify async part with timeout
+        verify(moodService, timeout(1000)).applyMoodUpdate(any(MoodUpdate.class));
+        verify(llmClient, timeout(1000)).generateMoodUpdateResponse(any(Prompt.class));
+        verify(promptBuilder, timeout(1000)).buildMoodUpdatePrompt(any(), eq(userQuery), eq(fullResponse));
     }
 
     @Test
