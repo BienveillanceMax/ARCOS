@@ -134,6 +134,12 @@
         </dependency>
 
         <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-text</artifactId>
+            <version>1.12.0</version>
+        </dependency>
+
+        <dependency>
             <groupId>io.qdrant</groupId>
             <artifactId>client</artifactId>
         </dependency>

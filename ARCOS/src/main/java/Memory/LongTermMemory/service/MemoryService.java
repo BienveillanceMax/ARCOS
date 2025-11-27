@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -63,6 +64,7 @@ public class MemoryService {
         // This method's implementation depends on how the LLM client generates a memory entry.
         // For this refactoring, we'll assume the LLM client returns a MemoryEntry object.
         MemoryEntry memoryEntry = llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation));
+        memoryEntry.setId(UUID.randomUUID().toString());
         storeMemory(memoryEntry);
         return memoryEntry;
     }

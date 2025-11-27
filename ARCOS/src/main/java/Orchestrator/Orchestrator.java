@@ -5,17 +5,14 @@ import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
 import LLM.LLMClient;
-import java.util.List;
-import java.util.stream.Collectors;
 import Memory.ConversationContext;
 import Memory.LongTermMemory.service.MemoryService;
 import LLM.Prompts.PromptBuilder;
 import Personality.Desires.DesireService;
-import Personality.Mood.ConversationResponse;
 import Personality.Mood.MoodService;
 import Personality.Mood.MoodVoiceMapper;
+import Personality.Mood.MoodUpdate;
 import Personality.Mood.PadState;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -108,29 +105,103 @@ public class Orchestrator
     private void processAndSpeak(String userQuery) {
         log.info("Processing query: {}", userQuery);
 
-        // Search for relevant memories
-        //List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery);
+        // Create the prompt for streaming response
+        Prompt streamingPrompt = promptBuilder.buildConversationnalPrompt(context, userQuery);
+        log.info("Streaming Prompt: {}", streamingPrompt);
 
-        // Create the prompt
-        Prompt prompt = promptBuilder.buildConversationnalPrompt(context,userQuery);
-        log.info("Prompt: {}", prompt);
-
-        ConversationResponse response = llmClient.generateConversationResponse(prompt);
-        log.info("Answer: {}", response.response);
-
-        // Update Mood
-        moodService.applyMoodUpdate(response.moodUpdate);
-
-        // Get Voice Parameters based on new Mood
+        // Get Voice Parameters based on current Mood
         PadState currentPad = context.getPadState();
         MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
 
-        // 7. Ajout à la mémoire à court terme.
-        context.addUserMessage(userQuery);
-        context.addAssistantMessage(response.response);
+        StringBuilder sentenceBuffer = new StringBuilder();
+        StringBuilder fullResponse = new StringBuilder();
 
-        // Speak with parameters
-        ttsHandler.speak(response.response, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+        llmClient.generateStreamingChatResponse(streamingPrompt)
+                .doOnNext(chunk -> {
+                    // 1. On garde le texte brut (avec *) pour l'historique et le buffer
+                    sentenceBuffer.append(chunk);
+                    fullResponse.append(chunk);
+
+                    int punctuationIndex;
+                    while ((punctuationIndex = findSentenceEnd(sentenceBuffer)) != -1) {
+
+                        // Extraction de la phrase brute
+                        String rawSentence = sentenceBuffer.substring(0, punctuationIndex + 1);
+
+                        // 2. NETTOYAGE : On enlève les * et autres bruits pour l'audio uniquement
+                        String cleanSentence = cleanForTTS(rawSentence);
+
+                        // On ne parle que s'il reste quelque chose à dire après nettoyage
+                        if (!cleanSentence.isEmpty()) {
+                            ttsHandler.speak(cleanSentence, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                        }
+
+                        sentenceBuffer.delete(0, punctuationIndex + 1);
+                    }
+                })
+                .doOnComplete(() -> {
+                    // Gestion du reliquat (fin de phrase sans point)
+                    if (sentenceBuffer.length() > 0) {
+                        String cleanRelic = cleanForTTS(sentenceBuffer.toString());
+                        if (!cleanRelic.isEmpty()) {
+                            ttsHandler.speak(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                        }
+                    }
+
+                    // Pour la mémoire, on garde le texte original 'fullResponse' (avec le formatage)
+                    String finalResponse = fullResponse.toString();
+
+                    context.addUserMessage(userQuery);
+                    context.addAssistantMessage(finalResponse);
+                    updateMoodAsync(userQuery, finalResponse);
+                    log.info("Complete response : " + fullResponse);
+
+                })
+                .subscribe();
+
+    }
+
+    private int findSentenceEnd(StringBuilder sb) {
+        String text = sb.toString();
+        // On cherche les index des ponctuations
+        int dot = text.indexOf(".");
+        int query = text.indexOf("?");
+        int exclam = text.indexOf("!");
+
+        // On trouve le plus petit index non négatif (le premier qui apparaît)
+        int minIndex = -1;
+
+        if (dot != -1) minIndex = dot;
+        if (query != -1 && (minIndex == -1 || query < minIndex)) minIndex = query;
+        if (exclam != -1 && (minIndex == -1 || exclam < minIndex)) minIndex = exclam;
+
+        return minIndex;
+    }
+
+    private String cleanForTTS(String text) {
+        if (text == null) return "";
+
+        // 1. Remplacer les astérisques (*) et les dièses (#) par rien
+        // Le regex [*#]+ signifie : n'importe quelle combinaison de * ou #
+        String cleaned = text.replaceAll("[*#]+", "");
+
+        cleaned = cleaned.replaceAll("\\[(.*?)\\]\\(.*?\\)", "$1");
+
+        return cleaned.trim();
+    }
+
+    private void updateMoodAsync(String userQuery, String assistantResponse) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                log.info("Starting asynchronous mood update...");
+                Prompt moodPrompt = promptBuilder.buildMoodUpdatePrompt(context.getPadState(), userQuery, assistantResponse);
+                MoodUpdate moodUpdate = llmClient.generateMoodUpdateResponse(moodPrompt);
+                moodService.applyMoodUpdate(moodUpdate);
+                log.info("Asynchronous mood update completed.");
+            } catch (Exception e) {
+                log.error("Error during asynchronous mood update", e);
+            }
+        });
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {

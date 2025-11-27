@@ -19,7 +19,7 @@ public class MoodVoiceMapper {
 
     public VoiceParams mapToVoice(PadState pad) {
         // Base values
-        float baseLength = 1.0f;
+        float baseLength = 1.2f;
         float baseNoise = 0.667f;
         float baseNoiseW = 0.8f;
 

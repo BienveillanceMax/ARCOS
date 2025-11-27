@@ -48,7 +48,7 @@ public class DesireRepository extends BaseVectorRepository<DesireEntry>
         // 2. Création de la requête de Scroll
         // Note : Si vous avez beaucoup de documents, il faudra gérer la pagination avec l'offset
         Points.ScrollPoints scrollRequest = Points.ScrollPoints.newBuilder()
-                .setCollectionName("votre_collection")
+                .setCollectionName("Desires")
                 .setFilter(filter)
                 .setLimit(100)
                 .setWithPayload(io.qdrant.client.grpc.Points.WithPayloadSelector.newBuilder().setEnable(true).build())

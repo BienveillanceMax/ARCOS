@@ -11,20 +11,25 @@ import Personality.Mood.MoodUpdate;
 import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
 import Tools.Actions.SearchActions;
+import com.fasterxml.jackson.core.json.JsonReadFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 public class LLMClient
 {
 
+    private final BeanOutputConverter<MoodUpdate> converter;
     private final ChatClient chatClient;
     private final CalendarActions calendarActions;
     private final PythonActions pythonActions;
     private final SearchActions searchActions;
-
 
 
     public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions) {
@@ -32,8 +37,12 @@ public class LLMClient
         this.calendarActions = calendarActions;
         this.pythonActions = pythonActions;
         this.searchActions = searchActions;
-    }
 
+        ObjectMapper mapper = JsonMapper.builder()
+                .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
+                .build();
+        converter = new BeanOutputConverter<>(MoodUpdate.class, mapper);
+    }
 
 
     @RateLimiter(name = "mistral_free")
@@ -82,4 +91,18 @@ public class LLMClient
                 .entity(ConversationResponse.class);
     }
 
+    @RateLimiter(name = "mistral_free")
+    public Flux<String> generateStreamingChatResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .stream()
+                .content();
+    }
+
+    @RateLimiter(name = "mistral_free")
+    public MoodUpdate generateMoodUpdateResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .call()
+                .entity(converter);
+    }
 }
