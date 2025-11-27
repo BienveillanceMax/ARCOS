@@ -7,7 +7,6 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
 import Orchestrator.Entities.ExecutionPlan;
-import Orchestrator.Entities.Parameter;
 import Personality.Mood.Mood;
 import Personality.Mood.PadState;
 import Personality.Values.Entities.DimensionSchwartz;

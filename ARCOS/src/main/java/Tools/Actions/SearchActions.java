@@ -33,35 +33,37 @@ public class SearchActions
         BraveSearchService.SearchResult result;
 
         try {
-            result = searchService.search(query);
+            BraveSearchService.SearchOptions options = BraveSearchService.SearchOptions.defaultOptions()
+                    .withCount(5);
+            result = searchService.search(query, options);
         } catch (SearchException e) {
             return ActionResult.failure("Erreur de Recherche: " + e.getMessage(), e)
                     .withExecutionTime(System.currentTimeMillis() - startTime);
-
         }
 
         List<String> processedResults = new ArrayList<>();
-        processedResults.add("[Instruction : ne précise tes sources que si cela a un vrai intérêt.] Recherche : " + result.getQuery() + '\n');
-        processedResults.add("Nombre de résultats : " + (long) result.getItems().size() + '\n');
+        processedResults.add("### Résultats de recherche pour \"" + result.getQuery() + "\"\n");
 
+        int index = 1;
         for (BraveSearchService.SearchResultItem item : result.getItems()) {
             StringBuilder builder = new StringBuilder();
-            builder.append('\n');
-            builder.append("Debut de l'objet recherche");
-            builder.append("Titre : ");
-            builder.append(item.getTitle());
-            builder.append('\n' + '\t');
-            builder.append("URL : ");
-            builder.append(item.getUrl());
-            builder.append('\n' + '\t');
-            builder.append("Date de publication : ");
-            builder.append(item.getPublishedDate());
-            builder.append('\n' + '\t');
-            builder.append("Description : ");
-            builder.append(item.getDescription());
+            builder.append(index++).append(". **").append(item.getTitle()).append("**");
+
+            item.getPublishedDate().ifPresent(date ->
+                    builder.append(" (").append(date).append(")")
+            );
+
+            builder.append("\n   ").append(item.getDescription());
+            builder.append("\n   Source: ").append(item.getUrl());
+            builder.append("\n");
+
             processedResults.add(builder.toString());
-            builder.append('\n' + '\t');
         }
+
+        if (processedResults.size() <= 1) {
+            processedResults.add("Aucun résultat pertinent trouvé.");
+        }
+
         return ActionResult.success(processedResults, "Recherche effectuée avec succès")
                 .addMetadata("query", query)
                 .withExecutionTime(System.currentTimeMillis() - startTime);

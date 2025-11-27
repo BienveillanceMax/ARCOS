@@ -209,7 +209,7 @@ public class Orchestrator
             try {
                 // On ne veut pas que la personnalité se déclenche à chaque interaction.
                 Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
-                if (elapsedTime.toMinutes() > 10) {
+                if (elapsedTime.toMinutes() > 5) {
                     log.info("Triggering personality processing...");
                     String fullConversation = context.getFullConversation();
                     personalityOrchestrator.processMemory(fullConversation);
