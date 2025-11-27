@@ -87,9 +87,19 @@ public class SpeechToText {
                 }
 
                 String responseBody = Objects.requireNonNull(response.body()).string();
-                JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
-                String transcript = jsonResponse.has("text") ? jsonResponse.get("text").getAsString() : "";
-                return cleanTranscript(transcript);
+                if (responseBody.isEmpty()) {
+                    log.warn("Transcription service returned an empty body");
+                    return "";
+                }
+
+                try {
+                    JsonObject jsonResponse = gson.fromJson(responseBody, JsonObject.class);
+                    String transcript = jsonResponse.has("text") ? jsonResponse.get("text").getAsString() : "";
+                    return cleanTranscript(transcript);
+                } catch (Exception e) {
+                    log.error("Failed to parse response from transcription service. Response was: {}", responseBody, e);
+                    return "";
+                }
             }
         } catch (IOException e) {
             log.error("Error during transcription request", e);

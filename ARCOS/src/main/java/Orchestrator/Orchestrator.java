@@ -157,7 +157,10 @@ public class Orchestrator
                     log.info("Complete response : " + fullResponse);
 
                 })
-                .subscribe();
+                .subscribe(
+                        content -> {},
+                        error -> log.error("Error during streaming response generation", error)
+                );
 
     }
 

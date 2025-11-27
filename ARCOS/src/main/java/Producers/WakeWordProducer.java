@@ -217,7 +217,13 @@ public class WakeWordProducer implements Runnable {
                 log.error("Error processing audio with Porcupine", e);
             } catch (Exception e) {
                 log.error("Error in wake word detection loop", e);
-                break;
+                // Prevent tight loop in case of persistent error
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
             }
         }
 
