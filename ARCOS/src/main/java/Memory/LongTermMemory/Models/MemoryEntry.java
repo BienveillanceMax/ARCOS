@@ -1,13 +1,14 @@
 package Memory.LongTermMemory.Models;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.qdrant.client.grpc.JsonWithInt;
+import io.qdrant.client.grpc.Points;
+import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Représente un souvenir/entrée mémoire avec tous les attributs nécessaires
@@ -37,6 +38,8 @@ public class MemoryEntry implements QdrantEntry {
 
     // Constructeur par défaut pour Jackson
     public MemoryEntry() {
+        this.id = UUID.randomUUID().toString();
+        this.timestamp = LocalDateTime.now();
     }
 
     /**
@@ -133,10 +136,45 @@ public class MemoryEntry implements QdrantEntry {
                 timestamp);
     }
 
+
+    public static Document fromMemoryPoint(Points.RetrievedPoint point) {
+        Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
+
+        // Extraire le contenu. Le contenu est stocké directement dans la charge utile.
+        String content = payloadMap.get("doc_content").getStringValue();
+
+        // Créer les métadonnées à partir de la charge utile.
+        Map<String, Object> metadata = payloadMap.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals("content")) // Exclure le contenu
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    JsonWithInt.Value value = entry.getValue();
+                    switch (value.getKindCase()) {
+                        case STRING_VALUE:
+                            return value.getStringValue();
+                        case DOUBLE_VALUE:
+                            return value.getDoubleValue();
+                        case BOOL_VALUE:
+                            return value.getBoolValue();
+                        case NULL_VALUE:
+                        default:
+                            return null;
+                    }
+                }));
+
+        // Gérer le vecteur (embedding)
+        List<Float> vector = point.getVectors().getVector().getDataList();
+        metadata.put("embedding", vector);
+
+
+        // L'ID du document est l'ID du point Qdrant.
+        String id = point.getId().getUuid();
+
+        return new Document(id, content, metadata);
+    }
+
     @Override
-    public ObjectNode getPayload() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectNode payload = objectMapper.createObjectNode();
+    public Map<String, Object> getPayload() {
+        Map<String, Object> payload = new HashMap<>();
         payload.put("content", this.getContent());
         payload.put("subject", this.getSubject().getValue());
         payload.put("satisfaction", this.getSatisfaction());

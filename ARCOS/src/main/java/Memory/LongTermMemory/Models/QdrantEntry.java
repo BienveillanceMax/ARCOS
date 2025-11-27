@@ -1,6 +1,6 @@
 package Memory.LongTermMemory.Models;
 
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Map;
 
 public interface QdrantEntry {
     String getId();
@@ -8,5 +8,5 @@ public interface QdrantEntry {
     float[] getEmbedding();
     void setEmbedding(float[] embedding);
 
-    ObjectNode getPayload();
+    Map<String, Object> getPayload();
 }

@@ -1,1 +1,5 @@
+ARCOS/.env
+.idea
+ARCOS/HELP.md
 ARCOS/target/
+ARCOS/src/main/resources/*

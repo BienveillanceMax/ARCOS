@@ -1,60 +1,56 @@
 package Personality.Opinions;
 
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult.SearchResult;
-import Memory.LongTermMemory.service.MemoryService;
+import Memory.LongTermMemory.Repositories.OpinionRepository;
 import Personality.Values.Entities.DimensionSchwartz;
 import Personality.Values.ValueProfile;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class OpinionService
-{
+public class OpinionService {
 
     private final ValueProfile valueProfile;
     private final PromptBuilder promptBuilder;
-    private final MemoryService memoryService;
+    private final OpinionRepository opinionRepository;
     private final LLMClient llmClient;
-    private final LLMResponseParser llmResponseParser;
+    private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
 
     // ---- Hyperparamètres ----
     private static final double W_EXPERIENCE = 0.70;   // poids experience dans polarity
     private static final double W_COHERENCE = 0.30;    // poids coherence valeur -> polarity
 
-
-    private static final double ALPHA_POL_UPDATE = 0.0; // non utilisé (inertie via oldS used)
     private static final double REINFORCE_BASE = 0.05; // gain confiance quand cohérent
     private static final double CONTRADICT_BASE = 0.08; // perte confiance si contradictoire
 
     private static final double STABILITY_GROWTH = 0.02; // croissance stabilité si renforcé
     private static final double STABILITY_SHRINK = 0.03; // baisse stabilité si contradictoire
 
-    // extended params
     private static final double RHO_NETWORK = 0.25; // poids du réseau dans expEffective
 
-
-    public OpinionService(LLMResponseParser llmResponseParser, LLMClient llmClient, MemoryService memoryService, PromptBuilder promptBuilder, ValueProfile valueProfile) {
-        this.llmResponseParser = llmResponseParser;
+    public OpinionService(LLMClient llmClient, OpinionRepository opinionRepository, PromptBuilder promptBuilder, ValueProfile valueProfile) {
         this.llmClient = llmClient;
-        this.memoryService = memoryService;
+        this.opinionRepository = opinionRepository;
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
     }
-
 
     private static double clamp(double v, double lo, double hi) {
         if (Double.isNaN(v)) return lo;
@@ -67,26 +63,13 @@ public class OpinionService
         return 0;
     }
 
-    private static double normalize0to1(double v100) {
-        // transform 0..100 -> 0..1
-        return clamp(v100 / 100.0, 0.0, 1.0);
-    }
-
-
-/// ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    /**
-     * Prend en paramètre un souvenir et crée une opinion incomplète (ie avec uniquement les champs verbeux)
-     *
-     * @param memoryEntry Le souvenir source
-     * @return Une OpinionEntry avec les champs verbeux remplis
-     */
     private OpinionEntry getOpinionFromMemoryEntry(MemoryEntry memoryEntry) {
-        //gotta make a call, build a new prompt and parse the return
-
         OpinionEntry opinionEntry;
-        String prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
+        Prompt prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
-            opinionEntry = llmResponseParser.parseOpinionFromResponse(llmClient.generateOpinionResponse(prompt), memoryEntry);
+            opinionEntry = llmClient.generateOpinionResponse(prompt);
+            opinionEntry.setId(UUID.randomUUID().toString());
+            opinionEntry.getAssociatedMemories().add(memoryEntry.getId());
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;
@@ -94,34 +77,38 @@ public class OpinionService
         return opinionEntry;
     }
 
-    /**
-     * Prend en paramètre un souvenir et gère la création/l'update d'opinion
-     *
-     * @param memory Le souvenir source
-     */
-
     public List<OpinionEntry> processInteraction(MemoryEntry memory) {
         OpinionEntry opinionEntry = getOpinionFromMemoryEntry(memory);
         List<OpinionEntry> opinionEntries = new ArrayList<>();
         if (opinionEntry == null) {
-            return null;    //no opinion to process
+            return null;
         }
 
-        // Logique de tri d'opinion
-        List<SearchResult<OpinionEntry>> similarOpinions = memoryService.searchOpinions(opinionEntry.getSubject());
-        boolean similarOpinionsFound = false;
+        SearchRequest searchRequest = SearchRequest.builder().query(opinionEntry.getSubject()).topK(10).build();
+        List<Document> similarOpinionDocs = opinionRepository.search(searchRequest);
 
-        for (SearchResult<OpinionEntry> searchResult : similarOpinions) {
+        List<Document> sufficientlySimilarDocs = similarOpinionDocs.stream()
+                .filter(doc -> {
+                    Float distance = (Float) doc.getMetadata().get("distance");
+                    return (1 - distance) >= 0.85;
+                })
+                .collect(Collectors.toList());
 
-            if (searchResult.getSimilarityScore() >= 0.85) {            //TODO HANDLE LESSER SIMILARITY ? HANDLE SUBJECT DIFFERENTIATION
-                similarOpinionsFound = true;
-                opinionEntries.add(updateOpinion(searchResult, opinionEntry));
+        if (!sufficientlySimilarDocs.isEmpty()) {
+            for (Document doc : sufficientlySimilarDocs) {
+                OpinionEntry existingOpinion = fromDocument(doc);
+                opinionEntries.add(updateOpinion(existingOpinion, opinionEntry)); ///hmmm todo tests for duplication  
             }
-        }
-        if (!similarOpinionsFound) {
+        } else {
             opinionEntries.add(addOpinion(opinionEntry, memory));
         }
         return opinionEntries;
+    }
+
+    public List<OpinionEntry> searchOpinions(String query) {
+        SearchRequest searchRequest = SearchRequest.builder().query(query).topK(5).build();
+        List<Document> docs = opinionRepository.search(searchRequest);
+        return docs.stream().map(this::fromDocument).collect(Collectors.toList());
     }
 
     private double calculateDeltaC(OpinionEntry opinionEntry, double networkConsistency, double imp, int sOld, int sExp) {
@@ -129,12 +116,10 @@ public class OpinionService
         if (sOld == 0) {
             deltaC = REINFORCE_BASE * imp * (1.0 - opinionEntry.getConfidence()) * (0.75 + 0.5 * ((networkConsistency + 1.0) / 2.0));
         } else if (sOld == sExp) {
-            // reinforce, amplified by positive networkConsistency
-            double netFactor = 1.0 + 0.5 * Math.max(0.0, networkConsistency); // 1..1.5
+            double netFactor = 1.0 + 0.5 * Math.max(0.0, networkConsistency);
             deltaC = REINFORCE_BASE * imp * (1.0 - opinionEntry.getConfidence()) * netFactor;
         } else {
-            // contradiction, penalise more if networkConsistency negative
-            double netFactor = 1.0 + 0.5 * Math.max(0.0, -networkConsistency); // 1..1.5
+            double netFactor = 1.0 + 0.5 * Math.max(0.0, -networkConsistency);
             deltaC = -CONTRADICT_BASE * imp * opinionEntry.getConfidence() * netFactor;
         }
         return deltaC;
@@ -145,24 +130,20 @@ public class OpinionService
         int sOld = sign(newOpinion.getPolarity());
         int sExp = sign(expEffective);
         double signDelta = (sOld == sExp ? +1.0 : -1.0);
-
         double deltaC = calculateDeltaC(opinionEntry, networkConsistency, imp, sOld, sExp);
 
         if (sOld == 0) signDelta = +0.5;
-        double netStabFactor = 1.0 + 0.3 * ((networkConsistency + 1.0) / 2.0); // 1..1.3
+        double netStabFactor = 1.0 + 0.3 * ((networkConsistency + 1.0) / 2.0);
         double stabilityDelta = (signDelta > 0 ? STABILITY_GROWTH : -STABILITY_SHRINK) * imp * Math.abs(deltaC) * netStabFactor;
         return clamp(opinionEntry.getStability() + stabilityDelta, 0.0, 1.0);
     }
-
 
     private double updateConfidenceScore(OpinionEntry opinionEntry, double networkConsistency, double imp) {
         double expEffective = clamp((1.0 - RHO_NETWORK) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + RHO_NETWORK * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
         int sOld = sign(opinionEntry.getPolarity());
         int sExp = sign(expEffective);
         double deltaC = calculateDeltaC(opinionEntry, networkConsistency, imp, sOld, sExp);
-
         return clamp(opinionEntry.getConfidence() + deltaC, 0.0, 1.0);
-
     }
 
     private double updatePolarityScore(OpinionEntry opinionEntry, double networkConsistency, double coh) {
@@ -172,8 +153,6 @@ public class OpinionService
     }
 
     private double getNetworkConsistencyScore(OpinionEntry newOpinionEntry) {
-        double mainValueScore;
-        DimensionSchwartz mainValue;
         Map.Entry<DimensionSchwartz, Double> maxEntry = valueProfile.averageByDimension().entrySet()
                 .stream()
                 .max(Map.Entry.comparingByValue())
@@ -181,55 +160,82 @@ public class OpinionService
         if (maxEntry == null) {
             log.error("Erreur null lors du calcul de normVp dans le module OpinionService");
             return 0.5;
-        } else {
-            mainValueScore = maxEntry.getValue();
-            mainValue = maxEntry.getKey();
         }
-
+        double mainValueScore = maxEntry.getValue();
         double normVp = (mainValueScore - 50.0) / 50.0;
         return normVp * newOpinionEntry.getPolarity();
     }
 
-    private OpinionEntry updateOpinion(SearchResult<OpinionEntry> searchResult, OpinionEntry newOpinion) {
-        OpinionEntry opinionEntry = searchResult.getEntry();
-
+    private OpinionEntry updateOpinion(OpinionEntry existingOpinion, OpinionEntry newOpinion) {
         double networkConsistencyScore = getNetworkConsistencyScore(newOpinion);
-        double newOpinionImportance = valueProfile.averageByDimension(opinionEntry.getMainDimension());
-        double coherency = (valueProfile.averageByDimension(opinionEntry.getMainDimension()) - valueProfile.dimensionAverage()) / 100;
+        double newOpinionImportance = valueProfile.averageByDimension(existingOpinion.getMainDimension());
+        double coherency = (valueProfile.averageByDimension(existingOpinion.getMainDimension()) - valueProfile.dimensionAverage()) / 100;
 
-        opinionEntry.setStability(updateStabilityScore(opinionEntry, networkConsistencyScore, newOpinionImportance, newOpinion));
-        if (opinionEntry.getStability() <= 0) {
-            memoryService.deleteOpinion(opinionEntry.getId());
+        existingOpinion.setStability(updateStabilityScore(existingOpinion, networkConsistencyScore, newOpinionImportance, newOpinion));
+        if (existingOpinion.getStability() <= 0) {
+            opinionRepository.delete(Collections.singletonList(existingOpinion.getId()));
             return null; //Opinion deleted -> nothing more to do
         }
-        opinionEntry.setConfidence(updateConfidenceScore(opinionEntry, networkConsistencyScore, newOpinionImportance));
-        opinionEntry.setPolarity(updatePolarityScore(opinionEntry, networkConsistencyScore, coherency));
+        existingOpinion.setConfidence(updateConfidenceScore(existingOpinion, networkConsistencyScore, newOpinionImportance));
+        existingOpinion.setPolarity(updatePolarityScore(existingOpinion, networkConsistencyScore, coherency));
+        existingOpinion.setUpdatedAt(LocalDateTime.now());
 
-
-        memoryService.storeOpinion(opinionEntry);
-        return opinionEntry;
+        opinionRepository.save(toDocument(existingOpinion));
+        return existingOpinion;
     }
 
-
     private double calculateStabilityScore(OpinionEntry opinionEntry) {
-
         if (opinionEntry.getMainDimension() == null) {
             return 0.5;
         }
         return 0.5 + (valueProfile.averageByDimension(opinionEntry.getMainDimension()) / 200.0);
-
     }
 
     private OpinionEntry addOpinion(OpinionEntry opinionEntry, MemoryEntry associatedMemoryEntry) {
         opinionEntry.setId(UUID.randomUUID().toString());
         opinionEntry.setStability(calculateStabilityScore(opinionEntry));
         opinionEntry.setAssociatedMemories(List.of(associatedMemoryEntry.getId()));
-
         opinionEntry.setCreatedAt(LocalDateTime.now());
         opinionEntry.setUpdatedAt(LocalDateTime.now());
 
-        memoryService.storeOpinion(opinionEntry);
+        opinionRepository.save(toDocument(opinionEntry));
         return opinionEntry;
+    }
 
+    private Document toDocument(OpinionEntry opinionEntry) {
+        String content = opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject();
+        return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
+    }
+
+    private OpinionEntry fromDocument(Document document) {
+        Map<String, Object> metadata = document.getMetadata();
+        OpinionEntry opinionEntry = new OpinionEntry();
+        opinionEntry.setId(document.getId());
+        opinionEntry.setSubject((String) metadata.get("subject"));
+        opinionEntry.setSummary((String) metadata.get("summary"));
+        opinionEntry.setNarrative((String) metadata.get("narrative"));
+        opinionEntry.setPolarity((Double) metadata.get("polarity"));
+        opinionEntry.setConfidence((Double) metadata.get("confidence"));
+        opinionEntry.setStability((Double) metadata.get("stability"));
+        opinionEntry.setAssociatedMemories((List<String>) metadata.get("associatedMemories"));
+        opinionEntry.setAssociatedDesire((String) metadata.get("associatedDesire"));
+        Object mainDimensionObj = metadata.get("mainDimension");
+        if (mainDimensionObj != null) {
+            opinionEntry.setMainDimension(DimensionSchwartz.valueOf(mainDimensionObj.toString()));
+        }
+        opinionEntry.setCreatedAt(LocalDateTime.parse((String) metadata.get("createdAt"), TIMESTAMP_FORMATTER));
+        String updatedAtStr = (String) metadata.get("updatedAt");
+        if (updatedAtStr != null) {
+            opinionEntry.setUpdatedAt(LocalDateTime.parse(updatedAtStr, TIMESTAMP_FORMATTER));
+        }
+        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
+        if (embeddingDouble != null) {
+            float[] embeddingFloat = new float[embeddingDouble.size()];
+            for (int i = 0; i < embeddingDouble.size(); i++) {
+                embeddingFloat[i] = embeddingDouble.get(i).floatValue();
+            }
+            opinionEntry.setEmbedding(embeddingFloat);
+        }
+        return opinionEntry;
     }
 }

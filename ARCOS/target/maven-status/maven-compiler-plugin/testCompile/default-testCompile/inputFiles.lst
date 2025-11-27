@@ -1,9 +1,0 @@
-/app/ARCOS/src/test/java/Memory/Actions/DeepSearchActionTest.java
-/app/ARCOS/src/test/java/Memory/MemoryServiceTests.java
-/app/ARCOS/src/test/java/Orchestrator/InitiativeServiceTest.java
-/app/ARCOS/src/test/java/Orchestrator/OrchestratorTests.java
-/app/ARCOS/src/test/java/Personality/Desires/DesireServiceTest.java
-/app/ARCOS/src/test/java/Personality/Opinions/OpinionServiceTest.java
-/app/ARCOS/src/test/java/Personality/PersonalityOrchestratorIT.java
-/app/ARCOS/src/test/java/Personality/Values/ValueProfileTest.java
-/app/ARCOS/src/test/java/Producers/DesireInitiativeProducerTest.java

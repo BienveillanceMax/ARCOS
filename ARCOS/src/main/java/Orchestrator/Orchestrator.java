@@ -3,31 +3,26 @@ package Orchestrator;
 import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
-import Exceptions.ResponseParsingException;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
-import LLM.LLMResponseParser;
 import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import LLM.LLMClient;
-import java.util.List;
-import java.util.stream.Collectors;
 import Memory.ConversationContext;
-import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.service.MemoryService;
-import Orchestrator.Entities.ExecutionPlan;
 import LLM.Prompts.PromptBuilder;
+import Personality.Desires.DesireService;
+import Personality.Mood.MoodService;
+import Personality.Mood.MoodVoiceMapper;
+import Personality.Mood.MoodUpdate;
+import Personality.Mood.PadState;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cglib.core.Local;
 import org.springframework.stereotype.Component;
 import Personality.PersonalityOrchestrator;
 
 
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.Period;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
 @Component
@@ -37,32 +32,34 @@ public class Orchestrator
     private final EventQueue eventQueue;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
-    private final LLMResponseParser responseParser;
-    private final ActionExecutor actionExecutor;
     private final ConversationContext context;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
     private final PiperEmbeddedTTSModule ttsHandler;
     private final PersonalityOrchestrator personalityOrchestrator;
+    private final MoodService moodService;
+    private final MoodVoiceMapper moodVoiceMapper;
 
     private LocalDateTime lastInteracted;
+    private DesireService desireService;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, responseParser, actionExecutor, context, memoryService, initiativeService, new PiperEmbeddedTTSModule());
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule(), moodService, moodVoiceMapper);
+        this.desireService = desireService;
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, LLMResponseParser responseParser, ActionExecutor actionExecutor, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
-        this.responseParser = responseParser;
-        this.actionExecutor = actionExecutor;
         this.context = context;
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
         this.ttsHandler = ttsHandler;
+        this.moodService = moodService;
+        this.moodVoiceMapper = moodVoiceMapper;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -70,7 +67,10 @@ public class Orchestrator
     public void dispatch(Event<?> event) {
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
-            ttsHandler.speak(processQuery((String) event.getPayload()));
+            processAndSpeak((String) event.getPayload());
+            triggerPersonalityProcessing(lastInteracted);
+            lastInteracted = LocalDateTime.now();
+
         } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
@@ -79,16 +79,18 @@ public class Orchestrator
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
                 desire.setStatus(DesireEntry.Status.PENDING);
                 desire.setLastUpdated(java.time.LocalDateTime.now());
-                memoryService.storeDesire(desire);
+                desireService.storeDesire(desire);
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
 
-            ttsHandler.speak(llmClient.generateResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+            ttsHandler.speak(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
         }
+
     }
 
     public void start() {
+        log.info("Orchestrator starting");
         while (true) {
             try {
                 Event<?> event = eventQueue.take();
@@ -100,63 +102,106 @@ public class Orchestrator
         }
     }
 
-    private String processQuery(String userQuery) {
+    private void processAndSpeak(String userQuery) {
         log.info("Processing query: {}", userQuery);
 
+        // Create the prompt for streaming response
+        Prompt streamingPrompt = promptBuilder.buildConversationnalPrompt(context, userQuery);
+        log.info("Streaming Prompt: {}", streamingPrompt);
 
-        // Search for relevant memories
-        LocalDateTime lastCall = LocalDateTime.now();
-        List<MemoryEntry> relevantMemories = memoryService.searchMemories(userQuery)
-                .stream()
-                .map(SearchResult::getEntry)
-                .collect(Collectors.toList());
+        // Get Voice Parameters based on current Mood
+        PadState currentPad = context.getPadState();
+        MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
 
+        StringBuilder sentenceBuffer = new StringBuilder();
+        StringBuilder fullResponse = new StringBuilder();
 
+        llmClient.generateStreamingChatResponse(streamingPrompt)
+                .doOnNext(chunk -> {
+                    // 1. On garde le texte brut (avec *) pour l'historique et le buffer
+                    sentenceBuffer.append(chunk);
+                    fullResponse.append(chunk);
 
-        // 1. Génération du prompt
-        String planningPrompt = promptBuilder.buildPlanningPrompt(userQuery, context, relevantMemories);
-        log.debug("Planning prompt:\n{}", planningPrompt);
+                    int punctuationIndex;
+                    while ((punctuationIndex = findSentenceEnd(sentenceBuffer)) != -1) {
 
+                        // Extraction de la phrase brute
+                        String rawSentence = sentenceBuffer.substring(0, punctuationIndex + 1);
 
+                        // 2. NETTOYAGE : On enlève les * et autres bruits pour l'audio uniquement
+                        String cleanSentence = cleanForTTS(rawSentence);
 
+                        // On ne parle que s'il reste quelque chose à dire après nettoyage
+                        if (!cleanSentence.isEmpty()) {
+                            ttsHandler.speak(cleanSentence, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                        }
 
-        // 2. Appel à Mistral pour planification
-        String planningResponse = llmClient.generatePlanningResponse(planningPrompt).replace("*",""); //fallback plan is probably not valid*
-        log.debug("Planning response:\n{}", planningResponse);
+                        sentenceBuffer.delete(0, punctuationIndex + 1);
+                    }
+                })
+                .doOnComplete(() -> {
+                    // Gestion du reliquat (fin de phrase sans point)
+                    if (sentenceBuffer.length() > 0) {
+                        String cleanRelic = cleanForTTS(sentenceBuffer.toString());
+                        if (!cleanRelic.isEmpty()) {
+                            ttsHandler.speak(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                        }
+                    }
 
+                    // Pour la mémoire, on garde le texte original 'fullResponse' (avec le formatage)
+                    String finalResponse = fullResponse.toString();
 
-        // 3. Parsing avec retry spécifique Mistral
-        ExecutionPlan plan = null;
-        try {
-            plan = responseParser.parseWithMistralRetry(planningResponse, 3);
-        } catch (ResponseParsingException e) {
-            log.error("Error parsing planning response", e);
-            throw new RuntimeException(e);
-        }
+                    context.addUserMessage(userQuery);
+                    context.addAssistantMessage(finalResponse);
+                    updateMoodAsync(userQuery, finalResponse);
+                    log.info("Complete response : " + fullResponse);
 
-        // 4. Exécution des actions
-        Map<String, ActionResult> results = actionExecutor.executeActions(plan);    //TODO
-        log.debug("Action execution results: {}", results);
+                })
+                .subscribe();
 
-        // 5. Prompt de formulation
-        String formulationPrompt = promptBuilder.buildFormulationPrompt(
-                userQuery, plan, results, context
-        );
-        log.debug("Formulation prompt:\n{}", formulationPrompt);
+    }
 
+    private int findSentenceEnd(StringBuilder sb) {
+        String text = sb.toString();
+        // On cherche les index des ponctuations
+        int dot = text.indexOf(".");
+        int query = text.indexOf("?");
+        int exclam = text.indexOf("!");
 
+        // On trouve le plus petit index non négatif (le premier qui apparaît)
+        int minIndex = -1;
 
-        // 6. Appel à Mistral pour formulation
-        String finalResponse = llmClient.generateFormulationResponse(formulationPrompt).replace("*","");
-        log.info("Final response: {}", finalResponse);
+        if (dot != -1) minIndex = dot;
+        if (query != -1 && (minIndex == -1 || query < minIndex)) minIndex = query;
+        if (exclam != -1 && (minIndex == -1 || exclam < minIndex)) minIndex = exclam;
 
-        // 7. Ajout à la mémoire à court terme.
-        context.addUserMessage(userQuery);
-        context.addAssistantMessage(finalResponse, plan);
-        log.info("Starting personality processing workflow...");
-        triggerPersonalityProcessing(lastInteracted);
-        lastInteracted = LocalDateTime.now();
-        return finalResponse;
+        return minIndex;
+    }
+
+    private String cleanForTTS(String text) {
+        if (text == null) return "";
+
+        // 1. Remplacer les astérisques (*) et les dièses (#) par rien
+        // Le regex [*#]+ signifie : n'importe quelle combinaison de * ou #
+        String cleaned = text.replaceAll("[*#]+", "");
+
+        cleaned = cleaned.replaceAll("\\[(.*?)\\]\\(.*?\\)", "$1");
+
+        return cleaned.trim();
+    }
+
+    private void updateMoodAsync(String userQuery, String assistantResponse) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                log.info("Starting asynchronous mood update...");
+                Prompt moodPrompt = promptBuilder.buildMoodUpdatePrompt(context.getPadState(), userQuery, assistantResponse);
+                MoodUpdate moodUpdate = llmClient.generateMoodUpdateResponse(moodPrompt);
+                moodService.applyMoodUpdate(moodUpdate);
+                log.info("Asynchronous mood update completed.");
+            } catch (Exception e) {
+                log.error("Error during asynchronous mood update", e);
+            }
+        });
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
@@ -164,8 +209,6 @@ public class Orchestrator
             try {
                 // On ne veut pas que la personnalité se déclenche à chaque interaction.
                 Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
-                log.info("Personality Processing : waiting to avoid usage limit");
-                Thread.sleep(1000);
                 if (elapsedTime.toMinutes() > 10) {
                     log.info("Triggering personality processing...");
                     String fullConversation = context.getFullConversation();

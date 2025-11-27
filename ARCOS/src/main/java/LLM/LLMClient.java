@@ -1,65 +1,108 @@
 package LLM;
 
+import Exceptions.DesireCreationException;
+import Exceptions.ResponseParsingException;
 import LLM.service.RateLimiterService;
+import Memory.LongTermMemory.Models.DesireEntry;
+import Memory.LongTermMemory.Models.MemoryEntry;
+import Memory.LongTermMemory.Models.OpinionEntry;
+import Personality.Mood.ConversationResponse;
+import Personality.Mood.MoodUpdate;
+import Tools.Actions.CalendarActions;
+import Tools.Actions.PythonActions;
+import Tools.Actions.SearchActions;
+import com.fasterxml.jackson.core.json.JsonReadFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 
 @Service
 public class LLMClient
 {
 
+    private final BeanOutputConverter<MoodUpdate> converter;
     private final ChatClient chatClient;
-    private final RateLimiterService rateLimiterService;
+    private final CalendarActions calendarActions;
+    private final PythonActions pythonActions;
+    private final SearchActions searchActions;
 
-    public LLMClient(ChatClient.Builder chatClientBuilder, RateLimiterService rateLimiterService) {
+
+    public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions) {
         this.chatClient = chatClientBuilder.build();
-        this.rateLimiterService = rateLimiterService;
+        this.calendarActions = calendarActions;
+        this.pythonActions = pythonActions;
+        this.searchActions = searchActions;
+
+        ObjectMapper mapper = JsonMapper.builder()
+                .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
+                .build();
+        converter = new BeanOutputConverter<>(MoodUpdate.class, mapper);
     }
 
-    private void acquirePermit() {
-        rateLimiterService.acquirePermit();
+
+    @RateLimiter(name = "mistral_free")
+    public String generateChatResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .call()
+                .content();
     }
 
-    public String generatePlanningResponse(String prompt) {
-        acquirePermit();
+    @RateLimiter(name = "mistral_free")
+    public String generateToollessResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .call()
                 .content();
     }
 
-    public String generateFormulationResponse(String prompt) {
-        acquirePermit();
+    @RateLimiter(name = "mistral_free")
+    public MemoryEntry generateMemoryResponse(Prompt prompt) throws ResponseParsingException {
         return chatClient.prompt(prompt)
                 .call()
+                .entity(MemoryEntry.class);
+    }
+
+    @RateLimiter(name = "mistral_free")
+    public OpinionEntry generateOpinionResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .call()
+                .entity(OpinionEntry.class);
+    }
+
+    @RateLimiter(name = "mistral_free")
+    public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
+        return chatClient.prompt(prompt)
+                .call()
+                .entity(DesireEntry.class);
+    }
+
+
+    @RateLimiter(name = "mistral_free")
+    public ConversationResponse generateConversationResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .call()
+                .entity(ConversationResponse.class);
+    }
+
+    @RateLimiter(name = "mistral_free")
+    public Flux<String> generateStreamingChatResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .tools(calendarActions, pythonActions, searchActions)
+                .stream()
                 .content();
     }
 
-    public String generateMemoryResponse(String prompt) {
-        acquirePermit();
+    @RateLimiter(name = "mistral_free")
+    public MoodUpdate generateMoodUpdateResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .call()
-                .content();
+                .entity(converter);
     }
-
-    public String generateOpinionResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt)
-                .call()
-                .content();
-    }
-
-    public String generateDesireResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt)
-                .call()
-                .content();
-    }
-
-    public String generateResponse(String prompt) {
-        acquirePermit();
-        return chatClient.prompt(prompt)
-                .call()
-                .content();
-    }
-
 }

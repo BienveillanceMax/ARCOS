@@ -356,6 +356,10 @@ public class PiperEmbeddedTTSModule {
     }
 
     public void speak(String text) {
+        speak(text, 1.0f, 0.667f, 0.8f);
+    }
+
+    public void speak(String text, float lengthScale, float noiseScale, float noiseW) {
         try {
             // Create temp file for audio output
             File audioFile = File.createTempFile("piper_output_", ".wav");
@@ -369,7 +373,10 @@ public class PiperEmbeddedTTSModule {
                     "--speaker","1",
                     "--model", modelFile.getAbsolutePath(),
                     "--config", configFile.getAbsolutePath(),
-                    "--output_file", audioFile.getAbsolutePath()
+                    "--output_file", audioFile.getAbsolutePath(),
+                    "--length_scale", String.valueOf(lengthScale),
+                    "--noise_scale", String.valueOf(noiseScale),
+                    "--noise_w", String.valueOf(noiseW)
             );
 
             pb.redirectErrorStream(true);

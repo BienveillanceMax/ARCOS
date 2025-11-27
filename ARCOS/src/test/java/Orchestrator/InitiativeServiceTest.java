@@ -1,122 +1,84 @@
 package Orchestrator;
 
 import LLM.LLMClient;
-import LLM.LLMResponseParser;
 import LLM.Prompts.PromptBuilder;
-import Memory.Actions.ActionRegistry;
-import Memory.Actions.Entities.ActionResult;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.SearchResult.SearchResult;
 import Memory.LongTermMemory.service.MemoryService;
-import Orchestrator.Entities.ExecutionPlan;
+import Personality.Desires.DesireService;
 import Personality.Opinions.OpinionService;
-import org.junit.jupiter.api.BeforeEach;
+import Personality.PersonalityOrchestrator;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
+import static org.junit.jupiter.api.Assertions.*;
 
-public class InitiativeServiceTest {
+@ExtendWith(MockitoExtension.class)
+class InitiativeServiceTest {
 
-    @Mock
-    private MemoryService memoryService;
+    @Mock MemoryService memoryService;
+    @Mock OpinionService opinionService;
+    @Mock DesireService desireService;
+    @Mock LLMClient llmClient;
+    @Mock PromptBuilder promptBuilder;
+    @Mock PersonalityOrchestrator personalityOrchestrator;
 
-    @Mock
-    private OpinionService opinionService;
+    @InjectMocks InitiativeService initiativeService;
 
-    @Mock
-    private ActionRegistry actionRegistry;
+    @Test
+    void testProcessInitiative_Success() {
+        // Given
+        DesireEntry desire = new DesireEntry();
+        desire.setDescription("Learn Java");
+        desire.setStatus(DesireEntry.Status.PENDING);
 
-    @Mock
-    private LLMClient llmClient;
+        when(memoryService.searchMemories(anyString(), anyInt())).thenReturn(Collections.emptyList());
+        when(opinionService.searchOpinions(anyString())).thenReturn(Collections.emptyList());
+        when(promptBuilder.buildInitiativePrompt(any(DesireEntry.class), anyList(), anyList())).thenReturn(mock(Prompt.class));
+        when(llmClient.generateChatResponse(any(Prompt.class))).thenReturn("I have read the documentation.");
 
-    @Mock
-    private LLMResponseParser responseParser;
+        // When
+        initiativeService.processInitiative(desire);
 
-    @Mock
-    private ActionExecutor actionExecutor;
+        // Then
+        assertEquals(DesireEntry.Status.SATISFIED, desire.getStatus());
+        verify(desireService).storeDesire(desire);
+        verify(llmClient).generateChatResponse(any(Prompt.class));
 
-    @Mock
-    private PromptBuilder promptBuilder;
-
-    @InjectMocks
-    private InitiativeService initiativeService;
-
-    @BeforeEach
-    void setUp() {
-        MockitoAnnotations.openMocks(this);
+        // Verify BDI loop closure
+        verify(memoryService).storeMemory(any(MemoryEntry.class));
+        verify(personalityOrchestrator).processExplicitMemory(any(MemoryEntry.class));
     }
 
     @Test
-    void testProcessInitiative_Success() throws Exception {
-        // Arrange
+    void testProcessInitiative_Failure() {
+        // Given
         DesireEntry desire = new DesireEntry();
-        desire.setId("desire-1");
-        desire.setDescription("A test desire");
+        desire.setStatus(DesireEntry.Status.PENDING);
 
-        ExecutionPlan mockPlan = new ExecutionPlan();
-        mockPlan.setReasoning("A good plan");
+        when(memoryService.searchMemories(anyString(), anyInt())).thenThrow(new RuntimeException("Search failed"));
 
-        ActionResult successResult = ActionResult.successWithMessage("Action succeeded");
+        // When
+        try {
+            initiativeService.processInitiative(desire);
+            fail("Should have thrown exception");
+        } catch (RuntimeException e) {
+            // Expected
+        }
 
-        when(memoryService.searchMemories(anyString(), anyInt())).thenReturn(Collections.emptyList());
-        when(memoryService.searchOpinions(anyString(), anyInt())).thenReturn(Collections.emptyList());
-        when(promptBuilder.buildInitiativePlanningPrompt(any(DesireEntry.class), any(List.class), any(List.class))).thenReturn("prompt");
-        when(llmClient.generatePlanningResponse(anyString())).thenReturn("llm-response");
-        when(responseParser.parseWithMistralRetry(anyString(), anyInt())).thenReturn(mockPlan);
-        when(actionExecutor.executeActions(any(ExecutionPlan.class))).thenReturn(Collections.singletonMap("action1", successResult));
-
-        // Act
-        initiativeService.processInitiative(desire);
-
-        // Assert
-        ArgumentCaptor<DesireEntry> desireCaptor = ArgumentCaptor.forClass(DesireEntry.class);
-        verify(memoryService, times(1)).storeDesire(desireCaptor.capture());
-
-        DesireEntry storedDesire = desireCaptor.getValue();
-        assertEquals(DesireEntry.Status.SATISFIED, storedDesire.getStatus());
-    }
-
-    @Test
-    void testProcessInitiative_PlanExecutionFails() throws Exception {
-        // Arrange
-        DesireEntry desire = new DesireEntry();
-        desire.setId("desire-2");
-        desire.setDescription("Another test desire");
-
-        ExecutionPlan mockPlan = new ExecutionPlan();
-        mockPlan.setReasoning("A plan that will fail");
-
-        ActionResult failureResult = ActionResult.failure("Action failed");
-
-        when(memoryService.searchMemories(anyString(), anyInt())).thenReturn(Collections.emptyList());
-        when(memoryService.searchOpinions(anyString(), anyInt())).thenReturn(Collections.emptyList());
-        when(promptBuilder.buildInitiativePlanningPrompt(any(DesireEntry.class), any(List.class), any(List.class))).thenReturn("prompt");
-        when(llmClient.generatePlanningResponse(anyString())).thenReturn("llm-response");
-        when(responseParser.parseWithMistralRetry(anyString(), anyInt())).thenReturn(mockPlan);
-        when(actionExecutor.executeActions(any(ExecutionPlan.class))).thenReturn(Collections.singletonMap("action1", failureResult));
-
-        // Act
-        initiativeService.processInitiative(desire);
-
-        // Assert
-        ArgumentCaptor<DesireEntry> desireCaptor = ArgumentCaptor.forClass(DesireEntry.class);
-        verify(memoryService, times(1)).storeDesire(desireCaptor.capture());
-
-        DesireEntry storedDesire = desireCaptor.getValue();
-        assertEquals(DesireEntry.Status.PENDING, storedDesire.getStatus());
+        // Then
+        assertEquals(DesireEntry.Status.PENDING, desire.getStatus());
+        verify(desireService).storeDesire(desire);
     }
 }

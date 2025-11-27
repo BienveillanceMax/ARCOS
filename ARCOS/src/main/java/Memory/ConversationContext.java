@@ -2,6 +2,7 @@ package Memory;
 
 import Memory.Actions.Entities.ActionResult;
 import Orchestrator.Entities.ExecutionPlan;
+import Personality.Mood.PadState;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.stereotype.Component;
@@ -49,6 +50,9 @@ public class ConversationContext {
     @JsonProperty("metadata")
     private Map<String, String> metadata;
 
+    @JsonProperty("pad_state")
+    private PadState padState;
+
     // Variables transientes (non sérialisées)
     private transient int maxHistorySize = 50;
     private transient int maxErrorSize = 10;
@@ -65,6 +69,7 @@ public class ConversationContext {
         this.actionHistory = new ArrayList<>();
         this.errors = new ArrayList<>();
         this.metadata = new ConcurrentHashMap<>();
+        this.padState = new PadState();
     }
 
     public ConversationContext(String userId) {
@@ -89,8 +94,8 @@ public class ConversationContext {
     /**
      * Ajoute une réponse de l'assistant au contexte
      */
-    public void addAssistantMessage(String content, ExecutionPlan executionPlan) {
-        addMessage(ConversationMessage.MessageType.ASSISTANT, content, executionPlan);
+    public void addAssistantMessage(String content) {
+        addMessage(ConversationMessage.MessageType.ASSISTANT, content, null);
     }
 
     /**
@@ -101,7 +106,7 @@ public class ConversationContext {
     }
 
     private void addMessage(ConversationMessage.MessageType type, String content, ExecutionPlan plan) {
-        ConversationMessage message = new ConversationMessage(type, content, plan);
+        ConversationMessage message = new ConversationMessage(type, content, null);
         messageHistory.add(message);
 
         // Maintient la taille de l'historique
@@ -433,6 +438,14 @@ public class ConversationContext {
     }
     public void setMetadata(Map<String, String> metadata) {
         this.metadata = new ConcurrentHashMap<>(metadata);
+    }
+
+    public PadState getPadState() {
+        return padState;
+    }
+
+    public void setPadState(PadState padState) {
+        this.padState = padState;
     }
 
     public int getMaxHistorySize() { return maxHistorySize; }

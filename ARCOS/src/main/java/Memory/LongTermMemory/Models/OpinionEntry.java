@@ -2,13 +2,17 @@ package Memory.LongTermMemory.Models;
 
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.qdrant.client.grpc.JsonWithInt;
+import io.qdrant.client.grpc.Points;
+import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class OpinionEntry implements QdrantEntry
 {
@@ -54,6 +58,8 @@ public class OpinionEntry implements QdrantEntry
     private DimensionSchwartz mainDimension;
 
     public OpinionEntry() {
+        associatedMemories = new ArrayList<>();
+        associatedDesire = "";
     }
 
     public DimensionSchwartz getMainDimension() {
@@ -161,23 +167,19 @@ public class OpinionEntry implements QdrantEntry
     }
 
     @Override
-    public ObjectNode getPayload() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectNode payload = objectMapper.createObjectNode();
+    public Map<String, Object> getPayload() {
+        Map<String, Object> payload = new HashMap<>();
         payload.put("subject", this.getSubject());
         payload.put("summary", this.getSummary());
         payload.put("narrative", this.getNarrative());
         payload.put("polarity", this.getPolarity());
         payload.put("confidence", this.getConfidence());
         payload.put("stability", this.getStability());
-
-        ArrayNode memoriesArray = objectMapper.createArrayNode();
-        if (this.getAssociatedMemories() != null) {
-            for (String mem : this.getAssociatedMemories()) {
-                memoriesArray.add(mem);
-            }
+        payload.put("associatedMemories", this.getAssociatedMemories());
+        payload.put("associatedDesire", this.getAssociatedDesire());
+        if (this.getMainDimension() != null) {
+            payload.put("mainDimension", this.getMainDimension().name());
         }
-        payload.set("associatedMemories", memoriesArray);
 
         if (this.getCreatedAt() != null) {
             payload.put("createdAt", this.getCreatedAt().format(TIMESTAMP_FORMATTER));
@@ -188,6 +190,36 @@ public class OpinionEntry implements QdrantEntry
 
         return payload;
     }
+
+    public static Document fromOpinionPoint(Points.RetrievedPoint point) {
+        Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
+
+        String narrative = payloadMap.get("narrative").getStringValue();
+
+        Map<String, Object> metadata = payloadMap.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals("narrative")) // Exclude the narrative from metadata
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    JsonWithInt.Value value = entry.getValue();
+                    switch (value.getKindCase()) {
+                        case STRING_VALUE:
+                            return value.getStringValue();
+                        case DOUBLE_VALUE:
+                            return value.getDoubleValue();
+                        case BOOL_VALUE:
+                            return value.getBoolValue();
+                        case LIST_VALUE:
+                            return value.getListValue().getValuesList().stream()
+                                    .map(JsonWithInt.Value::getStringValue)
+                                    .collect(Collectors.toList());
+                        case NULL_VALUE:
+                        default:
+                            return null;
+                    }
+                }));
+
+        List<Float> vector = point.getVectors().getVector().getDataList();
+        metadata.put("embedding", vector);
+        String id = point.getId().getUuid();
+        return new Document(id, narrative, metadata);
+    }
 }
-
-

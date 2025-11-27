@@ -1,12 +1,15 @@
 package Memory.LongTermMemory.Models;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import io.qdrant.client.grpc.JsonWithInt;
+import io.qdrant.client.grpc.Points;
+import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 public class DesireEntry implements QdrantEntry
 {
@@ -107,9 +110,8 @@ public class DesireEntry implements QdrantEntry
     }
 
     @Override
-    public ObjectNode getPayload() {
-        ObjectMapper objectMapper = new ObjectMapper();
-        ObjectNode payload = objectMapper.createObjectNode();
+    public Map<String, Object> getPayload() {
+        Map<String, Object> payload = new HashMap<>();
         payload.put("label", this.getLabel());
         payload.put("description", this.getDescription());
         payload.put("reasoning", this.getReasoning());
@@ -126,6 +128,36 @@ public class DesireEntry implements QdrantEntry
         }
 
         return payload;
+    }
+
+    public static Document fromDesirePoint(Points.RetrievedPoint point) {
+        Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
+
+        String description = payloadMap.get("description").getStringValue();
+
+        Map<String, Object> metadata = payloadMap.entrySet().stream()
+                .filter(entry -> !entry.getKey().equals("description"))
+                .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
+                    JsonWithInt.Value value = entry.getValue();
+                    switch (value.getKindCase()) {
+                        case STRING_VALUE:
+                            return value.getStringValue();
+                        case DOUBLE_VALUE:
+                            return value.getDoubleValue();
+                        case BOOL_VALUE:
+                            return value.getBoolValue();
+                        case NULL_VALUE:
+                        default:
+                            return null;
+                    }
+                }));
+
+        List<Float> vector = point.getVectors().getVector().getDataList();
+        metadata.put("embedding", vector);
+
+        String id = point.getId().getUuid();
+
+        return new Document(id, description, metadata);
     }
 }
 
