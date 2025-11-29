@@ -1,14 +1,12 @@
 package LLM.Client;
 
 import Exceptions.DesireCreationException;
-import Exceptions.ResponseParsingException;
 import LLM.Client.ResponseObject.DesireResponse;
 import LLM.Client.ResponseObject.MemoryResponse;
 import LLM.Client.ResponseObject.OpinionResponse;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
-import Personality.Mood.ConversationResponse;
 import Personality.Mood.MoodUpdate;
 import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
@@ -19,7 +17,6 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -27,7 +24,7 @@ import reactor.core.publisher.Flux;
 public class LLMClient
 {
 
-    private final BeanOutputConverter<MoodUpdate> converter;
+    private final RobustBeanOutputConverter<MoodUpdate> moodConverter;
     private final ChatClient chatClient;
     private final CalendarActions calendarActions;
     private final PythonActions pythonActions;
@@ -45,8 +42,12 @@ public class LLMClient
         this.objectMapper = JsonMapper.builder()
                 .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
                 .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
+                .enable(JsonReadFeature.ALLOW_JAVA_COMMENTS)
+                .enable(JsonReadFeature.ALLOW_SINGLE_QUOTES)
                 .build();
-        converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
+
+        // Use RobustBeanOutputConverter
+        this.moodConverter = new RobustBeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
     }
 
 
@@ -69,7 +70,7 @@ public class LLMClient
     public MemoryEntry generateMemoryResponse(Prompt prompt) {
         MemoryResponse response = chatClient.prompt(prompt)
                 .call()
-                .entity(new BeanOutputConverter<>(MemoryResponse.class, this.objectMapper));
+                .entity(new RobustBeanOutputConverter<>(MemoryResponse.class, this.objectMapper));
         if (response == null) {
             return null;
         }
@@ -81,7 +82,7 @@ public class LLMClient
         OpinionResponse response = chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
-                .entity(new BeanOutputConverter<>(OpinionResponse.class, this.objectMapper));
+                .entity(new RobustBeanOutputConverter<>(OpinionResponse.class, this.objectMapper));
         if (response == null) {
             return null;
         }
@@ -92,7 +93,7 @@ public class LLMClient
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
         DesireResponse response = chatClient.prompt(prompt)
                 .call()
-                .entity(new BeanOutputConverter<>(DesireResponse.class, this.objectMapper));
+                .entity(new RobustBeanOutputConverter<>(DesireResponse.class, this.objectMapper));
         if (response == null) {
             return null;
         }
@@ -111,6 +112,6 @@ public class LLMClient
     public MoodUpdate generateMoodUpdateResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .call()
-                .entity(converter);
+                .entity(moodConverter);
     }
 }

@@ -9,8 +9,13 @@
 /app/ARCOS/src/main/java/IO/InputHandling/AudioForwarder.java
 /app/ARCOS/src/main/java/IO/InputHandling/SpeechToText.java
 /app/ARCOS/src/main/java/IO/OuputHandling/PiperEmbeddedTTSModule.java
-/app/ARCOS/src/main/java/LLM/LLMClient.java
+/app/ARCOS/src/main/java/LLM/Client/LLMClient.java
+/app/ARCOS/src/main/java/LLM/Client/ResponseObject/DesireResponse.java
+/app/ARCOS/src/main/java/LLM/Client/ResponseObject/MemoryResponse.java
+/app/ARCOS/src/main/java/LLM/Client/ResponseObject/OpinionResponse.java
+/app/ARCOS/src/main/java/LLM/Client/RobustBeanOutputConverter.java
 /app/ARCOS/src/main/java/LLM/Prompts/PromptBuilder.java
+/app/ARCOS/src/main/java/LLM/Utils/JsonSanitizer.java
 /app/ARCOS/src/main/java/LLM/service/RateLimiterService.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/ActionResult.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/Action.java
@@ -23,6 +28,7 @@
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/RespondAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/SearchAction.java
 /app/ARCOS/src/main/java/Memory/Actions/Entities/Actions/SearchCalendarEventsAction.java
+/app/ARCOS/src/main/java/Memory/Actions/Entities/Parameter.java
 /app/ARCOS/src/main/java/Memory/ConversationContext.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/DesireEntry.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Models/MemoryEntry.java
@@ -36,7 +42,6 @@
 /app/ARCOS/src/main/java/Memory/LongTermMemory/Repositories/OpinionRepository.java
 /app/ARCOS/src/main/java/Memory/LongTermMemory/service/MemoryService.java
 /app/ARCOS/src/main/java/Orchestrator/Entities/ExecutionPlan.java
-/app/ARCOS/src/main/java/Orchestrator/Entities/Parameter.java
 /app/ARCOS/src/main/java/Orchestrator/InitiativeService.java
 /app/ARCOS/src/main/java/Orchestrator/Orchestrator.java
 /app/ARCOS/src/main/java/Personality/Desires/DesireService.java

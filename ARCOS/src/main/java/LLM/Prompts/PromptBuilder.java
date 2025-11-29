@@ -230,7 +230,7 @@ public class PromptBuilder {
     private void appendOutputFormatInstructions(StringBuilder system) {
         system.append("""
         ## Format de Réponse
-        Tu dois répondre UNIQUEMENT au format JSON, structuré comme suit :
+        Tu dois répondre UNIQUEMENT au format JSON brut, SANS MARKDOWN (pas de ```json ... ```), structuré comme suit :
         {
           "response": "Ta réponse textuelle à l'utilisateur ici.",
           "mood_update": {
