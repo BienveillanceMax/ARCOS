@@ -1,8 +1,10 @@
 package LLM.Client.ResponseObject;
 
 import Memory.LongTermMemory.Models.Subject;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class MemoryResponse
 {
     @JsonProperty("content")

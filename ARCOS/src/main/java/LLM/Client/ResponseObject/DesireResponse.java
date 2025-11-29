@@ -1,7 +1,9 @@
 package LLM.Client.ResponseObject;
 
 import Memory.LongTermMemory.Models.DesireEntry;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class DesireResponse
 {
     private String label;       // title of the desire

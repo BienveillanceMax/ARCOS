@@ -63,15 +63,18 @@ public class MemoryService
     }
 
     public MemoryEntry memorizeConversation(String conversation) {
-
-
-        Prompt memoryPrompt = promptBuilder.buildMemoryPrompt(conversation);
-        log.info("Memory prompt = {}", memoryPrompt.toString());
-        MemoryEntry memoryEntry = llmClient.generateMemoryResponse(memoryPrompt);
-        if (memoryEntry != null) {
-            storeMemory(memoryEntry);
+        try {
+            Prompt memoryPrompt = promptBuilder.buildMemoryPrompt(conversation);
+            log.info("Memory prompt = {}", memoryPrompt.toString());
+            MemoryEntry memoryEntry = llmClient.generateMemoryResponse(memoryPrompt);
+            if (memoryEntry != null) {
+                storeMemory(memoryEntry);
+            }
+            return memoryEntry;
+        } catch (ResponseParsingException e) {
+            log.error("Failed to generate memory response: {}", e.getMessage());
+            return null;
         }
-        return memoryEntry;
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {

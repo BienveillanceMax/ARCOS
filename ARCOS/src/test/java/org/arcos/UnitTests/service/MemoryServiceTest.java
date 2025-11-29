@@ -136,15 +136,18 @@ class MemoryServiceTest {
     }
 
     @Test
-    void memorizeConversation_Failure_ShouldThrowException() throws ResponseParsingException {
+    void memorizeConversation_Failure_ShouldReturnNull() throws ResponseParsingException {
         // Given
         String conversation = "test conversation";
         Prompt prompt = new Prompt("test prompt");
         when(promptBuilder.buildMemoryPrompt(conversation)).thenReturn(prompt);
         doThrow(new ResponseParsingException("LLM error")).when(llmClient).generateMemoryResponse(any(Prompt.class));
 
-        // When & Then
-        assertThrows(ResponseParsingException.class, () -> memoryService.memorizeConversation(conversation));
+        // When
+        MemoryEntry result = memoryService.memorizeConversation(conversation);
+
+        // Then
+        assertNull(result);
         verify(memoryRepository, never()).save(any(Document.class));
     }
 

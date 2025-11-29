@@ -14,6 +14,7 @@ import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
 import Tools.Actions.SearchActions;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
@@ -45,6 +46,8 @@ public class LLMClient
         this.objectMapper = JsonMapper.builder()
                 .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
                 .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
+                .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+                .configure(DeserializationFeature.READ_UNKNOWN_ENUM_VALUES_AS_NULL, true)
                 .build();
         converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
     }
@@ -66,14 +69,18 @@ public class LLMClient
     }
 
     @RateLimiter(name = "mistral_free")
-    public MemoryEntry generateMemoryResponse(Prompt prompt) {
-        MemoryResponse response = chatClient.prompt(prompt)
-                .call()
-                .entity(new BeanOutputConverter<>(MemoryResponse.class, this.objectMapper));
-        if (response == null) {
-            return null;
+    public MemoryEntry generateMemoryResponse(Prompt prompt) throws ResponseParsingException {
+        try {
+            MemoryResponse response = chatClient.prompt(prompt)
+                    .call()
+                    .entity(new BeanOutputConverter<>(MemoryResponse.class, this.objectMapper));
+            if (response == null) {
+                return null;
+            }
+            return MemoryEntry.fromMemoryResponse(response);
+        } catch (Exception e) {
+            throw new ResponseParsingException("Failed to parse MemoryResponse", e);
         }
-        return MemoryEntry.fromMemoryResponse(response);
     }
 
     @RateLimiter(name = "mistral_free")

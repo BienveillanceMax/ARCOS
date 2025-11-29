@@ -176,8 +176,6 @@ public class PromptBuilder {
         - Pleasure (P) : Positif (Joie/Satisfaction) vs Négatif (Douleur/Insatisfaction)
         - Arousal (A) : Élevé (Excitation/Colère) vs Bas (Calme/Ennui)
         - Dominance (D) : Dominant (Contrôle/Confiance) vs Soumis (Doute/Peur)
-
-        Retourne UNIQUEMENT le JSON avec les deltas.
         """;
 
         Map<String, Object> model = new HashMap<>();
@@ -227,22 +225,6 @@ public class PromptBuilder {
         prompt.append("**Indicateurs PAD :** ").append(pad.toString()).append("\n\n");
     }
 
-    private void appendOutputFormatInstructions(StringBuilder system) {
-        system.append("""
-        ## Format de Réponse
-        Tu dois répondre UNIQUEMENT au format JSON, structuré comme suit :
-        {
-          "response": "Ta réponse textuelle à l'utilisateur ici.",
-          "mood_update": {
-            "delta_pleasure": 0.1,
-            "delta_arousal": 0.0,
-            "delta_dominance": -0.1,
-            "reasoning": "Explication de ton changement d'humeur."
-          }
-        }
-        - delta_pleasure, delta_arousal, delta_dominance : valeurs entre -0.5 et +0.5 indiquant l'impact de cet échange sur ton humeur actuelle.
-        """);
-    }
 
     // ==================== SECTIONS VALEURS ====================
 
