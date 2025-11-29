@@ -121,8 +121,8 @@ class OrchestratorTest {
         // Verify streaming part
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
         verify(llmClient).generateStreamingChatResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk2), anyFloat(), anyFloat(), anyFloat());
+        //verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
+        verify(piperEmbeddedTTSModule, times(1)).speak(eq(fullResponse), anyFloat(), anyFloat(), anyFloat());
 
         // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);

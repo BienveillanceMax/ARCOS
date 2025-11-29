@@ -163,7 +163,7 @@ public class Orchestrator
 
 
                 })
-                .subscribe();
+                .subscribe(v -> {}, error -> log.error("Error generating streaming chat response", error));
     }
 
     private int findSentenceEnd(StringBuilder sb) {
