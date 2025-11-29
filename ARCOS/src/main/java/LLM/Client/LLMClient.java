@@ -17,6 +17,7 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
@@ -65,6 +66,7 @@ public class LLMClient
                 .content();
     }
 
+    @Retry(name = "llm_retry")
     @RateLimiter(name = "mistral_free")
     public MemoryEntry generateMemoryResponse(Prompt prompt) {
         MemoryResponse response = chatClient.prompt(prompt)
@@ -76,6 +78,7 @@ public class LLMClient
         return MemoryEntry.fromMemoryResponse(response);
     }
 
+    @Retry(name = "llm_retry")
     @RateLimiter(name = "mistral_free")
     public OpinionEntry generateOpinionResponse(Prompt prompt) {
         OpinionResponse response = chatClient.prompt(prompt)
@@ -88,6 +91,7 @@ public class LLMClient
         return OpinionEntry.fromOpinionResponse(response);
     }
 
+    @Retry(name = "llm_retry")
     @RateLimiter(name = "mistral_free")
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
         DesireResponse response = chatClient.prompt(prompt)
@@ -107,6 +111,7 @@ public class LLMClient
                 .content();
     }
 
+    @Retry(name = "llm_retry")
     @RateLimiter(name = "mistral_free")
     public MoodUpdate generateMoodUpdateResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
