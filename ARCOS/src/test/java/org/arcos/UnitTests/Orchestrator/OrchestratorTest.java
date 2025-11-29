@@ -4,7 +4,7 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.ConversationContext;
 import Memory.LongTermMemory.Models.DesireEntry;
@@ -24,8 +24,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.prompt.Prompt;
-
-import java.util.Collections;
 
 import reactor.core.publisher.Flux;
 

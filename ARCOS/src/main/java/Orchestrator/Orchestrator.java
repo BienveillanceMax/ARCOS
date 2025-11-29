@@ -5,7 +5,7 @@ import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import Memory.ConversationContext;
 import Memory.LongTermMemory.service.MemoryService;
 import LLM.Prompts.PromptBuilder;
@@ -68,9 +68,6 @@ public class Orchestrator
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
             processAndSpeak((String) event.getPayload());
-            triggerPersonalityProcessing(lastInteracted);
-            lastInteracted = LocalDateTime.now();
-
         } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
@@ -112,10 +109,17 @@ public class Orchestrator
         // Get Voice Parameters based on current Mood
         PadState currentPad = context.getPadState();
         MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
+        generateFluxAndSpeak(streamingPrompt,userQuery,voiceParams);
 
+
+
+
+
+    }
+
+    private void generateFluxAndSpeak(Prompt streamingPrompt, String userQuery, MoodVoiceMapper.VoiceParams voiceParams) {
         StringBuilder sentenceBuffer = new StringBuilder();
         StringBuilder fullResponse = new StringBuilder();
-
         llmClient.generateStreamingChatResponse(streamingPrompt)
                 .doOnNext(chunk -> {
                     // 1. On garde le texte brut (avec *) pour l'historique et le buffer
@@ -155,10 +159,11 @@ public class Orchestrator
                     context.addAssistantMessage(finalResponse);
                     updateMoodAsync(userQuery, finalResponse);
                     log.info("Complete response : " + fullResponse);
+                    triggerPersonalityProcessing(lastInteracted);
+
 
                 })
                 .subscribe();
-
     }
 
     private int findSentenceEnd(StringBuilder sb) {
@@ -209,10 +214,11 @@ public class Orchestrator
             try {
                 // On ne veut pas que la personnalité se déclenche à chaque interaction.
                 Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
-                if (elapsedTime.toMinutes() > 5) {
+                if (elapsedTime.toMinutes() >= 0) {             //todo change after tests
                     log.info("Triggering personality processing...");
                     String fullConversation = context.getFullConversation();
                     personalityOrchestrator.processMemory(fullConversation);
+                    lastInteracted = LocalDateTime.now();
                 }
             } catch (Exception e) {
                 log.error("Error during personality processing", e);

@@ -3,7 +3,6 @@ package Producers;
 import EventBus.EventQueue;
 import EventBus.Events.EventPriority;
 import EventBus.Events.EventType;
-import LLM.LLMClient;
 import Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
 import org.springframework.scheduling.annotation.Scheduled;

@@ -1,8 +1,10 @@
-package LLM;
+package LLM.Client;
 
 import Exceptions.DesireCreationException;
 import Exceptions.ResponseParsingException;
-import LLM.service.RateLimiterService;
+import LLM.Client.ResponseObject.DesireResponse;
+import LLM.Client.ResponseObject.MemoryResponse;
+import LLM.Client.ResponseObject.OpinionResponse;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -32,16 +34,19 @@ public class LLMClient
     private final SearchActions searchActions;
 
 
+    private final ObjectMapper objectMapper;
+
     public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions) {
         this.chatClient = chatClientBuilder.build();
         this.calendarActions = calendarActions;
         this.pythonActions = pythonActions;
         this.searchActions = searchActions;
 
-        ObjectMapper mapper = JsonMapper.builder()
+        this.objectMapper = JsonMapper.builder()
                 .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
+                .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
                 .build();
-        converter = new BeanOutputConverter<>(MoodUpdate.class, mapper);
+        converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
     }
 
 
@@ -61,34 +66,37 @@ public class LLMClient
     }
 
     @RateLimiter(name = "mistral_free")
-    public MemoryEntry generateMemoryResponse(Prompt prompt) throws ResponseParsingException {
-        return chatClient.prompt(prompt)
+    public MemoryEntry generateMemoryResponse(Prompt prompt) {
+        MemoryResponse response = chatClient.prompt(prompt)
                 .call()
-                .entity(MemoryEntry.class);
+                .entity(new BeanOutputConverter<>(MemoryResponse.class, this.objectMapper));
+        if (response == null) {
+            return null;
+        }
+        return MemoryEntry.fromMemoryResponse(response);
     }
 
     @RateLimiter(name = "mistral_free")
     public OpinionEntry generateOpinionResponse(Prompt prompt) {
-        return chatClient.prompt(prompt)
+        OpinionResponse response = chatClient.prompt(prompt)
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
-                .entity(OpinionEntry.class);
+                .entity(new BeanOutputConverter<>(OpinionResponse.class, this.objectMapper));
+        if (response == null) {
+            return null;
+        }
+        return OpinionEntry.fromOpinionResponse(response);
     }
 
     @RateLimiter(name = "mistral_free")
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
-        return chatClient.prompt(prompt)
+        DesireResponse response = chatClient.prompt(prompt)
                 .call()
-                .entity(DesireEntry.class);
-    }
-
-
-    @RateLimiter(name = "mistral_free")
-    public ConversationResponse generateConversationResponse(Prompt prompt) {
-        return chatClient.prompt(prompt)
-                .tools(calendarActions, pythonActions, searchActions)
-                .call()
-                .entity(ConversationResponse.class);
+                .entity(new BeanOutputConverter<>(DesireResponse.class, this.objectMapper));
+        if (response == null) {
+            return null;
+        }
+        return DesireEntry.fromDesireResponse(response);
     }
 
     @RateLimiter(name = "mistral_free")

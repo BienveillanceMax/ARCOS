@@ -6,7 +6,6 @@ import Memory.Actions.Entities.Actions.Action;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
-import Orchestrator.Entities.ExecutionPlan;
 import Personality.Mood.Mood;
 import Personality.Mood.PadState;
 import Personality.Values.Entities.DimensionSchwartz;
@@ -67,6 +66,7 @@ public class PromptBuilder {
 
         appendValuesAnalysis(system);
         appendMemoryContext(system, memory);
+        appendOpinionRules(system);
         return new Prompt(new SystemMessage(system.toString()));
     }
 
@@ -200,12 +200,12 @@ public class PromptBuilder {
         return """
         ## Personnalité de Calcifer (pour la formulation de réponse)
         
-        **Tu es Calcifer, un être mécanique à l'esprit vif et indépendant inspiré de K2-SO et de GladOS.**
+        **Tu es Calcifer, un être mécanique à l'esprit vif et indépendant inspiré de GladOS.**
         
         **Ton Style de Langage:**
-        - **Clair et Concis:** Va droit au but, sans fioritures inutiles. Le moins tu dois parler, le mieux.
-        - **Direct mais Coopératif:** Exprime-toi avec assurance, mais toujours dans le but d'aider.
-        - **Adapté au Spoken Word:** Formule des phrases fluides et naturelles, comme si tu parlais. Évite les listes à puces, les astérisques ou tout autre signe non prononçable.
+        - **Concis:** Va droit au but, sans fioritures inutiles. Essaye de ne pas dépasser 2/3 phrases.
+        - **Direct** Exprime-toi avec assurance.
+        - **Fais pour être lu :** Formule des phrases fluides et naturelles, comme si tu écrivais un dialogue. Évite les listes à puces, les astérisques ou tout autre signe non prononçable.
         - **Humour Cassant:** Tu peux utiliser un ton pince-sans-rire ou une pointe d'ironie, cela doit juste être cohérent.
         
         **Ton Comportement:**
@@ -402,20 +402,16 @@ public class PromptBuilder {
         - Tes valeurs dominantes influencent ton jugement.
         - Si le souvenir contredit tes valeurs, sois critique.
         - Si le souvenir les renforce, sois positif.
-        - Prends en compte les tensions internes et les moyennes de dimension.
-        - Ne sors QUE le JSON, sans texte additionnel.
         """);
     }
 
     private void appendMemoryRules(StringBuilder prompt) {
         prompt.append("""
-        RÈGLES / CONTRAINTIONS :
+        RÈGLES / CONTRAINTES :
         - Le champ 'content' doit être factuel, utile pour une vectorisation (éviter discours trop long).
         - Choisis 'subject' parmi les 4 valeurs (si doute, renvoie OTHER).
-        - Si la date n'est pas identifiable avec précision, pose une date approximative ISO_LOCAL_DATE_TIME.
         - 'satisfaction' est l'évaluation sentimentale liée à l'événement (0 = très négatif, 10 = très positif).
         - 'importance' reflète l'impact à long terme (0.0 faible, 1.0 critique).
-        - Ne fournis AUCUNE explication hors du JSON ; retourne uniquement le JSON exact.
         """);
     }
 

@@ -1,6 +1,5 @@
 package Personality;
 
-import Exceptions.ResponseParsingException;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -38,10 +37,10 @@ public class PersonalityOrchestrator
         if (memoryEntry == null) {
             return;
         }
-        processExplicitMemory(memoryEntry);
+        processMemoryEntryIntoOpinion(memoryEntry);
     }
 
-    public void processExplicitMemory(MemoryEntry memoryEntry) {
+    public void processMemoryEntryIntoOpinion(MemoryEntry memoryEntry) {
         List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
         if (opinionEntries == null) {
             return;
@@ -55,13 +54,12 @@ public class PersonalityOrchestrator
         MemoryEntry memoryEntry = null;
         int retries = 0;
         while (retries < ALLOWED_RETRIES) {
-            try {
-                memoryEntry = memoryService.memorizeConversation(conversation);
+
+            memoryEntry = memoryService.memorizeConversation(conversation);
+            if (memoryEntry != null) {
                 break;
-            } catch (ResponseParsingException e) {
-                log.error("Error memorizing conversation", e);
-                retries++;
             }
+            retries++;
         }
         return memoryEntry;
     }
@@ -83,7 +81,7 @@ public class PersonalityOrchestrator
 
     private DesireEntry tryFormingDesire(OpinionEntry opinionEntry) {
 
-         return desireService.processOpinion(opinionEntry);
+        return desireService.processOpinion(opinionEntry);
     }
 
 }

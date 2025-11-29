@@ -1,12 +1,13 @@
 package Memory.LongTermMemory.service;
 
 import Exceptions.ResponseParsingException;
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.Subject;
 import Memory.LongTermMemory.Repositories.MemoryRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.stereotype.Service;
@@ -20,7 +21,8 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-public class MemoryService {
+public class MemoryService
+{
 
     private final MemoryRepository memoryRepository;
     private final LLMClient llmClient;
@@ -60,12 +62,15 @@ public class MemoryService {
         memoryRepository.delete(List.of(memoryId));
     }
 
-    public MemoryEntry memorizeConversation(String conversation) throws ResponseParsingException {
-        // This method's implementation depends on how the LLM client generates a memory entry.
-        // For this refactoring, we'll assume the LLM client returns a MemoryEntry object.
-        MemoryEntry memoryEntry = llmClient.generateMemoryResponse(promptBuilder.buildMemoryPrompt(conversation));
-        memoryEntry.setId(UUID.randomUUID().toString());
-        storeMemory(memoryEntry);
+    public MemoryEntry memorizeConversation(String conversation) {
+
+
+        Prompt memoryPrompt = promptBuilder.buildMemoryPrompt(conversation);
+        log.info("Memory prompt = {}", memoryPrompt.toString());
+        MemoryEntry memoryEntry = llmClient.generateMemoryResponse(memoryPrompt);
+        if (memoryEntry != null) {
+            storeMemory(memoryEntry);
+        }
         return memoryEntry;
     }
 

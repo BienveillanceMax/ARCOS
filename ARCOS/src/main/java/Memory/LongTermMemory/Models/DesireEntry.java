@@ -1,5 +1,6 @@
 package Memory.LongTermMemory.Models;
 
+import LLM.Client.ResponseObject.DesireResponse;
 import io.qdrant.client.grpc.JsonWithInt;
 import io.qdrant.client.grpc.Points;
 import org.springframework.ai.document.Document;
@@ -9,11 +10,24 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 public class DesireEntry implements QdrantEntry
 {
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
+
+    public static DesireEntry fromDesireResponse(DesireResponse response) {
+        DesireEntry entry = new DesireEntry();
+
+        entry.id = UUID.randomUUID().toString();
+        entry.label = response.getLabel();
+        entry.status = response.getStatus();
+        entry.reasoning = response.getReasoning();
+        entry.setCreatedAt(LocalDateTime.now());
+        entry.setLastUpdated(LocalDateTime.now());
+        return entry;
+    }
 
     public enum Status
     {PENDING, ACTIVE, SATISFIED, ABANDONED}

@@ -1,6 +1,6 @@
 package Orchestrator;
 
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -74,7 +74,7 @@ public class InitiativeService {
                 0.8 // Assuming satisfaction
             );
             memoryService.storeMemory(memory);
-            personalityOrchestrator.processExplicitMemory(memory);
+            personalityOrchestrator.processMemoryEntryIntoOpinion(memory);
 
         } catch (Exception e) {
             log.error("An unexpected error occurred while processing initiative {}", desire.getId(), e);

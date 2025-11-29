@@ -1,5 +1,6 @@
 package Memory.LongTermMemory.Models;
 
+import LLM.Client.ResponseObject.MemoryResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.qdrant.client.grpc.JsonWithInt;
 import io.qdrant.client.grpc.Points;
@@ -180,5 +181,19 @@ public class MemoryEntry implements QdrantEntry {
         payload.put("satisfaction", this.getSatisfaction());
         payload.put("timestamp", this.getTimestamp().format(TIMESTAMP_FORMATTER));
         return payload;
+    }
+
+
+    public static MemoryEntry fromMemoryResponse(MemoryResponse memoryResponse)
+    {
+        MemoryEntry memoryEntry = new MemoryEntry();
+        memoryEntry.setId(UUID.randomUUID().toString());
+        memoryEntry.setContent(memoryResponse.getContent());
+        memoryEntry.setSubject(memoryResponse.getSubject());
+        memoryEntry.setSatisfaction(memoryResponse.getSatisfaction());
+        memoryEntry.setTimestamp(LocalDateTime.now());
+        return memoryEntry;
+
+
     }
 }

@@ -1,6 +1,6 @@
 package Orchestrator;
 
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
@@ -58,7 +58,7 @@ class InitiativeServiceTest {
 
         // Verify BDI loop closure
         verify(memoryService).storeMemory(any(MemoryEntry.class));
-        verify(personalityOrchestrator).processExplicitMemory(any(MemoryEntry.class));
+        verify(personalityOrchestrator).processMemoryEntryIntoOpinion(any(MemoryEntry.class));
     }
 
     @Test

@@ -1,12 +1,11 @@
 package Integration;
 
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.ConversationContext;
 import Personality.Mood.Mood;
 import Personality.Mood.MoodService;
 import Personality.Mood.MoodUpdate;
-import Personality.Mood.PadState;
 import Personality.Values.ValueProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

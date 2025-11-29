@@ -1,5 +1,6 @@
 package Memory.LongTermMemory.Models;
 
+import LLM.Client.ResponseObject.OpinionResponse;
 import Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.qdrant.client.grpc.JsonWithInt;
@@ -8,10 +9,7 @@ import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class OpinionEntry implements QdrantEntry
@@ -60,6 +58,23 @@ public class OpinionEntry implements QdrantEntry
     public OpinionEntry() {
         associatedMemories = new ArrayList<>();
         associatedDesire = "";
+    }
+
+    public static OpinionEntry fromOpinionResponse(OpinionResponse response) {
+        OpinionEntry entry = new OpinionEntry();
+        entry.id = UUID.randomUUID().toString();
+        entry.subject = response.getSubject();
+        entry.summary = response.getSummary();
+        entry.narrative = response.getNarrative();
+        entry.polarity = response.getPolarity();
+        entry.confidence = response.getConfidence();
+        entry.stability = response.getStability();
+        entry.associatedMemories = new ArrayList<>();
+        entry.associatedDesire = "";
+        entry.createdAt = LocalDateTime.now();
+        entry.updatedAt = LocalDateTime.now();
+        entry.mainDimension = response.getMainDimension();
+        return entry;
     }
 
     public DimensionSchwartz getMainDimension() {

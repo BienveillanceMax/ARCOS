@@ -1,6 +1,6 @@
 package Personality.Opinions;
 
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -68,7 +68,6 @@ public class OpinionService {
         Prompt prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
             opinionEntry = llmClient.generateOpinionResponse(prompt);
-            opinionEntry.setId(UUID.randomUUID().toString());
             opinionEntry.getAssociatedMemories().add(memoryEntry.getId());
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);

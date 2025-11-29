@@ -1,7 +1,7 @@
 package Personality.Desires;
 
 import Exceptions.DesireCreationException;
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;

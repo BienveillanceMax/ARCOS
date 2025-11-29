@@ -2,7 +2,7 @@ package org.arcos.UnitTests.service;
 
 
 import Exceptions.ResponseParsingException;
-import LLM.LLMClient;
+import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.Subject;
