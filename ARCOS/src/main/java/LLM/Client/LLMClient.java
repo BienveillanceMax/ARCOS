@@ -17,12 +17,15 @@ import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+@Slf4j
 @Service
 public class LLMClient
 {
@@ -47,6 +50,13 @@ public class LLMClient
                 .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
                 .build();
         converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
+        try {
+            Thread.sleep(2000);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        ChatResponse firstDebugCall = chatClient.prompt("Dis 'e'").call().chatResponse();
+        log.info(firstDebugCall.getMetadata().getModel());
     }
 
 

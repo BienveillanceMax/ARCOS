@@ -40,16 +40,6 @@ public class PersonalityOrchestrator
         processMemoryEntryIntoOpinion(memoryEntry);
     }
 
-    public void processMemoryEntryIntoOpinion(MemoryEntry memoryEntry) {
-        List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
-        if (opinionEntries == null) {
-            return;
-        }
-        for (OpinionEntry opinionEntry : opinionEntries) {
-            tryFormingDesire(opinionEntry);
-        }
-    }
-
     private MemoryEntry tryMemorizing(String conversation) {
         MemoryEntry memoryEntry = null;
         int retries = 0;
@@ -63,6 +53,17 @@ public class PersonalityOrchestrator
         }
         return memoryEntry;
     }
+
+    public void processMemoryEntryIntoOpinion(MemoryEntry memoryEntry) {
+        List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
+        if (opinionEntries == null) {
+            return;
+        }
+        for (OpinionEntry opinionEntry : opinionEntries) {
+            tryFormingDesire(opinionEntry);
+        }
+    }
+
 
     private List<OpinionEntry> tryFormingOpinion(MemoryEntry memoryEntry) {
         List<OpinionEntry> opinionEntry = null;

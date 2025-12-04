@@ -48,7 +48,7 @@ public class DesireService
     public DesireEntry processOpinion(OpinionEntry opinionEntry) {
 
         DesireEntry createdDesire;
-        if (opinionEntry.getAssociatedDesire() == null) {
+        if (opinionEntry.getAssociatedDesire() == null || opinionEntry.getAssociatedDesire().isEmpty()) {
 
             double opinionIntensity = calculateOpinionIntensity(opinionEntry);
 
