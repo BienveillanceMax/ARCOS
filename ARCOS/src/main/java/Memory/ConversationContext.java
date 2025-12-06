@@ -1,6 +1,6 @@
 package Memory;
 
-import Memory.Actions.Entities.ActionResult;
+import Tools.Actions.ActionResult;
 import Orchestrator.Entities.ExecutionPlan;
 import Personality.Mood.PadState;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -245,39 +245,6 @@ public class ConversationContext {
     public void removeSessionData(String key) {
         sessionData.remove(key);
         updateTimestamp();
-    }
-
-    // ===== GESTION DE L'HISTORIQUE DES ACTIONS =====
-
-    /**
-     * Ajoute une action exécutée à l'historique
-     */
-    public void addExecutedAction(String actionName, Map<String, Object> parameters,
-                                  ActionResult result) {
-        ExecutedAction executedAction = new ExecutedAction(actionName, parameters, result);
-        actionHistory.add(executedAction);
-        updateTimestamp();
-    }
-
-    /**
-     * Récupère les dernières actions exécutées
-     */
-    public List<ExecutedAction> getRecentActions(int count) {
-        if (actionHistory.isEmpty()) {
-            return new ArrayList<>();
-        }
-
-        int start = Math.max(0, actionHistory.size() - count);
-        return new ArrayList<>(actionHistory.subList(start, actionHistory.size()));
-    }
-
-    /**
-     * Vérifie si une action similaire a été récemment exécutée
-     */
-    public boolean hasRecentSimilarAction(String actionName, Map<String, Object> parameters) {
-        return getRecentActions(5).stream()
-                .anyMatch(action -> action.getActionName().equals(actionName) &&
-                        parametersAreSimilar(action.getParameters(), parameters));
     }
 
     // ===== GESTION DES ERREURS =====
@@ -553,9 +520,6 @@ class ExecutedAction {
 
     public Map<String, Object> getParameters() { return parameters; }
     public void setParameters(Map<String, Object> parameters) { this.parameters = parameters; }
-
-    public ActionResult getResult() { return result; }
-    public void setResult(ActionResult result) { this.result = result; }
 
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }

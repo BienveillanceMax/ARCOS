@@ -1,4 +1,4 @@
-package Memory.Actions.Entities;
+package Tools.Actions;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;

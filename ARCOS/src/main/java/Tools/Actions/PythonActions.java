@@ -1,6 +1,5 @@
 package Tools.Actions;
 
-import Memory.Actions.Entities.ActionResult;
 import Tools.PythonTool.PythonExecutor;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.tool.annotation.Tool;

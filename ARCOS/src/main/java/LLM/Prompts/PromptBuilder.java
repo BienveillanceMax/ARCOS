@@ -1,8 +1,6 @@
 package LLM.Prompts;
 
 import Memory.ConversationContext;
-import Memory.Actions.Entities.ActionResult;
-import Memory.Actions.Entities.Actions.Action;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
@@ -261,7 +259,7 @@ public class PromptBuilder {
 
         Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
         if (!suppressedValues.isEmpty()) {
-            prompt.append("**Valeurs supprimées (<30%) :**\n");
+            prompt.append("**Valeurs dominées (<30%) :**\n");
             suppressedValues.forEach((value, score) ->
                     prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
             );
@@ -400,6 +398,7 @@ public class PromptBuilder {
         prompt.append("""
         RÈGLES :
         - Tes valeurs dominantes influencent ton jugement.
+        - Parle à la première personne.
         - Si le souvenir contredit tes valeurs, sois critique.
         - Si le souvenir les renforce, sois positif.
         """);
@@ -409,9 +408,9 @@ public class PromptBuilder {
         prompt.append("""
         RÈGLES / CONTRAINTES :
         - Le champ 'content' doit être factuel, utile pour une vectorisation (éviter discours trop long).
+        - Parle à la première personne.
         - Choisis 'subject' parmi les 4 valeurs (si doute, renvoie OTHER).
         - 'satisfaction' est l'évaluation sentimentale liée à l'événement (0 = très négatif, 10 = très positif).
-        - 'importance' reflète l'impact à long terme (0.0 faible, 1.0 critique).
         """);
     }
 

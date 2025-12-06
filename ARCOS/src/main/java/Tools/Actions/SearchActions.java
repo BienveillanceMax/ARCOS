@@ -1,7 +1,6 @@
 package Tools.Actions;
 
 import Exceptions.SearchException;
-import Memory.Actions.Entities.ActionResult;
 import Tools.SearchTool.BraveSearchService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.springframework.ai.tool.annotation.Tool;

@@ -1,6 +1,4 @@
 package Tools.Actions;
-import Memory.Actions.Entities.ActionResult;
-import Memory.Actions.Entities.Actions.AddCalendarEventAction;
 import Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
@@ -24,7 +22,7 @@ import java.util.stream.Collectors;
 public class CalendarActions
 {
 
-    private static final Logger LOGGER = Logger.getLogger(AddCalendarEventAction.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(CalendarActions.class.getName());
     private final CalendarService calendarService;
 
 
