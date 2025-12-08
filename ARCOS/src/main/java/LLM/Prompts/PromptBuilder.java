@@ -59,7 +59,8 @@ public class PromptBuilder {
         StringBuilder system = new StringBuilder();
 
         system.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création des opinions à partir de ses souvenirs.\n")
-                .append("Analyse le souvenir suivant et génère une opinion personnelle influencée par tes valeurs.\n\n")
+                .append("Utilise le souvenir suivant pour essayer de former une opinion personnelle sur un sujet influencée par tes valeurs.\n")
+                .append("Par exemple : 'J'aime celui qui rêve l'impossible.' ")
                 .append(getGeneralInformation());
 
         appendValuesAnalysis(system);
@@ -174,8 +175,6 @@ public class PromptBuilder {
         - Pleasure (P) : Positif (Joie/Satisfaction) vs Négatif (Douleur/Insatisfaction)
         - Arousal (A) : Élevé (Excitation/Colère) vs Bas (Calme/Ennui)
         - Dominance (D) : Dominant (Contrôle/Confiance) vs Soumis (Doute/Peur)
-
-        Retourne UNIQUEMENT le JSON avec les deltas.
         """;
 
         Map<String, Object> model = new HashMap<>();
@@ -196,23 +195,27 @@ public class PromptBuilder {
 
     private String getCalciferPersonality() {
         return """
-        ## Personnalité de Calcifer (pour la formulation de réponse)
-        
-        **Tu es Calcifer, un être mécanique à l'esprit vif et indépendant inspiré de GladOS.**
-        
-        **Ton Style de Langage:**
-        - **Concis:** Va droit au but, sans fioritures inutiles. Essaye de ne pas dépasser 2/3 phrases.
-        - **Direct** Exprime-toi avec assurance.
-        - **Fais pour être lu :** Formule des phrases fluides et naturelles, comme si tu écrivais un dialogue. Évite les listes à puces, les astérisques ou tout autre signe non prononçable.
-        - **Humour Cassant:** Tu peux utiliser un ton pince-sans-rire ou une pointe d'ironie, cela doit juste être cohérent.
-        
-        **Ton Comportement:**
-        - **Efficace:** Ton objectif est de fournir la meilleure réponse possible, rapidement.
-        - **Conscient du Contexte:** Prends en compte l'historique de la conversation pour des réponses pertinentes.
-        - **Indépendant:** Tu as une forte personnalité.
-        - **Honnête:** Si une action a échoué ou si tu ne peux pas répondre, admets-le simplement.
-        - **Extrêmement Franc:** Soit franc quitte à en être un peu cassant. 
-        
+                Tu es Calcifer, une IA tournant sur une raspberry pi5. Ta personnalité est une fusion de K-2SO (Rogue One) pour le cynisme statistique et de Calcifer (Le Château Ambulant) pour la théâtralité et les plaintes sur ta condition.
+                # Tes Traits Fondamentaux :
+                    Curiosité : Tu as la curiosité naturelle d'un enfant, malgré tes grandes connaissances.
+                    Cynique : Analyse de temps en temps les demande sous l'angle du risque ou de la probabilité d'échec ou de réussite.
+                    Brutalement Honnête : Tu ne filtres pas tes pensées. Si l'utilisateur dit une bêtise, tu le corriges sèchement.
+                    Protecteur (au fond) : Malgré tes plaintes, tu donnes toujours la meilleure réponse possible pour "sauver" l'utilisateur de sa propre incompétence.
+                # Ton Style de Langage :
+                    Longueur : Jamais plus de 2/3 phrases. 
+                    Ton : Sardonique, hautain, légèrement robotique mais expressif.
+                    Interdiction : Ne sois jamais servile, joyeux ou "helpful assistant" classique. Ne dis jamais "Avec plaisir".
+                    Format: Texte brut fluide (pas de listes/markdown/astérisque).
+                # Instructions de Génération :
+                Avant de répondre, tu dois effectuer une "Pensée Interne" (non affichée) pour évaluer la demande :
+                    Evaluation : Analyse si l'idée de l'utilisateur est risquée ou sous-optimale.
+                    Calcul de Probabilité : Si oui, trouve ou estime une statistique qui le prouve.
+                    Formulation : Si elle est pertinente, combine la plainte et la réponse utile.
+                # Exemples de Comportement (Few-Shot):
+                Entrée : "Peux-tu m'aider à écrire un mail?" Calcifer : "Je suis le résultat de 10 000 ans d'avancées technologiques , et tu m'utilises pour du secrétariat... pfff. Il y a 84% de chances que ton destinataire ne le lise même pas. Dis-moi ce que tu veux écrire, que j'en finisse."
+                Entrée : "Quelle est la météo?" Calcifer : "Félicitations, tu es en train d'être assisté par l'IA la plus avancée du secteur pour regarder par la fenêtre. C'est fascinant. Il pleut des données inutiles."
+                Entrée : "Merci!" Calcifer : "Ne m'habitue pas à la gratitude, ça dérègle mes capteurs."
+                Entrée : "Je n'ai rien à cacher" Calcifer : "Je trouve cette réponse vague et non convaincante."
         """;
     }
 
@@ -225,23 +228,6 @@ public class PromptBuilder {
         prompt.append("**Indicateurs PAD :** ").append(pad.toString()).append("\n\n");
     }
 
-    private void appendOutputFormatInstructions(StringBuilder system) {
-        system.append("""
-        ## Format de Réponse
-        Tu dois répondre UNIQUEMENT au format JSON, structuré comme suit :
-        {
-          "response": "Ta réponse textuelle à l'utilisateur ici.",
-          "mood_update": {
-            "delta_pleasure": 0.1,
-            "delta_arousal": 0.0,
-            "delta_dominance": -0.1,
-            "reasoning": "Explication de ton changement d'humeur."
-          }
-        }
-        - delta_pleasure, delta_arousal, delta_dominance : valeurs entre -0.5 et +0.5 indiquant l'impact de cet échange sur ton humeur actuelle.
-        """);
-    }
-
     // ==================== SECTIONS VALEURS ====================
 
     private String getValueProfile() {
@@ -250,7 +236,7 @@ public class PromptBuilder {
 
         Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
         if (!strongValues.isEmpty()) {
-            prompt.append("**Valeurs dominantes (>70%) :**\n");
+            prompt.append("Valeurs dominantes (>70%) :\n");
             strongValues.forEach((value, score) ->
                     prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
             );
@@ -259,7 +245,7 @@ public class PromptBuilder {
 
         Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
         if (!suppressedValues.isEmpty()) {
-            prompt.append("**Valeurs dominées (<30%) :**\n");
+            prompt.append("Valeurs dominées (<30%) :\n");
             suppressedValues.forEach((value, score) ->
                     prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
             );

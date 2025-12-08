@@ -111,7 +111,7 @@ public class ConversationContext {
 
         // Maintient la taille de l'historique
         while (messageHistory.size() > maxHistorySize) {
-            messageHistory.remove(0);
+            messageHistory.removeFirst();
         }
 
         updateTimestamp();
@@ -194,7 +194,7 @@ public class ConversationContext {
     @SuppressWarnings("unchecked")
     public <T> T getUserPreference(String key, Class<T> type) {
         Object value = userPreferences.get(key);
-        if (value != null && type.isInstance(value)) {
+        if (type.isInstance(value)) {
             return (T) value;
         }
         return null;
