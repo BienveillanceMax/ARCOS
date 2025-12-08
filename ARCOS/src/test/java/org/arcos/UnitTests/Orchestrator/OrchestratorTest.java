@@ -3,7 +3,7 @@ package org.arcos.UnitTests.Orchestrator;
 import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
-import IO.OuputHandling.PiperEmbeddedTTSModule;
+import IO.OuputHandling.KokoroEmbeddedTTSModule;
 import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.ConversationContext;
@@ -65,7 +65,7 @@ class OrchestratorTest {
     private BraveSearchService braveSearchService;
 
     @Mock
-    private PiperEmbeddedTTSModule piperEmbeddedTTSModule;
+    private KokoroEmbeddedTTSModule kokoroEmbeddedTTSModule;
 
     @Mock
     private MoodService moodService;
@@ -84,7 +84,7 @@ class OrchestratorTest {
                 conversationContext,
                 memoryService,
                 initiativeService,
-                piperEmbeddedTTSModule,
+                kokoroEmbeddedTTSModule,
                 moodService,
                 moodVoiceMapper
         );
@@ -112,7 +112,7 @@ class OrchestratorTest {
         when(conversationContext.getPadState()).thenReturn(new PadState());
         when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
 
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class), anyFloat(), anyFloat(), anyFloat());
+        doNothing().when(kokoroEmbeddedTTSModule).speak(any(String.class), anyFloat(), anyFloat(), anyFloat());
 
         // When
         orchestrator.dispatch(wakeWordEvent);
@@ -121,8 +121,8 @@ class OrchestratorTest {
         // Verify streaming part
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
         verify(llmClient).generateStreamingChatResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk2), anyFloat(), anyFloat(), anyFloat());
+        verify(kokoroEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
+        verify(kokoroEmbeddedTTSModule, times(1)).speak(eq(responseChunk2), anyFloat(), anyFloat(), anyFloat());
 
         // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);
@@ -157,14 +157,14 @@ class OrchestratorTest {
         Event<String> calendarEvent = new Event<>(EventType.CALENDAR_EVENT_SCHEDULER, calendarEventPayload, "test");
         when(promptBuilder.buildSchedulerAlertPrompt(calendarEventPayload)).thenReturn(new Prompt("test prompt"));
         when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("test response");
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class));
+        doNothing().when(kokoroEmbeddedTTSModule).speak(any(String.class));
 
         // When
         orchestrator.dispatch(calendarEvent);
 
         // Then
         verify(llmClient).generateToollessResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule).speak("test response");
+        verify(kokoroEmbeddedTTSModule).speak("test response");
     }
 }
 

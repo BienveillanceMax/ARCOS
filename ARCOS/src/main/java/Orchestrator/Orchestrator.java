@@ -3,7 +3,7 @@ package Orchestrator;
 import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
-import IO.OuputHandling.PiperEmbeddedTTSModule;
+import IO.OuputHandling.KokoroEmbeddedTTSModule;
 import Memory.LongTermMemory.Models.DesireEntry;
 import LLM.Client.LLMClient;
 import Memory.ConversationContext;
@@ -35,7 +35,7 @@ public class Orchestrator
     private final ConversationContext context;
     private final MemoryService memoryService;
     private final InitiativeService initiativeService;
-    private final PiperEmbeddedTTSModule ttsHandler;
+    private final KokoroEmbeddedTTSModule ttsHandler;
     private final PersonalityOrchestrator personalityOrchestrator;
     private final MoodService moodService;
     private final MoodVoiceMapper moodVoiceMapper;
@@ -45,11 +45,11 @@ public class Orchestrator
 
     @Autowired
     public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule(), moodService, moodVoiceMapper);
+        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new KokoroEmbeddedTTSModule(), moodService, moodVoiceMapper);
         this.desireService = desireService;
     }
 
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, KokoroEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
