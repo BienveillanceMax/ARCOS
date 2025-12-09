@@ -9,10 +9,10 @@ public class KokoroEmbeddedTTSModule {
     private static final String KOKORO_SCRIPT = "kokoro_tts.py";
     private static final String KOKORO_DIR = System.getProperty("user.home") + "/.kokoro-tts";
     private static final String VENV_DIR = KOKORO_DIR + "/venv";
-    private static final String MODEL_URL = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.int8.onnx";
-    private static final String VOICES_URL = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.json";
-    private static final String MODEL_FILE = "kokoro-v0_19.int8.onnx";
-    private static final String VOICES_FILE = "voices.json";
+    private static final String MODEL_URL = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx";
+    private static final String VOICE_URL = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/voices/ff_siwis.bin";
+    private static final String MODEL_FILE = "model_quantized.onnx";
+    private static final String VOICE_FILE = "ff_siwis.bin";
 
     private final ExecutorService executor;
     private File scriptFile;
@@ -51,10 +51,10 @@ public class KokoroEmbeddedTTSModule {
                 downloadFile(MODEL_URL, modelFile);
             }
 
-            File voicesFile = new File(KOKORO_DIR, VOICES_FILE);
-            if (!voicesFile.exists()) {
-                System.out.println("Downloading voices.json...");
-                downloadFile(VOICES_URL, voicesFile);
+            File voiceFile = new File(KOKORO_DIR, VOICE_FILE);
+            if (!voiceFile.exists()) {
+                System.out.println("Downloading voice file...");
+                downloadFile(VOICE_URL, voiceFile);
             }
         } catch (Exception e) {
             throw new RuntimeException("Failed to download Kokoro resources", e);
@@ -185,10 +185,9 @@ public class KokoroEmbeddedTTSModule {
                     "--text", text,
                     "--output_file", audioFile.getAbsolutePath(),
                     "--lang", lang,
-                    "--voice", voice,
+                    "--voice_path", new File(KOKORO_DIR, VOICE_FILE).getAbsolutePath(),
                     "--speed", String.valueOf(speed),
-                    "--model_path", new File(KOKORO_DIR, MODEL_FILE).getAbsolutePath(),
-                    "--voices_path", new File(KOKORO_DIR, VOICES_FILE).getAbsolutePath()
+                    "--model_path", new File(KOKORO_DIR, MODEL_FILE).getAbsolutePath()
             );
 
             pb.redirectErrorStream(true);
