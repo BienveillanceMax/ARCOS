@@ -3,13 +3,20 @@ package IO.OuputHandling;
 import java.io.*;
 import java.nio.file.*;
 import java.util.concurrent.*;
+import java.nio.file.StandardCopyOption;
 
 public class KokoroEmbeddedTTSModule {
     private static final String KOKORO_SCRIPT = "kokoro_tts.py";
     private static final String KOKORO_DIR = System.getProperty("user.home") + "/.kokoro-tts";
+    private static final String VENV_DIR = KOKORO_DIR + "/venv";
+    private static final String MODEL_URL = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v0_19.int8.onnx";
+    private static final String VOICES_URL = "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/voices.json";
+    private static final String MODEL_FILE = "kokoro-v0_19.int8.onnx";
+    private static final String VOICES_FILE = "voices.json";
 
     private final ExecutorService executor;
     private File scriptFile;
+    private String pythonExecutable;
 
     public KokoroEmbeddedTTSModule() {
         this.executor = Executors.newSingleThreadExecutor();
@@ -29,8 +36,44 @@ public class KokoroEmbeddedTTSModule {
         System.out.println("Extracting Kokoro script from resources to " + scriptFile.getAbsolutePath());
         copyResourceToFile(KOKORO_SCRIPT, scriptFile);
 
+        // Download model and voices if missing
+        downloadResources();
+
         // Verify python installation and script execution
         verifyInstallation();
+    }
+
+    private void downloadResources() {
+        try {
+            File modelFile = new File(KOKORO_DIR, MODEL_FILE);
+            if (!modelFile.exists()) {
+                System.out.println("Downloading Kokoro model...");
+                downloadFile(MODEL_URL, modelFile);
+            }
+
+            File voicesFile = new File(KOKORO_DIR, VOICES_FILE);
+            if (!voicesFile.exists()) {
+                System.out.println("Downloading voices.json...");
+                downloadFile(VOICES_URL, voicesFile);
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to download Kokoro resources", e);
+        }
+    }
+
+    private void downloadFile(String urlStr, File destFile) throws IOException {
+        File tempFile = new File(destFile.getAbsolutePath() + ".tmp");
+        java.net.URL url = new java.net.URL(urlStr);
+        try (java.io.InputStream in = url.openStream()) {
+            java.nio.file.Files.copy(in, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            java.nio.file.Files.move(tempFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            // Clean up temp file on failure
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
+            throw e;
+        }
     }
 
     private void copyResourceToFile(String resourcePath, File destFile) throws Exception {
@@ -51,38 +94,56 @@ public class KokoroEmbeddedTTSModule {
 
     private void verifyInstallation() {
         try {
-            System.out.println("Verifying Kokoro script at: " + scriptFile.getAbsolutePath());
+            System.out.println("Verifying Kokoro environment...");
 
-            // Check if python3 is available
-            ProcessBuilder pb = new ProcessBuilder("python3", "--version");
-            if (System.getProperty("os.name").toLowerCase().contains("win")) {
-                pb = new ProcessBuilder("python", "--version");
+            // Determine system python command
+            String systemPython = System.getProperty("os.name").toLowerCase().contains("win") ? "python" : "python3";
+
+            // Check if venv exists, if not create it
+            File venvDir = new File(VENV_DIR);
+            if (!venvDir.exists()) {
+                System.out.println("Creating Python virtual environment in " + VENV_DIR);
+                ProcessBuilder pb = new ProcessBuilder(systemPython, "-m", "venv", VENV_DIR);
+                pb.inheritIO();
+                if (pb.start().waitFor() != 0) {
+                    throw new RuntimeException("Failed to create virtual environment");
+                }
             }
 
+            // Determine venv python executable
+            if (System.getProperty("os.name").toLowerCase().contains("win")) {
+                pythonExecutable = new File(venvDir, "Scripts/python.exe").getAbsolutePath();
+            } else {
+                pythonExecutable = new File(venvDir, "bin/python").getAbsolutePath();
+            }
+
+            // Install requirements
+            System.out.println("Installing dependencies (misaki[fr], onnxruntime, soundfile, numpy)...");
+            ProcessBuilder pb = new ProcessBuilder(pythonExecutable, "-m", "pip", "install",
+                "misaki[fr]", "onnxruntime", "soundfile", "numpy");
+            pb.inheritIO();
+            if (pb.start().waitFor() != 0) {
+                 // Try simple misaki if [fr] fails (zsh/bash escaping issues sometimes)
+                 System.out.println("Retrying dependency installation...");
+                 pb = new ProcessBuilder(pythonExecutable, "-m", "pip", "install",
+                    "misaki", "espeak-ng", "onnxruntime", "soundfile", "numpy");
+                 pb.inheritIO();
+                 if (pb.start().waitFor() != 0) {
+                     throw new RuntimeException("Failed to install dependencies");
+                 }
+            }
+
+            // Verify script execution
+            pb = new ProcessBuilder(pythonExecutable, scriptFile.getAbsolutePath(), "--help");
             pb.redirectErrorStream(true);
             Process process = pb.start();
-            int exitCode = process.waitFor();
-
-            if (exitCode != 0) {
-                throw new RuntimeException("Python 3 not found. Please install Python 3.");
-            }
-
-            // Check if kokoro is installed (optional, maybe just check if we can run help on script)
-            pb = new ProcessBuilder(
-                    System.getProperty("os.name").toLowerCase().contains("win") ? "python" : "python3",
-                    scriptFile.getAbsolutePath(),
-                    "--help"
-            );
-            pb.redirectErrorStream(true);
-            process = pb.start();
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     // System.out.println("Kokoro help: " + line);
                 }
             }
-            exitCode = process.waitFor();
-            if (exitCode != 0) {
+            if (process.waitFor() != 0) {
                 throw new RuntimeException("Kokoro script verification failed.");
             }
 
@@ -119,13 +180,15 @@ public class KokoroEmbeddedTTSModule {
 
             // Build command
             ProcessBuilder pb = new ProcessBuilder(
-                    System.getProperty("os.name").toLowerCase().contains("win") ? "python" : "python3",
+                    pythonExecutable,
                     scriptFile.getAbsolutePath(),
                     "--text", text,
                     "--output_file", audioFile.getAbsolutePath(),
                     "--lang", lang,
                     "--voice", voice,
-                    "--speed", String.valueOf(speed)
+                    "--speed", String.valueOf(speed),
+                    "--model_path", new File(KOKORO_DIR, MODEL_FILE).getAbsolutePath(),
+                    "--voices_path", new File(KOKORO_DIR, VOICES_FILE).getAbsolutePath()
             );
 
             pb.redirectErrorStream(true);
