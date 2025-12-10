@@ -6,7 +6,7 @@ import java.util.concurrent.*;
 import java.nio.file.StandardCopyOption;
 
 public class KokoroEmbeddedTTSModule {
-    private static final String KOKORO_SCRIPT = "kokoro_tts.py";
+    private static final String KOKORO_SCRIPT = "kokoro_onnx.py";
     private static final String KOKORO_DIR = System.getProperty("user.home") + "/.kokoro-tts";
     private static final String VENV_DIR = KOKORO_DIR + "/venv";
     private static final String MODEL_URL = "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/onnx/model_quantized.onnx";
