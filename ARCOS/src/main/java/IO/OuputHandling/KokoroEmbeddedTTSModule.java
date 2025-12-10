@@ -77,55 +77,101 @@ public class KokoroEmbeddedTTSModule {
     }
 
     private void copyResourceToFile(String resourcePath, File destFile) throws Exception {
-        InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
-        if (is == null) {
-            is = getClass().getResourceAsStream("/" + resourcePath);
+        // Embed the script content directly to avoid resource loading issues
+        String scriptContent = "import argparse\n" +
+"import os\n" +
+"import json\n" +
+"import numpy as np\n" +
+"import soundfile as sf\n" +
+"import onnxruntime as ort\n" +
+"from misaki import en, espeak\n" +
+"\n" +
+"def main():\n" +
+"    parser = argparse.ArgumentParser(description='Kokoro TTS Inference')\n" +
+"    parser.add_argument('--text', type=str, required=True, help='Text to speak')\n" +
+"    parser.add_argument('--output_file', type=str, required=True, help='Output WAV file path')\n" +
+"    parser.add_argument('--lang', type=str, default='f', help='Language code (default: f)')\n" +
+"    parser.add_argument('--voice_path', type=str, required=True, help='Path to voice .bin file')\n" +
+"    parser.add_argument('--speed', type=float, default=1.0, help='Speech speed')\n" +
+"    parser.add_argument('--model_path', type=str, default='model_quantized.onnx', help='Path to ONNX model')\n" +
+"    \n" +
+"    args = parser.parse_args()\n" +
+"\n" +
+"    # Load voice\n" +
+"    # Voice is stored as a raw numpy array, typically (256,) or (1, 256)\n" +
+"    try:\n" +
+"        voice_style = np.fromfile(args.voice_path, dtype=np.float32)\n" +
+"    except Exception as e:\n" +
+"        print(f\"Error loading voice file: {e}\")\n" +
+"        return\n" +
+"\n" +
+"    # Check shape and reshape if necessary\n" +
+"    # Model expects (1, 256) usually\n" +
+"    if voice_style.ndim == 1:\n" +
+"        voice_style = voice_style.reshape(1, -1) # (1, 256)\n" +
+"    \n" +
+"    # Tokenize\n" +
+"    # Kokoro v0.19 uses misaki for G2P.\n" +
+"    # Lang 'f' for French.\n" +
+"    \n" +
+"    phonemes = \"\"\n" +
+"    if args.lang == 'f':\n" +
+"        try:\n" +
+"            # Try to use misaki's french support via espeak-ng if available\n" +
+"            # Note: misaki might not have direct 'fr' function like `en`\n" +
+"            # We use espeak via misaki or directly\n" +
+"            phonemes = espeak.phonemize(args.text, args.lang)\n" +
+"        except Exception as e:\n" +
+"            print(f\"Error phonemizing: {e}\")\n" +
+"            return\n" +
+"    else:\n" +
+"         # Fallback or other languages\n" +
+"         phonemes = espeak.phonemize(args.text, args.lang)\n" +
+"    \n" +
+"    if not phonemes:\n" +
+"        print(\"Empty phonemes result\")\n" +
+"        return\n" +
+"\n" +
+"    # Tokenize phonemes\n" +
+"    # Kokoro has a specific vocabulary.\n" +
+"    # v0.19 vocab is standard.\n" +
+"    \n" +
+"    vocab = \"pad_ $;,.?!\\u00a1\\u00bf\\u2014\\u2026\\u2191\\u2193\\u201c\\u201d\\u00e0\\u00e1\\u00e2\\u00e3\\u00e4\\u00e5\\u00e6\\u00e7\\u00e8\\u00e9\\u00ea\\u00eb\\u00ec\\u00ed\\u00ee\\u00ef\\u00f1\\u00f2\\u00f3\\u00f4\\u00f5\\u00f6\\u00f9\\u00fa\\u00fb\\u00fc\\u00ff\\u0101\\u0105\\u0107\\u010d\\u0113\\u0119\\u011b\\u012b\\u0131\\u0142\\u0144\\u014d\\u0151\\u0153\\u015b\\u0161\\u016b\\u017a\\u017c\\u017e\\u017f\\u0250\\u0251\\u0252\\u0253\\u0254\\u0255\\u0256\\u0257\\u0259\\u025a\\u025b\\u025c\\u025d\\u025e\\u025f\\u0260\\u0261\\u0262\\u0263\\u0264\\u0265\\u0266\\u0267\\u0268\\u0269\\u026a\\u026b\\u026c\\u026d\\u026e\\u026f\\u0270\\u0271\\u0272\\u0273\\u0274\\u0275\\u0276\\u0277\\u0278\\u0279\\u027a\\u027b\\u027c\\u027d\\u027e\\u027f\\u0280\\u0281\\u0282\\u0283\\u0284\\u0285\\u0286\\u0287\\u0288\\u0289\\u028a\\u028b\\u028c\\u028d\\u028e\\u028f\\u0290\\u0291\\u0292\\u0293\\u0294\\u0295\\u0296\\u0297\\u0298\\u0299\\u029a\\u029b\\u029c\\u029d\\u029e\\u029f\\u02a0\\u02a1\\u02a2\\u02a3\\u02a4\\u02a5\\u02a6\\u02a7\\u02a8\\u02ac\\u02b0\\u02b1\\u02b2\\u02b4\\u02b7\\u02b9\\u02bb\\u02bc\\u02bd\\u02be\\u02bf\\u02c0\\u02c1\\u02c8\\u02cc\\u02d0\\u02d1\\u0300\\u0301\\u0302\\u0303\\u0304\\u0306\\u0308\\u030a\\u030b\\u030c\\u030f\\u0311\\u031a\\u031c\\u0323\\u0324\\u0325\\u0329\\u032f\\u0330\\u0339\\u033d\\u1d00\\u1d07\\u1d0a\\u1d0d\\u1d1c\\u1d20\\u1d21\\u1d25\\u1d6a\\u1d77\\u1d79\\u1d96\\u207f\"\n" +
+"    token_map = {c: i for i, c in enumerate(vocab)}\n" +
+"    \n" +
+"    tokens = [token_map.get(c, 0) for c in phonemes]\n" +
+"    \n" +
+"    # Truncate if too long (510 max usually for BERT-like, but Kokoro context is 512)\n" +
+"    if len(tokens) > 510:\n" +
+"        tokens = tokens[:510]\n" +
+"        \n" +
+"    input_ids = [0] + tokens + [0]\n" +
+"    \n" +
+"    # Inference\n" +
+"    sess = ort.InferenceSession(args.model_path)\n" +
+"    \n" +
+"    # Check model inputs\n" +
+"    # inputs: input_ids, style, speed\n" +
+"    \n" +
+"    inputs = {\n" +
+"        'input_ids': np.array([input_ids], dtype=np.int64),\n" +
+"        'style': voice_style,\n" +
+"        'speed': np.array([args.speed], dtype=np.float32)\n" +
+"    }\n" +
+"    \n" +
+"    audio = sess.run(None, inputs)[0]\n" +
+"    \n" +
+"    # Save\n" +
+"    sf.write(args.output_file, audio[0], 24000)\n" +
+"\n" +
+"if __name__ == \"__main__\":\n" +
+"    main()\n";
+
+        destFile.getParentFile().mkdirs();
+        try (FileWriter writer = new FileWriter(destFile)) {
+            writer.write(scriptContent);
         }
-
-        if (is == null) {
-            System.out.println("Resource " + resourcePath + " not found in classpath. Checking local files...");
-            System.out.println("Current working directory: " + System.getProperty("user.dir"));
-
-            try {
-                java.net.URL codeSource = getClass().getProtectionDomain().getCodeSource().getLocation();
-                System.out.println("Code source: " + codeSource);
-                File codeLocation = new File(codeSource.toURI());
-                if (codeLocation.isDirectory()) {
-                    File resourceFile = new File(codeLocation, resourcePath);
-                    System.out.println("Checking code source location: " + resourceFile.getAbsolutePath());
-                    if (resourceFile.exists()) {
-                        System.out.println("Found resource in code source.");
-                        Files.copy(resourceFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                        return;
-                    }
-                }
-            } catch (Exception e) {
-                System.out.println("Failed to check code source: " + e.getMessage());
-            }
-
-            // Fallback: try local files
-            File[] tryPaths = {
-                new File("ARCOS/src/main/resources/" + resourcePath),
-                new File("src/main/resources/" + resourcePath),
-                new File("../src/main/resources/" + resourcePath), // Try parent relative path
-                new File(System.getProperty("user.dir"), "ARCOS/src/main/resources/" + resourcePath)
-            };
-
-            for (File localFile : tryPaths) {
-                System.out.println("Checking: " + localFile.getAbsolutePath());
-                if (localFile.exists()) {
-                    System.out.println("Found resource file at: " + localFile.getAbsolutePath());
-                    Files.copy(localFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-                    return;
-                }
-            }
-            throw new FileNotFoundException("Resource not found: " + resourcePath);
-        }
-
-        try (InputStream input = is) {
-            destFile.getParentFile().mkdirs();
-            Files.copy(input, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        System.out.println("Written embedded Kokoro script to " + destFile.getAbsolutePath());
     }
 
     private void verifyInstallation() {
