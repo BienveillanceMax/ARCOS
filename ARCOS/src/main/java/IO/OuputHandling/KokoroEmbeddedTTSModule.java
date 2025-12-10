@@ -86,11 +86,28 @@ public class KokoroEmbeddedTTSModule {
             System.out.println("Resource " + resourcePath + " not found in classpath. Checking local files...");
             System.out.println("Current working directory: " + System.getProperty("user.dir"));
 
+            try {
+                java.net.URL codeSource = getClass().getProtectionDomain().getCodeSource().getLocation();
+                System.out.println("Code source: " + codeSource);
+                File codeLocation = new File(codeSource.toURI());
+                if (codeLocation.isDirectory()) {
+                    File resourceFile = new File(codeLocation, resourcePath);
+                    System.out.println("Checking code source location: " + resourceFile.getAbsolutePath());
+                    if (resourceFile.exists()) {
+                        System.out.println("Found resource in code source.");
+                        Files.copy(resourceFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                        return;
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Failed to check code source: " + e.getMessage());
+            }
+
             // Fallback: try local files
             File[] tryPaths = {
                 new File("ARCOS/src/main/resources/" + resourcePath),
                 new File("src/main/resources/" + resourcePath),
-                new File("src/main/resources/" + resourcePath),
+                new File("../src/main/resources/" + resourcePath), // Try parent relative path
                 new File(System.getProperty("user.dir"), "ARCOS/src/main/resources/" + resourcePath)
             };
 
