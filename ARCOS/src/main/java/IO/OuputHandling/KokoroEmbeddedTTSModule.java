@@ -83,13 +83,19 @@ public class KokoroEmbeddedTTSModule {
         }
 
         if (is == null) {
+            System.out.println("Resource " + resourcePath + " not found in classpath. Checking local files...");
+            System.out.println("Current working directory: " + System.getProperty("user.dir"));
+
             // Fallback: try local files
             File[] tryPaths = {
                 new File("ARCOS/src/main/resources/" + resourcePath),
-                new File("src/main/resources/" + resourcePath)
+                new File("src/main/resources/" + resourcePath),
+                new File("src/main/resources/" + resourcePath),
+                new File(System.getProperty("user.dir"), "ARCOS/src/main/resources/" + resourcePath)
             };
 
             for (File localFile : tryPaths) {
+                System.out.println("Checking: " + localFile.getAbsolutePath());
                 if (localFile.exists()) {
                     System.out.println("Found resource file at: " + localFile.getAbsolutePath());
                     Files.copy(localFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
