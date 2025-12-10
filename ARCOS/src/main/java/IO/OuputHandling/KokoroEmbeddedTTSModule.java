@@ -118,19 +118,12 @@ public class KokoroEmbeddedTTSModule {
             }
 
             // Install requirements
-            System.out.println("Installing dependencies (misaki[fr], onnxruntime, soundfile, numpy)...");
+            System.out.println("Installing dependencies (misaki, num2words, phonemizer-fork, espeakng-loader, onnxruntime, soundfile, numpy)...");
             ProcessBuilder pb = new ProcessBuilder(pythonExecutable, "-m", "pip", "install",
-                "misaki[fr]", "onnxruntime", "soundfile", "numpy");
+                "misaki", "num2words", "phonemizer-fork", "espeakng-loader", "onnxruntime", "soundfile", "numpy");
             pb.inheritIO();
             if (pb.start().waitFor() != 0) {
-                 // Try simple misaki if [fr] fails (zsh/bash escaping issues sometimes)
-                 System.out.println("Retrying dependency installation...");
-                 pb = new ProcessBuilder(pythonExecutable, "-m", "pip", "install",
-                    "misaki", "espeak-ng", "onnxruntime", "soundfile", "numpy");
-                 pb.inheritIO();
-                 if (pb.start().waitFor() != 0) {
-                     throw new RuntimeException("Failed to install dependencies");
-                 }
+                 throw new RuntimeException("Failed to install dependencies");
             }
 
             // Verify script execution
@@ -140,7 +133,7 @@ public class KokoroEmbeddedTTSModule {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    // System.out.println("Kokoro help: " + line);
+                    System.out.println("Kokoro help: " + line);
                 }
             }
             if (process.waitFor() != 0) {
