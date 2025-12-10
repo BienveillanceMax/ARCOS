@@ -77,18 +77,31 @@ public class KokoroEmbeddedTTSModule {
     }
 
     private void copyResourceToFile(String resourcePath, File destFile) throws Exception {
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
-            if (is == null) {
-                // If not found in classpath (e.g. running from IDE without packaging), try local file
-                File localFile = new File("ARCOS/src/main/resources/" + resourcePath);
+        InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath);
+        if (is == null) {
+            is = getClass().getResourceAsStream("/" + resourcePath);
+        }
+
+        if (is == null) {
+            // Fallback: try local files
+            File[] tryPaths = {
+                new File("ARCOS/src/main/resources/" + resourcePath),
+                new File("src/main/resources/" + resourcePath)
+            };
+
+            for (File localFile : tryPaths) {
                 if (localFile.exists()) {
+                    System.out.println("Found resource file at: " + localFile.getAbsolutePath());
                     Files.copy(localFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
                     return;
                 }
-                throw new FileNotFoundException("Resource not found: " + resourcePath);
             }
+            throw new FileNotFoundException("Resource not found: " + resourcePath);
+        }
+
+        try (InputStream input = is) {
             destFile.getParentFile().mkdirs();
-            Files.copy(is, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            Files.copy(input, destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
     }
 
