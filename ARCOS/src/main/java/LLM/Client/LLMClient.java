@@ -8,7 +8,6 @@ import LLM.Client.ResponseObject.OpinionResponse;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Models.MemoryEntry;
 import Memory.LongTermMemory.Models.OpinionEntry;
-import Personality.Mood.ConversationResponse;
 import Personality.Mood.MoodUpdate;
 import Tools.Actions.CalendarActions;
 import Tools.Actions.PythonActions;
@@ -50,13 +49,14 @@ public class LLMClient
                 .enable(JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS)
                 .build();
         converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
-        try {
+
+       /* try {
             Thread.sleep(2000);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
-        ChatResponse firstDebugCall = chatClient.prompt("Dis 'e'").call().chatResponse();
-        log.info(firstDebugCall.getMetadata().getModel());
+        ChatResponse firstDebugCall = chatClient.prompt("Dis 'e'").call().chatResponse(); // Useful to get the model used
+        log.info(firstDebugCall.getMetadata().getModel());*/
     }
 
 

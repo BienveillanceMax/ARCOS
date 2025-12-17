@@ -20,11 +20,11 @@ public class MistralTimeoutConfig {
     public WebClientCustomizer mistralWebClientCustomizer() {
         return webClientBuilder -> {
             HttpClient httpClient = HttpClient.create()
-                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 60_000)
-                    .responseTimeout(Duration.ofSeconds(60))
+                    .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 120_000)
+                    .responseTimeout(Duration.ofSeconds(120))
                     .doOnConnected(conn ->
-                            conn.addHandlerLast(new ReadTimeoutHandler(60, TimeUnit.SECONDS))
-                                    .addHandlerLast(new WriteTimeoutHandler(60, TimeUnit.SECONDS)));
+                            conn.addHandlerLast(new ReadTimeoutHandler(120, TimeUnit.SECONDS))
+                                    .addHandlerLast(new WriteTimeoutHandler(120, TimeUnit.SECONDS)));
 
             webClientBuilder.clientConnector(new ReactorClientHttpConnector(httpClient));
         };
@@ -37,8 +37,8 @@ public class MistralTimeoutConfig {
             // Ici, on peut utiliser simple request factory ou réutiliser Netty si on veut être uniforme
             // Pour faire simple comme dans votre exemple :
             restClientBuilder.requestFactory(new org.springframework.http.client.SimpleClientHttpRequestFactory() {{
-                setConnectTimeout(60_000);
-                setReadTimeout(60_000);
+                setConnectTimeout(120_000);
+                setReadTimeout(120_000);
             }});
         };
     }

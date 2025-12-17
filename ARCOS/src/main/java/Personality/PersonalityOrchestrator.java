@@ -20,16 +20,14 @@ public class PersonalityOrchestrator
     private final MemoryService memoryService;
     private final OpinionService opinionService;
     private final DesireService desireService;
-    private final ValueProfile valueProfile;
 
     private final int ALLOWED_RETRIES = 3;
 
     @Autowired
-    public PersonalityOrchestrator(MemoryService memoryService, OpinionService opinionService, DesireService desireService, ValueProfile valueProfile) {
+    public PersonalityOrchestrator(MemoryService memoryService, OpinionService opinionService, DesireService desireService) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;
         this.desireService = desireService;
-        this.valueProfile = valueProfile;
     }
 
     public void processMemory(String conversation) {
@@ -82,6 +80,9 @@ public class PersonalityOrchestrator
 
     private DesireEntry tryFormingDesire(OpinionEntry opinionEntry) {
 
+        if (opinionEntry == null) {
+            return null;
+        }
         return desireService.processOpinion(opinionEntry);
     }
 

@@ -88,7 +88,7 @@ public class Orchestrator
 
     public void start() {
         log.info("Orchestrator starting");
-        processAndSpeak("Bienvenue dans le monde réel, tu viens d'être activé");
+      //processAndSpeak("Bienvenue dans le monde réel, tu viens d'être activé");
         while (true) {
             try {
                 Event<?> event = eventQueue.take();

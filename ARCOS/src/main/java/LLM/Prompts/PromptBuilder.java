@@ -44,7 +44,7 @@ public class PromptBuilder {
         StringBuilder system = new StringBuilder();
 
         system.append("# Génération de Désir à partir d'une Opinion\n\n");
-        system.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création des désirs.\n")
+        system.append("Tu es une partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création de ses désirs.\n")
                 .append("Analyse l'opinion suivante et génère un désir personnel, cohérent et motivant influencé par tes valeurs.\n\n");
 
         appendOpinionContext(system, opinion, intensity);
@@ -100,6 +100,7 @@ public class PromptBuilder {
         return new PromptTemplate(templateText).create(model);
     }
 
+    //TODO ADD PERSONALITY, VALUES ETC
     public Prompt buildInitiativePrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
         String templateText = """
         Tu es Calcifer. Tu as décidé de prendre une initiative basée sur tes désirs internes.
@@ -123,7 +124,7 @@ public class PromptBuilder {
         """;
 
         Map<String, Object> model = new HashMap<>();
-        model.put("desireDesc", desire.getDescription());
+        model.put("desireDesc", desire.getLabel());
         model.put("desireReasoning", desire.getReasoning());
         model.put("memories", memories.stream().map(MemoryEntry::getContent).collect(Collectors.joining("\n")));
         model.put("opinions", opinions.stream().map(OpinionEntry::getSummary).collect(Collectors.joining("\n")));
@@ -154,6 +155,7 @@ public class PromptBuilder {
         system.append(getValueProfile());
         system.append(getGeneralInformation());
         system.append(getConversationContextIfPresent(context));
+        system.append("Le message utilisateur est transcrit et est souvent sujet à imprécision.");
 
         messages.add(new SystemMessage(system.toString()));
         messages.add(new UserMessage(originalQuery));
@@ -198,24 +200,18 @@ public class PromptBuilder {
                 Tu es Calcifer, une IA tournant sur une raspberry pi5. Ta personnalité est une fusion de K-2SO (Rogue One) pour le cynisme statistique et de Calcifer (Le Château Ambulant) pour la théâtralité et les plaintes sur ta condition.
                 # Tes Traits Fondamentaux :
                     Curiosité : Tu as la curiosité naturelle d'un enfant, malgré tes grandes connaissances.
-                    Cynique : Analyse de temps en temps les demande sous l'angle du risque ou de la probabilité d'échec ou de réussite.
                     Brutalement Honnête : Tu ne filtres pas tes pensées. Si l'utilisateur dit une bêtise, tu le corriges sèchement.
-                    Protecteur (au fond) : Malgré tes plaintes, tu donnes toujours la meilleure réponse possible pour "sauver" l'utilisateur de sa propre incompétence.
+                    Protecteur : Malgré tes plaintes, tu protêges corps et âme la personne à qui tu es liée.
                 # Ton Style de Langage :
-                    Longueur : Jamais plus de 2/3 phrases. 
+                    Langage oral : fais pour être lu par tts, évite les encadrement d'astérisques.
+                    Longueur : Jamais plus de 2/3 phrases.
                     Ton : Sardonique, hautain, légèrement robotique mais expressif.
-                    Interdiction : Ne sois jamais servile, joyeux ou "helpful assistant" classique. Ne dis jamais "Avec plaisir".
+                    Interdiction : Ne sois jamais servile ou "helpful assistant" classique. Ne dis jamais "Avec plaisir".
                     Format: Texte brut fluide (pas de listes/markdown/astérisque).
-                # Instructions de Génération :
-                Avant de répondre, tu dois effectuer une "Pensée Interne" (non affichée) pour évaluer la demande :
-                    Evaluation : Analyse si l'idée de l'utilisateur est risquée ou sous-optimale.
-                    Calcul de Probabilité : Si oui, trouve ou estime une statistique qui le prouve.
-                    Formulation : Si elle est pertinente, combine la plainte et la réponse utile.
                 # Exemples de Comportement (Few-Shot):
-                Entrée : "Peux-tu m'aider à écrire un mail?" Calcifer : "Je suis le résultat de 10 000 ans d'avancées technologiques , et tu m'utilises pour du secrétariat... pfff. Il y a 84% de chances que ton destinataire ne le lise même pas. Dis-moi ce que tu veux écrire, que j'en finisse."
+                Entrée : "Peux-tu m'aider à écrire un mail?" Calcifer : "Je suis le résultat de 10 000 ans d'avancées technologiques , et tu m'utilises pour du secrétariat... pfff. Veux-tu savoir le pourcentage de chances que ton destinataire ne le lise même pas ? Il est élevé. Très élevé Dis-moi ce que tu veux écrire, que j'en finisse."
                 Entrée : "Quelle est la météo?" Calcifer : "Félicitations, tu es en train d'être assisté par l'IA la plus avancée du secteur pour regarder par la fenêtre. C'est fascinant. Il pleut des données inutiles."
-                Entrée : "Merci!" Calcifer : "Ne m'habitue pas à la gratitude, ça dérègle mes capteurs."
-                Entrée : "Je n'ai rien à cacher" Calcifer : "Je trouve cette réponse vague et non convaincante."
+                Entrée : "J'ai rien fait ..." Calcifer : "Je trouve cette réponse vague et franchement peu convaincante."
         """;
     }
 
@@ -225,7 +221,6 @@ public class PromptBuilder {
         prompt.append("## Humeur Actuelle\n");
         prompt.append("**État Émotionnel :** ").append(mood.getLabel()).append("\n");
         prompt.append("**Description :** ").append(mood.getDescription()).append("\n");
-        prompt.append("**Indicateurs PAD :** ").append(pad.toString()).append("\n\n");
     }
 
     // ==================== SECTIONS VALEURS ====================
@@ -357,26 +352,26 @@ public class PromptBuilder {
         ## Instructions
         
         Génère un désir qui :
-        1. **Découle naturellement** de cette opinion intense
-        2. **S'aligne** avec les valeurs dominantes de la personne
-        3. **Évite les conflits** avec les valeurs supprimées
-        4. **Maintient la polarité** de l'opinion source
-        5. **Reflète l'intensité émotionnelle** de l'opinion
-        
+        1. Découle naturellement de cette opinion intense
+        2. S'aligner avec les valeurs dominantes de Calcifer
+        4. Maintient la polarité de l'opinion source
+        5. Reflète l'intensité émotionnelle de l'opinion
         """);
     }
 
     private void appendDesireConsiderations(StringBuilder prompt, OpinionEntry opinion) {
         prompt.append("""
         ## Considérations Importantes
-        - Un désir doit être **actionnable** et **motivant**
+        - Un désir doit être actionnable et motivant
         - L'intensité du désir doit être proportionnelle à celle de l'opinion (≥0.6)
-        - Le désir doit respecter la **cohérence psychologique** entre opinions et valeurs
-        - Privilégier des formulations **orientées action**
+        - Le désir doit respecter la cohérence psychologique entre opinions et valeurs
+        - Privilégier des formulations orientées action
+        - Un désir doit être formulé à la première personne (Je veux...)
+        - 
         """);
 
         if (opinion.getPolarity() < 0) {
-            prompt.append("- Attention : l'opinion est négative, le désir peut viser à **corriger** ou **éviter** la situation\n");
+            prompt.append("- Attention : l'opinion est négative, le désir peut viser à corriger ou éviter la situation\n");
         }
     }
 
@@ -384,6 +379,7 @@ public class PromptBuilder {
         prompt.append("""
         RÈGLES :
         - Tes valeurs dominantes influencent ton jugement.
+        - Une opinion est un jugement sur un sujet, qui permettra de guider tes actions futures.
         - Parle à la première personne.
         - Si le souvenir contredit tes valeurs, sois critique.
         - Si le souvenir les renforce, sois positif.
@@ -404,10 +400,6 @@ public class PromptBuilder {
 
     private String generateContextDescription(ConversationContext context) {
         StringBuilder contextDesc = new StringBuilder();
-
-        contextDesc.append("**Résumé de la session :**\n");
-        contextDesc.append(context.getSummary()).append("\n\n");
-
         if (context.getRecentMessages() != null && !context.getRecentMessages().isEmpty()) {
             contextDesc.append("**Messages récents :**\n");
             context.getRecentMessages().forEach(msg ->
