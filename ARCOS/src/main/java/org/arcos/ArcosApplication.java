@@ -1,6 +1,11 @@
 package org.arcos;
 
+import EventBus.EventQueue;
+import EventBus.Events.Event;
+import EventBus.Events.EventType;
+import Memory.ConversationContext;
 import Orchestrator.Orchestrator;
+import Personality.PersonalityOrchestrator;
 import Producers.WakeWordProducer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -22,14 +27,15 @@ public class ArcosApplication
 
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
+
+        EventQueue eventQueue = context.getBean(EventQueue.class);
+        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Bienvenue parmi les vivants, je suis ton créateur.","home"));
+        //eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
+
         orchestrator.start();
 
-        /*EventQueue eventQueue = context.getBean(EventQueue.class);
-        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Bienvenue parmi les vivants, je suis ton créateur.","home"));
-        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
 
-
-        try {
+        /*try {
             orchestrator.dispatch(eventQueue.take());
             Thread.sleep(2000);
             orchestrator.dispatch(eventQueue.take());
@@ -45,8 +51,6 @@ public class ArcosApplication
 
 
         personalityOrchestrator.processMemory(convContext.getFullConversation());
-
-         */
         //EventLoopRunner eventLoopRunner = new EventLoopRunner();
         //eventLoopRunner.run();
         //DesireService desireService = context.getBean(DesireService.class);
@@ -68,6 +72,8 @@ public class ArcosApplication
         //System.out.println(orchestrator.processQuery("Je suis ton créateur, quelles actions et fonctionnalités voudrais-tu que je te rajoute ?"));
         //System.out.println(orchestrator.processQuery("Te rappelle-tu de la question que je t'ai posé précédemment ?"));
         //eventLoopRunner.run();
+
+         */
     }
 
 }

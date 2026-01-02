@@ -53,7 +53,6 @@ public class CalendarActions
             "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?([+-]\\d{2}:\\d{2}|Z)?$"
     );
 
-    @RateLimiter(name = "mistral_free")
     @Tool(name = "Ajouter_un_evenement_au_calendrier", description = "Ajoute_un_évenement_au_calendrier")
     public ActionResult AddCalendarEvent(String title, String description, String location, String startDateTimeStr, String endDateTimeStr) {
         try {
@@ -90,7 +89,6 @@ public class CalendarActions
         }
     }
 
-    @RateLimiter(name = "mistral_free")
     @Tool(name = "Lister_les_evenements_a_venir", description = "Liste les évenements à venir du calendrier de l'utilisateur")
     public ActionResult listCalendarEvents(int maxResults) {
         try {
@@ -110,7 +108,6 @@ public class CalendarActions
         }
     }
 
-    @RateLimiter(name = "mistral_free")
     @Tool(name = "Supprimer_un_evenement", description = "Supprime un évenement aujourd'hui")
     public ActionResult deleteCalendarEvent(String title) {
         try {

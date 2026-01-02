@@ -3,6 +3,7 @@ package Tools.Actions;
 import Exceptions.SearchException;
 import Tools.SearchTool.BraveSearchService;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -11,10 +12,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @Component
 public class SearchActions
 {
-
+//todo fix ?
     private final BraveSearchService searchService;
 
     @Autowired
@@ -22,7 +24,6 @@ public class SearchActions
         this.searchService = searchService;
     }
 
-    @RateLimiter(name = "mistral_free")
     @Tool(name = "Chercher_sur_Internet", description = "Recherche des informations sur le web. [Instruction : ne précise tes sources que si cela a un vrai intérêt.]" +
             "Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats.")
     public ActionResult searchTheWeb(Map<String, Object> params) {
@@ -36,6 +37,7 @@ public class SearchActions
                     .withCount(5);
             result = searchService.search(query, options);
         } catch (SearchException e) {
+            log.error(e.getMessage());
             return ActionResult.failure("Erreur de Recherche: " + e.getMessage(), e)
                     .withExecutionTime(System.currentTimeMillis() - startTime);
         }

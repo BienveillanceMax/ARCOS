@@ -10,6 +10,9 @@ public class PiperEmbeddedTTSModule {
     private static final String PIPER_VERSION = "2023.11.14-2";
     private static final String PIPER_DIR = System.getProperty("user.home") + "/.piper-tts";
     private static final String MODEL_DIR = PIPER_DIR + "/models";
+    private static final String GLADOS_MODEL_PATH = "fr_FR-glados-medium.onnx";
+    private static final String GLADOS_CONFIG_PATH = "fr_FR-glados-medium.onnx.json";
+
     private static final String UPMC_MODEL_PATH = "upmc-model/fr_FR-upmc-medium.onnx";
     private static final String UPMC_CONFIG_PATH = "upmc-model/fr_FR-upmc-medium.onnx.json";
 
@@ -258,18 +261,20 @@ public class PiperEmbeddedTTSModule {
     }
 
     private void loadModelFromResources() throws Exception {
-        modelFile = new File(MODEL_DIR, "fr_FR-upmc-medium.onnx");
-        configFile = new File(MODEL_DIR, "fr_FR-upmc-medium.onnx.json");
+        //modelFile = new File(MODEL_DIR, "fr_FR-upmc-medium.onnx");
+        //configFile = new File(MODEL_DIR, "fr_FR-upmc-medium.onnx.json");
+        modelFile = new File(MODEL_DIR, "fr_FR-glados-medium.onnx");
+        configFile = new File(MODEL_DIR, "fr_FR-glados-medium.onnx.json");
 
         // Try to load from resources
         if (!modelFile.exists()) {
             System.out.println("Extracting model from resources...");
-            copyResourceToFile(UPMC_MODEL_PATH, modelFile);
+            copyResourceToFile(GLADOS_MODEL_PATH, modelFile);
         }
 
         if (!configFile.exists()) {
             System.out.println("Extracting config from resources...");
-            copyResourceToFile(UPMC_CONFIG_PATH, configFile);
+            copyResourceToFile(GLADOS_CONFIG_PATH, configFile);
         }
 
         if (!modelFile.exists() || !configFile.exists()) {
@@ -363,7 +368,6 @@ public class PiperEmbeddedTTSModule {
         try {
             // Create temp file for audio output
             File audioFile = File.createTempFile("piper_output_", ".wav");
-            audioFile.deleteOnExit();
 
             System.out.println("Output file: " + audioFile.getAbsolutePath());
 
@@ -418,6 +422,8 @@ public class PiperEmbeddedTTSModule {
 
             // Play audio
             playAudio(audioFile);
+            audioFile.delete();
+
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to synthesize speech", e);
