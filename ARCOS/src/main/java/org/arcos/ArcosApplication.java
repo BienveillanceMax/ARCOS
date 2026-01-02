@@ -4,6 +4,8 @@ import Orchestrator.Orchestrator;
 import Producers.WakeWordProducer;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -12,6 +14,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 public class ArcosApplication
 {
+    private static final Logger logger = LoggerFactory.getLogger(ArcosApplication.class);
 
     public static void main(String[] args) {
 
@@ -22,6 +25,8 @@ public class ArcosApplication
 
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
+
+        logger.info("\n🚀 ARCOS is ready for interaction. Say the wake word to start.\n");
         orchestrator.start();
 
         /*EventQueue eventQueue = context.getBean(EventQueue.class);
