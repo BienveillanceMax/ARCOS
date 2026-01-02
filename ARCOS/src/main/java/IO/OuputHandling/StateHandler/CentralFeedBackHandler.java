@@ -18,6 +18,28 @@ public class CentralFeedBackHandler
     }
 
     public void handleFeedBack(FeedBackEvent feedBackEvent) {
-        //todo
+        switch (feedBackEvent.getEventType()) {
+            case WAKEUP_LONG:
+                audioCueHandler.playWakeUpSoundHard();
+                break;
+            case WAKEUP_SHORT:
+                audioCueHandler.playWakeUpSoundSoft();
+                break;
+            case LONGTASK_START:
+                audioCueHandler.playLongTaskStartedSound();
+                break;
+            case LONGTASK_END:
+                audioCueHandler.playLongTaskFinishedSound();
+                break;
+            case INITIATIVE_START:
+                audioCueHandler.playInitiativeStartedSound();
+                break;
+            case INITIATIVE_END:
+                audioCueHandler.playInitiativeEndedSound();
+                break;
+            case FAILURE:
+                audioCueHandler.playFailureSound();
+                break;
+        }
     }
 }
