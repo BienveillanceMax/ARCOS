@@ -83,7 +83,7 @@ public class Orchestrator
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
 
-            ttsHandler.speak(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+            ttsHandler.speakAsync(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
         }
 
@@ -141,7 +141,7 @@ public class Orchestrator
 
                         // On ne parle que s'il reste quelque chose à dire après nettoyage
                         if (!cleanSentence.isEmpty()) {
-                            ttsHandler.speak(cleanSentence, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                            ttsHandler.speakAsync(cleanSentence, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
                         }
 
                         sentenceBuffer.delete(0, punctuationIndex + 1);
@@ -152,7 +152,7 @@ public class Orchestrator
                     if (sentenceBuffer.length() > 0) {
                         String cleanRelic = cleanForTTS(sentenceBuffer.toString());
                         if (!cleanRelic.isEmpty()) {
-                            ttsHandler.speak(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                            ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
                         }
                     }
 

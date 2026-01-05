@@ -16,13 +16,15 @@ public class PiperEmbeddedTTSModule {
     private static final String UPMC_MODEL_PATH = "upmc-model/fr_FR-upmc-medium.onnx";
     private static final String UPMC_CONFIG_PATH = "upmc-model/fr_FR-upmc-medium.onnx.json";
 
-    private final ExecutorService executor;
+    private final ExecutorService generationExecutor;
+    private final ExecutorService playbackExecutor;
     private String piperExecutable;
     private File modelFile;
     private File configFile;
 
     public PiperEmbeddedTTSModule() {
-        this.executor = Executors.newSingleThreadExecutor();
+        this.generationExecutor = Executors.newSingleThreadExecutor();
+        this.playbackExecutor = Executors.newSingleThreadExecutor();
         try {
             initialize();
         } catch (Exception e) {
@@ -354,8 +356,27 @@ public class PiperEmbeddedTTSModule {
     }
 
     public Future<Void> speakAsync(String text) {
-        return executor.submit(() -> {
-            speak(text);
+        return speakAsync(text, 1.0f, 0.667f, 0.8f);
+    }
+
+    public Future<Void> speakAsync(String text, float lengthScale, float noiseScale, float noiseW) {
+        return generationExecutor.submit(() -> {
+            try {
+                File audioFile = generateAudio(text, lengthScale, noiseScale, noiseW);
+                playbackExecutor.submit(() -> {
+                    try {
+                        playAudio(audioFile);
+                    } catch (Exception e) {
+                        System.err.println("Error playing audio: " + e.getMessage());
+                        e.printStackTrace();
+                    } finally {
+                        audioFile.delete();
+                    }
+                });
+            } catch (Exception e) {
+                System.err.println("Error generating audio: " + e.getMessage());
+                e.printStackTrace();
+            }
             return null;
         });
     }
@@ -366,68 +387,70 @@ public class PiperEmbeddedTTSModule {
 
     public void speak(String text, float lengthScale, float noiseScale, float noiseW) {
         try {
-            // Create temp file for audio output
-            File audioFile = File.createTempFile("piper_output_", ".wav");
-
-            System.out.println("Output file: " + audioFile.getAbsolutePath());
-
-            // Build command
-            ProcessBuilder pb = new ProcessBuilder(
-                    piperExecutable,
-                    "--speaker","1",
-                    "--model", modelFile.getAbsolutePath(),
-                    "--config", configFile.getAbsolutePath(),
-                    "--output_file", audioFile.getAbsolutePath(),
-                    "--length_scale", String.valueOf(lengthScale),
-                    "--noise_scale", String.valueOf(noiseScale),
-                    "--noise_w", String.valueOf(noiseW)
-            );
-
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
-
-            // Write text to stdin
-            try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()))) {
-                writer.write(text);
-                writer.flush();
-            }
-
-            // Read output/error streams to prevent blocking
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    System.out.println("Piper: " + line);
-                }
-            }
-
-            // Wait for completion
-            int exitCode = process.waitFor();
-            System.out.println("Piper exit code: " + exitCode);
-
-            if (exitCode != 0) {
-                throw new RuntimeException("Piper process failed with exit code: " + exitCode);
-            }
-
-            // Verify the audio file was created and has content
-            if (!audioFile.exists()) {
-                throw new RuntimeException("Audio file was not created: " + audioFile.getAbsolutePath());
-            }
-
-            long fileSize = audioFile.length();
-            System.out.println("Audio file size: " + fileSize + " bytes");
-
-            if (fileSize == 0) {
-                throw new RuntimeException("Audio file is empty");
-            }
-
-            // Play audio
+            File audioFile = generateAudio(text, lengthScale, noiseScale, noiseW);
             playAudio(audioFile);
             audioFile.delete();
-
-
         } catch (Exception e) {
             throw new RuntimeException("Failed to synthesize speech", e);
         }
+    }
+
+    private File generateAudio(String text, float lengthScale, float noiseScale, float noiseW) throws Exception {
+        // Create temp file for audio output
+        File audioFile = File.createTempFile("piper_output_", ".wav");
+
+        System.out.println("Output file: " + audioFile.getAbsolutePath());
+
+        // Build command
+        ProcessBuilder pb = new ProcessBuilder(
+                piperExecutable,
+                "--speaker","1",
+                "--model", modelFile.getAbsolutePath(),
+                "--config", configFile.getAbsolutePath(),
+                "--output_file", audioFile.getAbsolutePath(),
+                "--length_scale", String.valueOf(lengthScale),
+                "--noise_scale", String.valueOf(noiseScale),
+                "--noise_w", String.valueOf(noiseW)
+        );
+
+        pb.redirectErrorStream(true);
+        Process process = pb.start();
+
+        // Write text to stdin
+        try (BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(process.getOutputStream()))) {
+            writer.write(text);
+            writer.flush();
+        }
+
+        // Read output/error streams to prevent blocking
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println("Piper: " + line);
+            }
+        }
+
+        // Wait for completion
+        int exitCode = process.waitFor();
+        System.out.println("Piper exit code: " + exitCode);
+
+        if (exitCode != 0) {
+            throw new RuntimeException("Piper process failed with exit code: " + exitCode);
+        }
+
+        // Verify the audio file was created and has content
+        if (!audioFile.exists()) {
+            throw new RuntimeException("Audio file was not created: " + audioFile.getAbsolutePath());
+        }
+
+        long fileSize = audioFile.length();
+        System.out.println("Audio file size: " + fileSize + " bytes");
+
+        if (fileSize == 0) {
+            throw new RuntimeException("Audio file is empty");
+        }
+
+        return audioFile;
     }
 
     private void playAudio(File audioFile) throws Exception {
@@ -502,13 +525,18 @@ public class PiperEmbeddedTTSModule {
     }
 
     public void shutdown() {
-        executor.shutdown();
+        generationExecutor.shutdown();
+        playbackExecutor.shutdown();
         try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                executor.shutdownNow();
+            if (!generationExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                generationExecutor.shutdownNow();
+            }
+            if (!playbackExecutor.awaitTermination(5, TimeUnit.SECONDS)) {
+                playbackExecutor.shutdownNow();
             }
         } catch (InterruptedException e) {
-            executor.shutdownNow();
+            generationExecutor.shutdownNow();
+            playbackExecutor.shutdownNow();
         }
     }
 }
