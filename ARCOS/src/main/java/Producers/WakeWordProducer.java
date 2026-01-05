@@ -3,6 +3,9 @@ package Producers;
 import EventBus.EventQueue;
 import EventBus.Events.WakeWordEvent;
 import IO.InputHandling.SpeechToText;
+import IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import IO.OuputHandling.StateHandler.EventType;
+import IO.OuputHandling.StateHandler.FeedBackEvent;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +36,8 @@ public class WakeWordProducer implements Runnable {
     private final SpeechToText speechToText;
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
+    private final CentralFeedBackHandler centralFeedBackHandler;
+
 
     private static final int MIC_SAMPLE_RATE = 44100;
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
@@ -54,8 +59,9 @@ public class WakeWordProducer implements Runnable {
     }
 
     @Autowired
-    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl) {
+    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl, CentralFeedBackHandler centralFeedBackHandler) {
         log.info("Initializing WakeWordProducer");
+        this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = eventQueue;
         String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
         String porcupineModelName = "porcupine_params_fr.pv";
@@ -200,6 +206,7 @@ public class WakeWordProducer implements Runnable {
                         log.info("[{}] Detected '{}'",
                                 LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                                 keywords[result]);
+                        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(EventType.WAKEUP_SHORT));
 
                         // Switch to transcription mode
                         String transcription = recordAndTranscribe();

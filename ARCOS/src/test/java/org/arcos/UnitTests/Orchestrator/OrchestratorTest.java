@@ -4,6 +4,7 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
+import IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import LLM.Client.LLMClient;
 import LLM.Prompts.PromptBuilder;
 import Memory.ConversationContext;
@@ -11,6 +12,7 @@ import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.service.MemoryService;
 import Orchestrator.InitiativeService;
 import Orchestrator.Orchestrator;
+import Personality.Desires.DesireService;
 import Personality.Mood.MoodService;
 import Personality.Mood.MoodUpdate;
 import Personality.Mood.MoodVoiceMapper;
@@ -59,12 +61,6 @@ class OrchestratorTest {
     private PersonalityOrchestrator personalityOrchestrator;
 
     @Mock
-    private WakeWordProducer wakeWordProducer;
-
-    @Mock
-    private BraveSearchService braveSearchService;
-
-    @Mock
     private PiperEmbeddedTTSModule piperEmbeddedTTSModule;
 
     @Mock
@@ -73,10 +69,16 @@ class OrchestratorTest {
     @Mock
     private MoodVoiceMapper moodVoiceMapper;
 
+    @Mock
+    private CentralFeedBackHandler centralFeedBackHandler;
+
+    @Mock
+    private DesireService desireService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        orchestrator = new Orchestrator(
+        orchestrator = new Orchestrator(centralFeedBackHandler,
                 personalityOrchestrator,
                 eventQueue,
                 llmClient,
@@ -84,7 +86,7 @@ class OrchestratorTest {
                 conversationContext,
                 memoryService,
                 initiativeService,
-                piperEmbeddedTTSModule,
+                desireService,
                 moodService,
                 moodVoiceMapper
         );

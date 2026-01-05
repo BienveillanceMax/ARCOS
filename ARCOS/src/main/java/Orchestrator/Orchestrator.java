@@ -4,6 +4,8 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventType;
 import IO.OuputHandling.PiperEmbeddedTTSModule;
+import IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import IO.OuputHandling.StateHandler.FeedBackEvent;
 import Memory.LongTermMemory.Models.DesireEntry;
 import LLM.Client.LLMClient;
 import Memory.ConversationContext;
@@ -39,17 +41,16 @@ public class Orchestrator
     private final PersonalityOrchestrator personalityOrchestrator;
     private final MoodService moodService;
     private final MoodVoiceMapper moodVoiceMapper;
+    private final CentralFeedBackHandler centralFeedBackHandler;
 
     private LocalDateTime lastInteracted;
     private DesireService desireService;
 
     @Autowired
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
-        this(personalityOrchestrator, evenQueue, llmClient, promptBuilder, context, memoryService, initiativeService, new PiperEmbeddedTTSModule(), moodService, moodVoiceMapper);
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+        this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
-    }
-
-    public Orchestrator(PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, PiperEmbeddedTTSModule ttsHandler, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+        this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
@@ -57,7 +58,6 @@ public class Orchestrator
         this.memoryService = memoryService;
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
-        this.ttsHandler = ttsHandler;
         this.moodService = moodService;
         this.moodVoiceMapper = moodVoiceMapper;
         lastInteracted = LocalDateTime.now();
@@ -71,7 +71,10 @@ public class Orchestrator
         } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(IO.OuputHandling.StateHandler.EventType.INITIATIVE_START));
                 initiativeService.processInitiative(desire);
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(IO.OuputHandling.StateHandler.EventType.INITIATIVE_END));
+
             } catch (Exception e) {
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
                 desire.setStatus(DesireEntry.Status.PENDING);

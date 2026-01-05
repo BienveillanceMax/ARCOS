@@ -13,7 +13,7 @@ public class AudioCueFeedbackHandler
 
     //When addressed after a long silence (>4 min) a sound should play to notify the user that the assistant is listening.
     public void playWakeUpSoundHard() {
-        audioCueEngine.play("wakeup_hard.wav");
+        audioCueEngine.play("wakeup_soft.wav");
     }
 
     //When addressed shortly, should only play a soft sound

@@ -4,6 +4,8 @@ import EventBus.EventQueue;
 import EventBus.Events.Event;
 import EventBus.Events.EventPriority;
 import EventBus.Events.EventType;
+import IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import IO.OuputHandling.StateHandler.FeedBackEvent;
 import Memory.LongTermMemory.Models.DesireEntry;
 import Memory.LongTermMemory.Repositories.DesireRepository;
 import Memory.LongTermMemory.service.MemoryService;
@@ -27,11 +29,14 @@ public class DesireInitiativeProducer {
 
     private final EventQueue eventQueue;
     private final DesireService desireService;
+    private final CentralFeedBackHandler centralFeedBackHandler;
+
 
     @Autowired
-    public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService) {
+    public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService, CentralFeedBackHandler centralFeedBackHandler) {
         this.eventQueue = eventQueue;
         this.desireService = desireService;
+        this.centralFeedBackHandler = centralFeedBackHandler;
     }
 
     @Scheduled(fixedRate = 6000000) // Check every hour
@@ -43,6 +48,7 @@ public class DesireInitiativeProducer {
             if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
                 if (isGoodMomentToInitiate(desire)) {
                     log.info("High-intensity desire found, initiating... {}", desire.getLabel());
+                    centralFeedBackHandler.handleFeedBack(new FeedBackEvent(IO.OuputHandling.StateHandler.EventType.INITIATIVE_START));
                     initiateDesireAction(desire);
                 }
             }
