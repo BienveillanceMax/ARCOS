@@ -33,14 +33,11 @@ public class ArcosApplication
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
         CentralFeedBackHandler centralFeedBackHandler = context.getBean(CentralFeedBackHandler.class);
-        log.info("Starting Sound test");
-        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(IO.OuputHandling.StateHandler.EventType.INITIATIVE_START));
 
         EventQueue eventQueue = context.getBean(EventQueue.class);
         //eventQueue.offer(new Event<>(EventType.WAKEWORD,"Bienvenue parmi les vivants, je suis ton créateur.","home"));
         //eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
-
-        //orchestrator.start();
+        orchestrator.start();
 
 
         /*try {
