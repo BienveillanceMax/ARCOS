@@ -54,7 +54,7 @@ public class AudioCueEngine {
 
             if (line.isControlSupported(FloatControl.Type.MASTER_GAIN)) {
                 FloatControl gain = (FloatControl) line.getControl(FloatControl.Type.MASTER_GAIN);
-                gain.setValue(20.0f);
+                gain.setValue(6.0f);
             }
 
             line.start();
