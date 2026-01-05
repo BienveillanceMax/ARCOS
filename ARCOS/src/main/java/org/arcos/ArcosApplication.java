@@ -1,14 +1,14 @@
 package org.arcos;
 
-import EventBus.EventQueue;
-import EventBus.Events.Event;
-import EventBus.Events.EventType;
-import IO.OuputHandling.StateHandler.CentralFeedBackHandler;
-import IO.OuputHandling.StateHandler.FeedBackEvent;
-import Memory.ConversationContext;
-import Orchestrator.Orchestrator;
-import Personality.PersonalityOrchestrator;
-import Producers.WakeWordProducer;
+import org.arcos.EventBus.EventQueue;
+import org.arcos.EventBus.Events.Event;
+import org.arcos.EventBus.Events.EventType;
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
+import org.arcos.Memory.ConversationContext;
+import org.arcos.Orchestrator.Orchestrator;
+import org.arcos.Personality.PersonalityOrchestrator;
+import org.arcos.Producers.WakeWordProducer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

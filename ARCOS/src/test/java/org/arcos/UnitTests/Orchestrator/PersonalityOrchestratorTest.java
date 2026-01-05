@@ -1,14 +1,14 @@
 package org.arcos.UnitTests.Orchestrator;
 
-import Exceptions.ResponseParsingException;
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.service.MemoryService;
-import Personality.Desires.DesireService;
-import Personality.Opinions.OpinionService;
-import Personality.PersonalityOrchestrator;
-import Personality.Values.ValueProfile;
+import org.arcos.Exceptions.ResponseParsingException;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.service.MemoryService;
+import org.arcos.Personality.Desires.DesireService;
+import org.arcos.Personality.Opinions.OpinionService;
+import org.arcos.Personality.PersonalityOrchestrator;
+import org.arcos.Personality.Values.ValueProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;

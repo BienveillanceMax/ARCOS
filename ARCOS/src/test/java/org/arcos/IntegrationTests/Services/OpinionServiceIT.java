@@ -1,7 +1,7 @@
 package org.arcos.IntegrationTests.Services;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Personality.Opinions.OpinionService;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Personality.Opinions.OpinionService;
 import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

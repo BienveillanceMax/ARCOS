@@ -1,8 +1,8 @@
 package org.arcos.IntegrationTests.Repositories;
 
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.Subject;
-import Memory.LongTermMemory.Repositories.MemoryRepository;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.Subject;
+import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
 import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

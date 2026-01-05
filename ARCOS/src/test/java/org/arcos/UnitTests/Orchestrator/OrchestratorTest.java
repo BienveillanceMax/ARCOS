@@ -1,25 +1,25 @@
 package org.arcos.UnitTests.Orchestrator;
 
-import EventBus.EventQueue;
-import EventBus.Events.Event;
-import EventBus.Events.EventType;
-import IO.OuputHandling.PiperEmbeddedTTSModule;
-import IO.OuputHandling.StateHandler.CentralFeedBackHandler;
-import LLM.Client.LLMClient;
-import LLM.Prompts.PromptBuilder;
-import Memory.ConversationContext;
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.service.MemoryService;
-import Orchestrator.InitiativeService;
-import Orchestrator.Orchestrator;
-import Personality.Desires.DesireService;
-import Personality.Mood.MoodService;
-import Personality.Mood.MoodUpdate;
-import Personality.Mood.MoodVoiceMapper;
-import Personality.Mood.PadState;
-import Personality.PersonalityOrchestrator;
-import Producers.WakeWordProducer;
-import Tools.SearchTool.BraveSearchService;
+import org.arcos.EventBus.EventQueue;
+import org.arcos.EventBus.Events.Event;
+import org.arcos.EventBus.Events.EventType;
+import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Prompts.PromptBuilder;
+import org.arcos.Memory.ConversationContext;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.service.MemoryService;
+import org.arcos.Orchestrator.InitiativeService;
+import org.arcos.Orchestrator.Orchestrator;
+import org.arcos.Personality.Desires.DesireService;
+import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodUpdate;
+import org.arcos.Personality.Mood.MoodVoiceMapper;
+import org.arcos.Personality.Mood.PadState;
+import org.arcos.Personality.PersonalityOrchestrator;
+import org.arcos.Producers.WakeWordProducer;
+import org.arcos.Tools.SearchTool.BraveSearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -90,6 +90,19 @@ class OrchestratorTest {
                 moodService,
                 moodVoiceMapper
         );
+        // Inject the mocked ttsHandler into the orchestrator instance using reflection or similar if not public,
+        // but wait, Orchestrator creates its own instance of PiperEmbeddedTTSModule in the constructor:
+        // this.ttsHandler = new PiperEmbeddedTTSModule();
+        // So @Mock private PiperEmbeddedTTSModule piperEmbeddedTTSModule; is not used!
+
+        // I need to use reflection to replace the internal ttsHandler with the mock.
+        try {
+            java.lang.reflect.Field field = Orchestrator.class.getDeclaredField("ttsHandler");
+            field.setAccessible(true);
+            field.set(orchestrator, piperEmbeddedTTSModule);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Test
@@ -97,6 +110,16 @@ class OrchestratorTest {
         // Given
         String userQuery = "test query";
         Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, userQuery, "test");
+        // The orchestrator logic accumulates chunks until it finds punctuation.
+        // Chunk 1: "Test " -> No punctuation -> Buffered
+        // Chunk 2: "answer." -> Punctuation -> "Test answer." is spoken.
+        // So we expect one speak call with "Test answer."
+        // Wait, logic:
+        // sentenceBuffer.append(chunk);
+        // while ((punctuationIndex = findSentenceEnd(sentenceBuffer)) != -1) { ... speak ... delete ... }
+        // "Test " -> buf="Test " (no punct)
+        // "answer." -> buf="Test answer." (punct at end) -> speak("Test answer.") -> buf=""
+
         String responseChunk1 = "Test ";
         String responseChunk2 = "answer.";
         String fullResponse = responseChunk1 + responseChunk2;
@@ -114,7 +137,9 @@ class OrchestratorTest {
         when(conversationContext.getPadState()).thenReturn(new PadState());
         when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
 
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class), anyFloat(), anyFloat(), anyFloat());
+        // speakAsync returns a Future, so we should mock it to return null or a mocked future.
+        // It is NOT a void method.
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class), anyFloat(), anyFloat(), anyFloat())).thenReturn(null);
 
         // When
         orchestrator.dispatch(wakeWordEvent);
@@ -123,8 +148,8 @@ class OrchestratorTest {
         // Verify streaming part
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
         verify(llmClient).generateStreamingChatResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk2), anyFloat(), anyFloat(), anyFloat());
+        // Due to sentence buffering, it should speak "Test answer." once.
+        verify(piperEmbeddedTTSModule, times(1)).speakAsync(eq("Test answer."), anyFloat(), anyFloat(), anyFloat());
 
         // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);
@@ -159,14 +184,14 @@ class OrchestratorTest {
         Event<String> calendarEvent = new Event<>(EventType.CALENDAR_EVENT_SCHEDULER, calendarEventPayload, "test");
         when(promptBuilder.buildSchedulerAlertPrompt(calendarEventPayload)).thenReturn(new Prompt("test prompt"));
         when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("test response");
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class));
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class))).thenReturn(null);
 
         // When
         orchestrator.dispatch(calendarEvent);
 
         // Then
         verify(llmClient).generateToollessResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule).speak("test response");
+        verify(piperEmbeddedTTSModule).speakAsync("test response");
     }
 }
 

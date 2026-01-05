@@ -1,11 +1,11 @@
 package common.utils;
 
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Models.Subject;
-import Personality.Opinions.OpinionService;
-import Personality.Values.Entities.DimensionSchwartz;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Models.Subject;
+import org.arcos.Personality.Opinions.OpinionService;
+import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

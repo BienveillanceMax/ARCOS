@@ -1,13 +1,13 @@
 package org.arcos.UnitTests.Personality.Opinions;
 
-import LLM.Client.LLMClient;
-import LLM.Prompts.PromptBuilder;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Repositories.OpinionRepository;
-import Personality.Opinions.OpinionService;
-import Personality.Values.Entities.DimensionSchwartz;
-import Personality.Values.ValueProfile;
+import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Prompts.PromptBuilder;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
+import org.arcos.Personality.Opinions.OpinionService;
+import org.arcos.Personality.Values.Entities.DimensionSchwartz;
+import org.arcos.Personality.Values.ValueProfile;
 import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
