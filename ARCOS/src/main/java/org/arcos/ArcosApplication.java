@@ -9,12 +9,14 @@ import Memory.ConversationContext;
 import Orchestrator.Orchestrator;
 import Personality.PersonalityOrchestrator;
 import Producers.WakeWordProducer;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 //might need to setup time because of dual boot : timedatectl set-time "2014-05-26 11:13:54"
+@Slf4j
 @SpringBootApplication(scanBasePackages = {"EventBus", "Producers", "LLM", "Orchestrator", "Memory", "org.arcos", "Personality", "Tools", "IO"})
 @EnableScheduling
 public class ArcosApplication
@@ -27,16 +29,18 @@ public class ArcosApplication
         //WakeWordProducer.showAudioDevices();
         //System.out.println("\n");
 
+
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
         CentralFeedBackHandler centralFeedBackHandler = context.getBean(CentralFeedBackHandler.class);
+        log.info("Starting Sound test");
         centralFeedBackHandler.handleFeedBack(new FeedBackEvent(IO.OuputHandling.StateHandler.EventType.INITIATIVE_START));
 
         EventQueue eventQueue = context.getBean(EventQueue.class);
         //eventQueue.offer(new Event<>(EventType.WAKEWORD,"Bienvenue parmi les vivants, je suis ton créateur.","home"));
         //eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
 
-        orchestrator.start();
+        //orchestrator.start();
 
 
         /*try {
@@ -78,6 +82,17 @@ public class ArcosApplication
         //eventLoopRunner.run();
 
          */
+    }
+    public static void printAudioMixers() {
+        System.out.println("--- Recherche des périphériques Audio ---");
+        javax.sound.sampled.Mixer.Info[] mixers = javax.sound.sampled.AudioSystem.getMixerInfo();
+        if (mixers.length == 0) {
+            System.err.println("AUCUN PÉRIPHÉRIQUE AUDIO TROUVÉ !");
+        }
+        for (javax.sound.sampled.Mixer.Info mixerInfo : mixers) {
+            System.out.println("Mixer: " + mixerInfo.getName() + " [" + mixerInfo.getDescription() + "]");
+        }
+        System.out.println("-----------------------------------------");
     }
 
 }
