@@ -45,7 +45,7 @@ public class WakeWordProducer implements Runnable {
 
     // Silence detection parameters
     private static final int SILENCE_THRESHOLD = 1000;
-    private static final long SILENCE_DURATION_MS = 2000;
+    private static final long SILENCE_DURATION_MS = 1200;
 
     @EventListener(ApplicationReadyEvent.class)
     public void startAfterStartup() {
