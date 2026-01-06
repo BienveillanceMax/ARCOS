@@ -4,11 +4,11 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import okio.BufferedSink;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -60,16 +60,14 @@ public class SpeechToText {
             return "";
         }
 
-        File tempWavFile = null;
         try {
-            // Create a temporary WAV file
-            tempWavFile = createTempWavFile(audioBytes);
-
-            // Build the request
+            // Build the request using streaming body
+            // Optimisation: We stream the WAV header + PCM data directly to avoid
+            // creating a temporary file on disk (IO reduction) and unnecessary memory copies.
             RequestBody requestBody = new MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
-                    .addFormDataPart("audio_file", tempWavFile.getName(),
-                            RequestBody.create(tempWavFile, MediaType.parse("audio/wav")))
+                    .addFormDataPart("audio_file", "speech.wav",
+                            createWaveRequestBody(audioBytes))
                     .build();
 
             Request request = new Request.Builder()
@@ -94,25 +92,32 @@ public class SpeechToText {
         } catch (IOException e) {
             log.error("Error during transcription request", e);
             return "";
-        } finally {
-            if (tempWavFile != null) {
-                if (!tempWavFile.delete()) {
-                    log.warn("Failed to delete temporary WAV file: {}", tempWavFile.getAbsolutePath());
-                }
+        }
+    }
+
+    private RequestBody createWaveRequestBody(final byte[] pcmData) {
+        return new RequestBody() {
+            @Override
+            public MediaType contentType() {
+                return MediaType.parse("audio/wav");
             }
-        }
+
+            @Override
+            public long contentLength() {
+                return pcmData.length + 44; // PCM data + WAV header size
+            }
+
+            @Override
+            public void writeTo(BufferedSink sink) throws IOException {
+                // Write header directly to the sink's output stream
+                writeWavHeader(sink.outputStream(), pcmData.length);
+                // Write PCM data
+                sink.write(pcmData);
+            }
+        };
     }
 
-    private File createTempWavFile(byte[] pcmData) throws IOException {
-        File tempFile = File.createTempFile("speech", ".wav");
-        try (FileOutputStream fos = new FileOutputStream(tempFile)) {
-            writeWavHeader(fos, pcmData.length);
-            fos.write(pcmData);
-        }
-        return tempFile;
-    }
-
-    private void writeWavHeader(FileOutputStream fos, int pcmDataLength) throws IOException {
+    private void writeWavHeader(OutputStream out, int pcmDataLength) throws IOException {
         int totalDataLen = pcmDataLength + 36;
         long longSampleRate = SAMPLE_RATE;
         int channels = CHANNELS;
@@ -164,7 +169,7 @@ public class SpeechToText {
         header[42] = (byte) ((pcmDataLength >> 16) & 0xff);
         header[43] = (byte) ((pcmDataLength >> 24) & 0xff);
 
-        fos.write(header, 0, 44);
+        out.write(header, 0, 44);
     }
 
     private String cleanTranscript(String transcript) {
