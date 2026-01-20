@@ -1,12 +1,12 @@
 package Integration;
 
-import LLM.Client.LLMClient;
-import LLM.Prompts.PromptBuilder;
-import Memory.ConversationContext;
-import Personality.Mood.Mood;
-import Personality.Mood.MoodService;
-import Personality.Mood.MoodUpdate;
-import Personality.Values.ValueProfile;
+import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Prompts.PromptBuilder;
+import org.arcos.Memory.ConversationContext;
+import org.arcos.Personality.Mood.Mood;
+import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodUpdate;
+import org.arcos.Personality.Values.ValueProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -1,6 +1,10 @@
 package Personality.Mood;
 
-import Memory.ConversationContext;
+import org.arcos.Memory.ConversationContext;
+import org.arcos.Personality.Mood.Mood;
+import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodUpdate;
+import org.arcos.Personality.Mood.PadState;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

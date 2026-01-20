@@ -1,13 +1,14 @@
 package Orchestrator;
 
-import LLM.Client.LLMClient;
-import LLM.Prompts.PromptBuilder;
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.service.MemoryService;
-import Personality.Desires.DesireService;
-import Personality.Opinions.OpinionService;
-import Personality.PersonalityOrchestrator;
+import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Prompts.PromptBuilder;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.service.MemoryService;
+import org.arcos.Personality.Desires.DesireService;
+import org.arcos.Personality.Opinions.OpinionService;
+import org.arcos.Personality.PersonalityOrchestrator;
+import org.arcos.Orchestrator.InitiativeService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -34,7 +35,8 @@ class InitiativeServiceTest {
     @Mock PromptBuilder promptBuilder;
     @Mock PersonalityOrchestrator personalityOrchestrator;
 
-    @InjectMocks InitiativeService initiativeService;
+    @InjectMocks
+    InitiativeService initiativeService;
 
     @Test
     void testProcessInitiative_Success() {

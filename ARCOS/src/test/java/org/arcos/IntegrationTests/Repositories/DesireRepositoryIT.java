@@ -1,14 +1,13 @@
 package org.arcos.IntegrationTests.Repositories;
 
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Repositories.DesireRepository;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.DesireRepository;
 import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.ai.document.Document;
 
-import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;

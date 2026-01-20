@@ -1,14 +1,14 @@
 package org.arcos.UnitTests.Personality.Desires;
 
-import Exceptions.DesireCreationException;
-import LLM.Client.LLMClient;
-import LLM.Prompts.PromptBuilder;
-import Memory.LongTermMemory.Models.DesireEntry;
-import Memory.LongTermMemory.Models.OpinionEntry;
-import Memory.LongTermMemory.Repositories.DesireRepository;
-import Memory.LongTermMemory.Repositories.OpinionRepository;
-import Personality.Desires.DesireService;
-import Personality.Values.ValueProfile;
+import org.arcos.Exceptions.DesireCreationException;
+import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Prompts.PromptBuilder;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.DesireRepository;
+import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
+import org.arcos.Personality.Desires.DesireService;
+import org.arcos.Personality.Values.ValueProfile;
 import common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,8 +1,11 @@
 package IO.OuputHandling.StateHandler;
 
-import IO.OuputHandling.StateHandler.AudioCue.AudioCueEngine;
-import IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
-import IO.OuputHandling.StateHandler.VisualCue.VisualCueFeedbackHandler;
+import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueEngine;
+import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.IO.OuputHandling.StateHandler.EventType;
+import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
+import org.arcos.IO.OuputHandling.StateHandler.VisualCue.VisualCueFeedbackHandler;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

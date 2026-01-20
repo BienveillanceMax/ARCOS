@@ -1,13 +1,13 @@
 package org.arcos.UnitTests.service;
 
 
-import Exceptions.ResponseParsingException;
-import LLM.Client.LLMClient;
-import LLM.Prompts.PromptBuilder;
-import Memory.LongTermMemory.Models.MemoryEntry;
-import Memory.LongTermMemory.Models.Subject;
-import Memory.LongTermMemory.Repositories.MemoryRepository;
-import Memory.LongTermMemory.service.MemoryService;
+import org.arcos.Exceptions.ResponseParsingException;
+import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Prompts.PromptBuilder;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.Subject;
+import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
+import org.arcos.Memory.LongTermMemory.service.MemoryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
