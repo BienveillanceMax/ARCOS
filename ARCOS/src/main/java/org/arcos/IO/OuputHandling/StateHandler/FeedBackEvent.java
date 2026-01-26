@@ -2,13 +2,13 @@ package org.arcos.IO.OuputHandling.StateHandler;
 
 public class FeedBackEvent
 {
-    public FeedBackEvent(EventType eventType) {
-        this.eventType = eventType;
+    public FeedBackEvent(UXEventType UXEventType) {
+        this.UXEventType = UXEventType;
     }
 
-    private final EventType eventType;
+    private final UXEventType UXEventType;
 
-    public EventType getEventType() {
-        return eventType;
+    public UXEventType getEventType() {
+        return UXEventType;
     }
 }

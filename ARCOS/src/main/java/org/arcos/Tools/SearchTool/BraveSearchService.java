@@ -14,6 +14,9 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import org.jsoup.Jsoup;
+import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
+
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -25,6 +28,8 @@ import java.util.Optional;
  * Service de recherche web utilisant l'API Brave Search
  * Conçu pour être intégré dans un assistant IA
  */
+
+@Service
 public class BraveSearchService {
 
     private static final Logger logger = LoggerFactory.getLogger(BraveSearchService.class);

@@ -19,6 +19,9 @@ public class CentralFeedBackHandler
 
     public void handleFeedBack(FeedBackEvent feedBackEvent) {
         switch (feedBackEvent.getEventType()) {
+
+            case ARCOS_START:
+                audioCueHandler.playArcosStart();
             case WAKEUP_LONG:
                 audioCueHandler.playWakeUpSoundHard();
                 break;

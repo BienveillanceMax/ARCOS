@@ -11,6 +11,11 @@ public class AudioCueFeedbackHandler
         this.audioCueEngine = audioCueEngine;
     }
 
+    //At startup completion, a sound should play
+    public void playArcosStart() {
+        audioCueEngine.play("arcos_startup.wav");
+    }
+
     //When addressed after a long silence (>4 min) a sound should play to notify the user that the assistant is listening.
     public void playWakeUpSoundHard() {
         audioCueEngine.play("wakeup_soft.wav");
@@ -45,4 +50,6 @@ public class AudioCueFeedbackHandler
     public void playFailureSound() {
         audioCueEngine.play("failure.wav");
     }
+
+
 }

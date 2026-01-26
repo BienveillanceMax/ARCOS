@@ -6,6 +6,7 @@ import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
+import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Personality.Desires.DesireService;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ public class DesireInitiativeProducer {
             if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
                 if (isGoodMomentToInitiate(desire)) {
                     log.info("High-intensity desire found, initiating... {}", desire.getLabel());
-                    centralFeedBackHandler.handleFeedBack(new FeedBackEvent(org.arcos.IO.OuputHandling.StateHandler.EventType.INITIATIVE_START));
+                    centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
                     initiateDesireAction(desire);
                 }
             }

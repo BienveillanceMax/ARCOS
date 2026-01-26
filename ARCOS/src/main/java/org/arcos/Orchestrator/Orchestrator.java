@@ -6,6 +6,7 @@ import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
+import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.Memory.ConversationContext;
@@ -71,9 +72,9 @@ public class Orchestrator
         } else if (event.getType() == EventType.INITIATIVE) {
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
-                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(org.arcos.IO.OuputHandling.StateHandler.EventType.INITIATIVE_START));
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
                 initiativeService.processInitiative(desire);
-                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(org.arcos.IO.OuputHandling.StateHandler.EventType.INITIATIVE_END));
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_END));
 
             } catch (Exception e) {
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);

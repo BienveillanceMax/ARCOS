@@ -49,11 +49,12 @@ public class DesireService
 
         DesireEntry createdDesire;
         if (opinionEntry.getAssociatedDesire() == null || opinionEntry.getAssociatedDesire().isEmpty()) {
-
+            log.info("Associated desire is null or empty");
             double opinionIntensity = calculateOpinionIntensity(opinionEntry);
-
+            log.info("Opinion intensity: " + opinionIntensity);
             if (opinionIntensity >= D_CREATE_THRESHOLD) {
                 try {
+                    log.info("Creating desire");
                     createdDesire = createDesire(opinionEntry, opinionIntensity);
                 } catch (DesireCreationException e) {
                     log.error("Failed to create desire for opinion {}", opinionEntry.getId(), e);

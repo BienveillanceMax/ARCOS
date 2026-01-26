@@ -25,10 +25,11 @@ public class SearchActions
 
     @Tool(name = "Chercher_sur_Internet", description = "Recherche des informations sur le web. [Instruction : ne précise tes sources que si cela a un vrai intérêt.]" +
             "Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats.")
-    public ActionResult searchTheWeb(Map<String, Object> params) {
+    public ActionResult searchTheWeb(String query) {
+        log.info("Recherche d'info sur le web");
+        log.info("{}", query);
 
         long startTime = System.currentTimeMillis();
-        String query = (String) params.get("query");
         BraveSearchService.SearchResult result;
 
         try {
@@ -42,8 +43,6 @@ public class SearchActions
         }
 
         List<String> processedResults = new ArrayList<>();
-        processedResults.add("### Résultats de recherche pour \"" + result.getQuery() + "\"\n");
-
         int index = 1;
         for (BraveSearchService.SearchResultItem item : result.getItems()) {
             StringBuilder builder = new StringBuilder();

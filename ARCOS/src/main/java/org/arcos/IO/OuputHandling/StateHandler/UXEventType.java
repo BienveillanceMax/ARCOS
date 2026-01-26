@@ -1,7 +1,8 @@
 package org.arcos.IO.OuputHandling.StateHandler;
 
-public enum EventType
+public enum UXEventType
 {
+    ARCOS_START,
     WAKEUP_LONG,
     WAKEUP_SHORT,
     INITIATIVE_START,

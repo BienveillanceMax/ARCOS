@@ -4,7 +4,7 @@ import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.WakeWordEvent;
 import org.arcos.IO.InputHandling.SpeechToText;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
-import org.arcos.IO.OuputHandling.StateHandler.EventType;
+import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
 import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
@@ -206,7 +206,7 @@ public class WakeWordProducer implements Runnable {
                         log.info("[{}] Detected '{}'",
                                 LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                                 keywords[result]);
-                        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(EventType.WAKEUP_SHORT));
+                        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.WAKEUP_SHORT));
 
                         // Switch to transcription mode
                         String transcription = recordAndTranscribe();

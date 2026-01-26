@@ -190,7 +190,7 @@ public class OpinionService {
         return 0.5 + (valueProfile.averageByDimension(opinionEntry.getMainDimension()) / 200.0);
     }
 
-    private OpinionEntry addOpinion(OpinionEntry opinionEntry, MemoryEntry associatedMemoryEntry) {
+    public OpinionEntry addOpinion(OpinionEntry opinionEntry, MemoryEntry associatedMemoryEntry) {
         opinionEntry.setId(UUID.randomUUID().toString());
         opinionEntry.setStability(calculateStabilityScore(opinionEntry));
         opinionEntry.setAssociatedMemories(List.of(associatedMemoryEntry.getId()));
