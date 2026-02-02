@@ -1,4 +1,4 @@
-package common.utils;
+package org.arcos.common.utils;
 
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;

@@ -1,4 +1,4 @@
-package IO.OuputHandling.StateHandler;
+package org.arcos.StateHandler;
 
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueEngine;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;

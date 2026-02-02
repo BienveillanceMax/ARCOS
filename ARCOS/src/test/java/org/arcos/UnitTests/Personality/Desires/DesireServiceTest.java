@@ -9,7 +9,7 @@ import org.arcos.Memory.LongTermMemory.Repositories.DesireRepository;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Values.ValueProfile;
-import common.utils.ObjectCreationUtils;
+import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;

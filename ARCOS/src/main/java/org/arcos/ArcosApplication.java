@@ -47,12 +47,13 @@ public class ArcosApplication
 
         //PiperEmbeddedTTSModule  piperEmbeddedTTSModule = new PiperEmbeddedTTSModule();
         EventQueue eventQueue = context.getBean(EventQueue.class);
-        eventQueue.offer(new Event<>(EventType.WAKEWORD,"Quelles sont les actualités du jour ?","home"));
+        eventQueue.offer(new Event<>(EventType.WAKEWORD,"J'ai besoin de me changer les idées, organise moi une sortie demain à 14H.","home"));
         //eventQueue.offer(new Event<>(EventType.WAKEWORD,"Que veux-tu et que veux tu devenir ?","home"));
         CentralFeedBackHandler centralFeedBackHandler = context.getBean(CentralFeedBackHandler.class);
         centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.ARCOS_START));
         OpinionService opinionService = context.getBean(OpinionService.class);
         OpinionEntry opinionEntry = createOpinionEntry();
+
 
         //SearchActions searchActions = context.getBean(SearchActions.class);
         //HashMap<String, Object> map = new HashMap<>();

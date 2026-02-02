@@ -3,3 +3,4 @@ ARCOS/.env
 ARCOS/HELP.md
 ARCOS/target/
 ARCOS/src/main/resources/*
+src/main/resources/client_secrets.json

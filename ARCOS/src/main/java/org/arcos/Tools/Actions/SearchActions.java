@@ -15,7 +15,6 @@ import java.util.Map;
 @Component
 public class SearchActions
 {
-//todo fix ?
     private final BraveSearchService searchService;
 
     @Autowired

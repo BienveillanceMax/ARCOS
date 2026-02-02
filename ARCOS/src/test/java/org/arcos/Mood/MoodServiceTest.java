@@ -1,4 +1,4 @@
-package Personality.Mood;
+package org.arcos.Mood;
 
 import org.arcos.Memory.ConversationContext;
 import org.arcos.Personality.Mood.Mood;

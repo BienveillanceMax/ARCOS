@@ -1,4 +1,4 @@
-package Orchestrator;
+package org.arcos.Orchestrator;
 
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;

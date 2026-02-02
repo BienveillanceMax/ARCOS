@@ -1,4 +1,4 @@
-package Personality.Mood;
+package org.arcos.Mood;
 
 import org.arcos.Personality.Mood.PadState;
 import org.junit.jupiter.api.Test;

@@ -1,4 +1,4 @@
-package Integration;
+package org.arcos.Integration;
 
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;

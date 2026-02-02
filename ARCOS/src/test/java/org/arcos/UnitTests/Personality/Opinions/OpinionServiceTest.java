@@ -8,7 +8,7 @@ import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Opinions.OpinionService;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
-import common.utils.ObjectCreationUtils;
+import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;

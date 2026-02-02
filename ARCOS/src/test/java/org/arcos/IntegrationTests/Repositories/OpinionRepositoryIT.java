@@ -2,7 +2,7 @@ package org.arcos.IntegrationTests.Repositories;
 
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
-import common.utils.ObjectCreationUtils;
+import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
