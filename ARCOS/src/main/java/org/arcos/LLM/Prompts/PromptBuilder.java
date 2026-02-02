@@ -98,6 +98,34 @@ public class PromptBuilder {
         return new PromptTemplate(templateText).create(model);
     }
 
+    public Prompt buildCanonicalizationPrompt(String narrative, String subject) {
+        String templateText = """
+        Transforme l'opinion suivante en une phrase Canonique Standardisée.
+
+        Opinion Brute : "{narrative}"
+        Sujet : "{subject}"
+
+        RÈGLES DE CANONICALISATION :
+        1. Format : Sujet + Verbe d'état/sentiment + Objet + Contexte (si nécessaire).
+        2. Grammaire : Toujours à la première personne du singulier (Je), présent de l'indicatif, phrase affirmative ou négative simple.
+        3. Objectif : Réduire la variance syntaxique pour la recherche vectorielle.
+        4. Pas de fioritures, pas de "Je pense que", juste l'affirmation du sentiment/état.
+
+        Exemples :
+        - "La pluie c'est nul" -> "Je n'aime pas la pluie."
+        - "J'adore quand il fait beau" -> "J'aime le beau temps."
+        - "Les chiens sont effrayants" -> "J'ai peur des chiens."
+
+        Réponse (uniquement la phrase canonique) :
+        """;
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("narrative", narrative);
+        model.put("subject", subject);
+
+        return new PromptTemplate(templateText).create(model);
+    }
+
     //TODO ADD PERSONALITY, VALUES ETC
     public Prompt buildInitiativePrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
         String templateText = """

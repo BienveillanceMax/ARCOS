@@ -35,6 +35,7 @@ public class DesireService
 
     public static final double D_CREATE_THRESHOLD = 0.5;
     public static final double D_UPDATE_THRESHOLD = 0.2;
+    public static final double D_PENDING_THRESHOLD = 0.7;
 
     @Autowired
     public DesireService(PromptBuilder promptBuilder, ValueProfile valueProfile, LLMClient llmClient, DesireRepository desireRepository, OpinionRepository opinionRepository) {
@@ -107,6 +108,9 @@ public class DesireService
         for (int i = 0; i < retries; i++) {
             createdDesire = llmClient.generateDesireResponse(prompt);
             createdDesire.setOpinionId(opinionEntry.getId());
+            if (createdDesire.getIntensity() >= D_PENDING_THRESHOLD) {
+                createdDesire.setStatus(DesireEntry.Status.PENDING);
+            }
             return createdDesire;
         }
         throw new DesireCreationException("Failed to create desire for opinion " + opinionEntry.getId() + " after " + retries + " retries.");
@@ -138,9 +142,10 @@ public class DesireService
             desireEntry.setIntensity(updatedIntensity);
             desireEntry.setLastUpdated(java.time.LocalDateTime.now());
 
-            if (updatedIntensity < D_UPDATE_THRESHOLD &&
+            if (updatedIntensity >= D_PENDING_THRESHOLD &&
                     desireEntry.getStatus() != DesireEntry.Status.SATISFIED &&
-                    desireEntry.getStatus() != DesireEntry.Status.ABANDONED) {
+                    desireEntry.getStatus() != DesireEntry.Status.ABANDONED &&
+                    desireEntry.getStatus() != DesireEntry.Status.ACTIVE) {
                 desireEntry.setStatus(DesireEntry.Status.PENDING);
             }
         }

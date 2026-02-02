@@ -22,6 +22,9 @@ public class OpinionEntry implements QdrantEntry
     @JsonProperty("subject")
     private String subject;         // Sujet concerné (chiens, politique, utilisateur...), un enum n'est pas suffisant ici
 
+    @JsonProperty("canonicalText")
+    private String canonicalText;   // Forme canonique pour la recherche (Sujet + Verbe + Objet + Contexte)
+
     @JsonProperty("summary")
     private String summary;         // Résumé court
 
@@ -99,6 +102,14 @@ public class OpinionEntry implements QdrantEntry
 
     public void setSubject(String subject) {
         this.subject = subject;
+    }
+
+    public String getCanonicalText() {
+        return canonicalText;
+    }
+
+    public void setCanonicalText(String canonicalText) {
+        this.canonicalText = canonicalText;
     }
 
     public String getSummary() {
@@ -185,6 +196,7 @@ public class OpinionEntry implements QdrantEntry
     public Map<String, Object> getPayload() {
         Map<String, Object> payload = new HashMap<>();
         payload.put("subject", this.getSubject());
+        payload.put("canonicalText", this.getCanonicalText());
         payload.put("summary", this.getSummary());
         payload.put("narrative", this.getNarrative());
         payload.put("polarity", this.getPolarity());
@@ -209,10 +221,17 @@ public class OpinionEntry implements QdrantEntry
     public static Document fromOpinionPoint(Points.RetrievedPoint point) {
         Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
 
-        String narrative = payloadMap.get("narrative").getStringValue();
+        // Retrieve canonicalText if present, otherwise use summary or subject as fallback for content
+        String content;
+        if (payloadMap.containsKey("canonicalText")) {
+            content = payloadMap.get("canonicalText").getStringValue();
+        } else if (payloadMap.containsKey("summary")) {
+            content = payloadMap.get("summary").getStringValue();
+        } else {
+             content = payloadMap.get("subject").getStringValue();
+        }
 
         Map<String, Object> metadata = payloadMap.entrySet().stream()
-                .filter(entry -> !entry.getKey().equals("narrative")) // Exclude the narrative from metadata
                 .collect(Collectors.toMap(Map.Entry::getKey, entry -> {
                     JsonWithInt.Value value = entry.getValue();
                     switch (value.getKindCase()) {
@@ -235,6 +254,13 @@ public class OpinionEntry implements QdrantEntry
         List<Float> vector = point.getVectors().getVector().getDataList();
         metadata.put("embedding", vector);
         String id = point.getId().getUuid();
-        return new Document(id, narrative, metadata);
+
+        // Ensure canonicalText is also in the object when reconstructed
+        OpinionEntry entry = new OpinionEntry();
+        // ... (This method returns a Document, conversion to OpinionEntry happens in OpinionService using metadata)
+        // Wait, fromOpinionPoint returns a Document. The OpinionService calls fromDocument which uses metadata.
+        // So I just need to ensure metadata contains everything.
+
+        return new Document(id, content, metadata);
     }
 }

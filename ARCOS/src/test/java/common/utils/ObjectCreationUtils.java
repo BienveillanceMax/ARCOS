@@ -29,6 +29,7 @@ public class ObjectCreationUtils
         OpinionEntry createdOpinion = new OpinionEntry();
         createdOpinion.setId(UUID.randomUUID().toString());
         createdOpinion.setSubject("Existing Subject");
+        createdOpinion.setCanonicalText("Je pense que l'on devrait tous s'aimer.");
         createdOpinion.setStability(0.1);
         createdOpinion.setCreatedAt(LocalDateTime.now());
         createdOpinion.setUpdatedAt(LocalDateTime.now());
