@@ -55,6 +55,11 @@ class OpinionServiceTest {
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
+
+        // Mock Canonicalization calls
+        when(promptBuilder.buildCanonicalizationPrompt(anyString(), anyString())).thenReturn(new Prompt("canonicalPrompt"));
+        when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("Canonical Text");
+
         when(opinionRepository.search(any())).thenReturn(new ArrayList<>());
 
         // When
@@ -92,9 +97,19 @@ class OpinionServiceTest {
         OpinionEntry existingOpinion = ObjectCreationUtils.createOpinionEntry();
         EnumMap<DimensionSchwartz,Double> values = ObjectCreationUtils.createAverageByDimension();
 
+        // Ensure canonicalText is present in newOpinion to avoid search crash if mocked llm response is missing it?
+        // No, processInteraction calls getOpinionFromMemoryEntry which sets it.
+        // But here we mock generateOpinionResponse returning newOpinion.
+        // We also need to mock canonicalization call.
 
         Map<String, Object> payload = existingOpinion.getPayload();
         payload.put("distance", (float) 0.1);
+
+        // Ensure payload has canonicalText (ObjectCreationUtils now adds it, but just in case)
+        if (!payload.containsKey("canonicalText")) {
+             payload.put("canonicalText", "Canonical Text");
+        }
+
         Document returnDocument = new Document(existingOpinion.getSummary(), payload);
         Document returnDocument2 = new Document(existingOpinion.getSummary(), payload);
 
@@ -102,6 +117,11 @@ class OpinionServiceTest {
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
+
+        // Mock Canonicalization calls
+        when(promptBuilder.buildCanonicalizationPrompt(anyString(), anyString())).thenReturn(new Prompt("canonicalPrompt"));
+        when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("Canonical Text");
+
         when(opinionRepository.search(any())).thenReturn(List.of(returnDocument, returnDocument2));
         when(valueProfile.averageByDimension()).thenReturn(values);
         when(valueProfile.dimensionAverage()).thenReturn(50.0);

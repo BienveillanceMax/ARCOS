@@ -69,6 +69,12 @@ public class OpinionService {
         try {
             opinionEntry = llmClient.generateOpinionResponse(prompt);
             opinionEntry.getAssociatedMemories().add(memoryEntry.getId());
+
+            // Canonicalization step
+            Prompt canonicalPrompt = promptBuilder.buildCanonicalizationPrompt(opinionEntry.getNarrative(), opinionEntry.getSubject());
+            String canonicalText = llmClient.generateToollessResponse(canonicalPrompt);
+            opinionEntry.setCanonicalText(canonicalText.trim());
+
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;
@@ -83,7 +89,12 @@ public class OpinionService {
             return null;
         }
 
-        SearchRequest searchRequest = SearchRequest.builder().query(opinionEntry.getSubject()).topK(10).build();
+        // Use canonicalText for search if available, otherwise fallback to subject
+        String searchQuery = opinionEntry.getCanonicalText() != null && !opinionEntry.getCanonicalText().isEmpty()
+                ? opinionEntry.getCanonicalText()
+                : opinionEntry.getSubject();
+
+        SearchRequest searchRequest = SearchRequest.builder().query(searchQuery).topK(10).build();
         List<Document> similarOpinionDocs = opinionRepository.search(searchRequest);
 
         List<Document> sufficientlySimilarDocs = similarOpinionDocs.stream()
@@ -202,7 +213,10 @@ public class OpinionService {
     }
 
     private Document toDocument(OpinionEntry opinionEntry) {
-        String content = opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject();
+        // Use canonicalText as the primary content for embedding/search
+        String content = opinionEntry.getCanonicalText() != null && !opinionEntry.getCanonicalText().isEmpty()
+                ? opinionEntry.getCanonicalText()
+                : (opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject());
         return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
     }
 
@@ -211,6 +225,7 @@ public class OpinionService {
         OpinionEntry opinionEntry = new OpinionEntry();
         opinionEntry.setId(document.getId());
         opinionEntry.setSubject((String) metadata.get("subject"));
+        opinionEntry.setCanonicalText((String) metadata.get("canonicalText"));
         opinionEntry.setSummary((String) metadata.get("summary"));
         opinionEntry.setNarrative((String) metadata.get("narrative"));
         opinionEntry.setPolarity((Double) metadata.get("polarity"));
