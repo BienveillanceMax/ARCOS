@@ -15,6 +15,7 @@ import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
+import jakarta.annotation.PreDestroy;
 import javax.sound.sampled.*;
 import java.io.File;
 import java.io.IOException;
@@ -37,6 +38,7 @@ public class WakeWordProducer implements Runnable {
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
+    private volatile Thread wakeWordThread;
 
 
     private static final int MIC_SAMPLE_RATE = 44100;
@@ -50,11 +52,26 @@ public class WakeWordProducer implements Runnable {
     @EventListener(ApplicationReadyEvent.class)
     public void startAfterStartup() {
         if (this.micDataLine != null) {
-            Thread thread = new Thread(this);
-            thread.setDaemon(true);
-            thread.start();
+            wakeWordThread = new Thread(this, "wakeword-producer");
+            wakeWordThread.setDaemon(true);
+            wakeWordThread.start();
         } else {
             log.warn("No audio input device found or configured. Wake word detection thread will not start.");
+        }
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        log.info("WakeWordProducer shutting down");
+        if (wakeWordThread != null) {
+            wakeWordThread.interrupt();
+        }
+        if (micDataLine != null) {
+            micDataLine.stop();
+            micDataLine.close();
+        }
+        if (porcupine != null) {
+            porcupine.delete();
         }
     }
 

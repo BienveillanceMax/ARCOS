@@ -189,7 +189,12 @@ public class PiperEmbeddedTTSModule {
                 }
             }
 
-            int exitCode = process.waitFor();
+            boolean finished = process.waitFor(120, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new RuntimeException("tar extraction timed out after 120 seconds");
+            }
+            int exitCode = process.exitValue();
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to extract tar.gz file, exit code: " + exitCode);
             }
@@ -225,7 +230,8 @@ public class PiperEmbeddedTTSModule {
                             try {
                                 ProcessBuilder pb = new ProcessBuilder("chmod", "+x", exe.getAbsolutePath());
                                 Process p = pb.start();
-                                p.waitFor();
+                                boolean finished = p.waitFor(10, TimeUnit.SECONDS);
+                                if (!finished) p.destroyForcibly();
                                 System.out.println("Set executable permissions using chmod");
                             } catch (Exception e) {
                                 System.out.println("chmod failed, using Java setExecutable: " + e.getMessage());
@@ -317,7 +323,8 @@ public class PiperEmbeddedTTSModule {
                 try {
                     ProcessBuilder chmodPb = new ProcessBuilder("chmod", "+x", piperExecutable);
                     Process chmodProcess = chmodPb.start();
-                    chmodProcess.waitFor();
+                    boolean finished = chmodProcess.waitFor(10, TimeUnit.SECONDS);
+                    if (!finished) chmodProcess.destroyForcibly();
                     System.out.println("Applied chmod +x to " + piperExecutable);
                 } catch (Exception e) {
                     System.err.println("chmod failed: " + e.getMessage());
@@ -342,7 +349,12 @@ public class PiperEmbeddedTTSModule {
                 }
             }
 
-            int exitCode = process.waitFor();
+            boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new RuntimeException("Piper verification timed out after 30 seconds");
+            }
+            int exitCode = process.exitValue();
             System.out.println("Piper verification exit code: " + exitCode);
 
             if (exitCode != 0) {
@@ -431,7 +443,12 @@ public class PiperEmbeddedTTSModule {
         }
 
         // Wait for completion
-        int exitCode = process.waitFor();
+        boolean finished = process.waitFor(30, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("Piper TTS generation timed out after 30 seconds");
+        }
+        int exitCode = process.exitValue();
         System.out.println("Piper exit code: " + exitCode);
 
         if (exitCode != 0) {
@@ -491,7 +508,12 @@ public class PiperEmbeddedTTSModule {
             }
         }
 
-        int exitCode = process.waitFor();
+        boolean finished = process.waitFor(60, TimeUnit.SECONDS);
+        if (!finished) {
+            process.destroyForcibly();
+            throw new RuntimeException("Audio playback timed out after 60 seconds");
+        }
+        int exitCode = process.exitValue();
         System.out.println("Audio player exit code: " + exitCode);
 
         if (exitCode != 0) {
@@ -503,8 +525,12 @@ public class PiperEmbeddedTTSModule {
         try {
             ProcessBuilder pb = new ProcessBuilder("which", command);
             Process process = pb.start();
-            int exitCode = process.waitFor();
-            return exitCode == 0;
+            boolean finished = process.waitFor(5, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return false;
+            }
+            return process.exitValue() == 0;
         } catch (Exception e) {
             return false;
         }

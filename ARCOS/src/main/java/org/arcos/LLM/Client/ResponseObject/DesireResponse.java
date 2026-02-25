@@ -1,13 +1,23 @@
 package org.arcos.LLM.Client.ResponseObject;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 
 public class DesireResponse
 {
+    @JsonProperty("label")
     private String label;       // title of the desire
+
+    @JsonProperty("description")
     private String description;
+
+    @JsonProperty("intensity")
     private double intensity;    // 0..1
+
+    @JsonProperty("reasoning")
     private String reasoning;
+
+    @JsonProperty("status")
     private DesireEntry.Status status;
 
 

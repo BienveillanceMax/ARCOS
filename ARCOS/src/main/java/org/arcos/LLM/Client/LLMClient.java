@@ -80,7 +80,8 @@ public class LLMClient
         MemoryResponse response = chatClient.prompt(prompt)
                 .call()
                 .entity(new BeanOutputConverter<>(MemoryResponse.class, this.objectMapper));
-        if (response == null) {
+        if (response == null || response.getContent() == null || response.getContent().isBlank()) {
+            log.warn("LLM returned null or empty memory response");
             return null;
         }
         return MemoryEntry.fromMemoryResponse(response);
@@ -92,7 +93,8 @@ public class LLMClient
                 .tools(calendarActions, pythonActions, searchActions)
                 .call()
                 .entity(new BeanOutputConverter<>(OpinionResponse.class, this.objectMapper));
-        if (response == null) {
+        if (response == null || response.getSummary() == null || response.getSummary().isBlank()) {
+            log.warn("LLM returned null or empty opinion response");
             return null;
         }
         return OpinionEntry.fromOpinionResponse(response);
@@ -103,7 +105,8 @@ public class LLMClient
         DesireResponse response = chatClient.prompt(prompt)
                 .call()
                 .entity(new BeanOutputConverter<>(DesireResponse.class, this.objectMapper));
-        if (response == null) {
+        if (response == null || response.getLabel() == null || response.getLabel().isBlank()) {
+            log.warn("LLM returned null or empty desire response");
             return null;
         }
         return DesireEntry.fromDesireResponse(response);

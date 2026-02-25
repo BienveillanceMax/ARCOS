@@ -27,7 +27,8 @@ import org.arcos.Personality.PersonalityOrchestrator;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 @Component
 @Slf4j
@@ -48,6 +49,16 @@ public class Orchestrator
     private volatile LocalDateTime lastInteracted;
     private volatile boolean running = true;
     private DesireService desireService;
+    private final ExecutorService moodExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "mood-updater");
+        t.setDaemon(true);
+        return t;
+    });
+    private final ExecutorService personalityExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "personality-processor");
+        t.setDaemon(true);
+        return t;
+    });
 
     @Autowired
     public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
@@ -113,6 +124,9 @@ public class Orchestrator
     public void stop() {
         log.info("Orchestrator shutdown requested");
         running = false;
+        moodExecutor.shutdownNow();
+        personalityExecutor.shutdownNow();
+        ttsHandler.shutdown();
     }
 
     private void processAndSpeak(String userQuery) {
@@ -212,7 +226,7 @@ public class Orchestrator
     }
 
     private void updateMoodAsync(String userQuery, String assistantResponse) {
-        CompletableFuture.runAsync(() -> {
+        moodExecutor.submit(() -> {
             try {
                 log.info("Starting asynchronous mood update...");
                 Prompt moodPrompt = promptBuilder.buildMoodUpdatePrompt(context.getPadState(), userQuery, assistantResponse);
@@ -226,9 +240,8 @@ public class Orchestrator
     }
 
     private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
-        CompletableFuture.runAsync(() -> {
+        personalityExecutor.submit(() -> {
             try {
-                // On ne veut pas que la personnalité se déclenche à chaque interaction.
                 Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
                 if (elapsedTime.toMinutes() >= 5) {
                     log.info("Triggering personality processing...");
@@ -240,6 +253,5 @@ public class Orchestrator
                 log.error("Error during personality processing", e);
             }
         });
-
     }
 }
