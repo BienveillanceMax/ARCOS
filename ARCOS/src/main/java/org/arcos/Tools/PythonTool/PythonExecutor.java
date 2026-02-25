@@ -4,6 +4,7 @@ import org.springframework.stereotype.Component;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class PythonExecutor {
@@ -36,32 +37,36 @@ public class PythonExecutor {
         }
     }
 
+    private static final int TIMEOUT_SECONDS = 30;
+
     public ExecutionResult execute(String code) {
+        Process process = null;
         try {
-            ProcessBuilder pb = new ProcessBuilder("python", "-c", code);
-            Process process = pb.start();
+            ProcessBuilder pb = new ProcessBuilder("python3", "-c", code);
+            // Merge stderr into stdout to avoid pipe-buffer deadlock from reading streams sequentially
+            pb.redirectErrorStream(true);
+            process = pb.start();
 
-            StringBuilder stdout = new StringBuilder();
-            StringBuilder stderr = new StringBuilder();
+            // Wait for process completion with timeout
+            boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return new ExecutionResult(-1, "", "Process timed out after " + TIMEOUT_SECONDS + " seconds");
+            }
 
-            try (BufferedReader stdoutReader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                 BufferedReader stderrReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-
+            // Process has exited — safe to drain output
+            StringBuilder output = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
-                while ((line = stdoutReader.readLine()) != null) {
-                    stdout.append(line).append("\n");
-                }
-
-                while ((line = stderrReader.readLine()) != null) {
-                    stderr.append(line).append("\n");
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
                 }
             }
 
-            int exitCode = process.waitFor();
-
-            return new ExecutionResult(exitCode, stdout.toString(), stderr.toString());
+            return new ExecutionResult(process.exitValue(), output.toString(), "");
 
         } catch (IOException | InterruptedException e) {
+            if (process != null) process.destroyForcibly();
             return new ExecutionResult(-1, "", e.getMessage());
         }
     }

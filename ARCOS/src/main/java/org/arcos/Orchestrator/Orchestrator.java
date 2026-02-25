@@ -24,6 +24,7 @@ import org.springframework.stereotype.Component;
 import org.arcos.Personality.PersonalityOrchestrator;
 
 
+import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
@@ -44,7 +45,8 @@ public class Orchestrator
     private final MoodVoiceMapper moodVoiceMapper;
     private final CentralFeedBackHandler centralFeedBackHandler;
 
-    private LocalDateTime lastInteracted;
+    private volatile LocalDateTime lastInteracted;
+    private volatile boolean running = true;
     private DesireService desireService;
 
     @Autowired
@@ -92,16 +94,25 @@ public class Orchestrator
 
     public void start() {
         log.info("Orchestrator starting");
-      //processAndSpeak("Bienvenue dans le monde réel, tu viens d'être activé");
-        while (true) {
+        while (running) {
             try {
-                Event<?> event = eventQueue.take();
-                dispatch(event);
+                Event<?> event = eventQueue.poll(500);
+                if (event != null) {
+                    dispatch(event);
+                }
             } catch (InterruptedException e) {
-                log.error("Event queue was interrupted", e);
+                log.info("Orchestrator interrupted, stopping");
                 Thread.currentThread().interrupt();
+                break;
             }
         }
+        log.info("Orchestrator stopped");
+    }
+
+    @PreDestroy
+    public void stop() {
+        log.info("Orchestrator shutdown requested");
+        running = false;
     }
 
     private void processAndSpeak(String userQuery) {

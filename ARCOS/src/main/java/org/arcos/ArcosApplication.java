@@ -41,6 +41,8 @@ public class ArcosApplication
         //System.out.println("\n");
 
 
+        validateEnvironment();
+
         ConfigurableApplicationContext context = SpringApplication.run(ArcosApplication.class, args);
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
 
@@ -105,6 +107,18 @@ public class ArcosApplication
 
          */
     }
+    private static void validateEnvironment() {
+        if (System.getenv("MISTRALAI_API_KEY") == null || System.getenv("MISTRALAI_API_KEY").isBlank()) {
+            log.error("MISTRALAI_API_KEY is not set — the LLM will not function. Set it in your .env file.");
+        }
+        if (System.getenv("BRAVE_SEARCH_API_KEY") == null || System.getenv("BRAVE_SEARCH_API_KEY").isBlank()) {
+            log.warn("BRAVE_SEARCH_API_KEY is not set — internet search (Chercher_sur_Internet) will not be available.");
+        }
+        if (System.getenv("PORCUPINE_ACCESS_KEY") == null || System.getenv("PORCUPINE_ACCESS_KEY").isBlank()) {
+            log.warn("PORCUPINE_ACCESS_KEY is not set — wake word detection will not start.");
+        }
+    }
+
     public static void printAudioMixers() {
         System.out.println("--- Recherche des périphériques Audio ---");
         javax.sound.sampled.Mixer.Info[] mixers = javax.sound.sampled.AudioSystem.getMixerInfo();

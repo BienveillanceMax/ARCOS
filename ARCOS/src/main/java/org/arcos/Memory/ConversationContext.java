@@ -63,11 +63,11 @@ public class ConversationContext {
         this.sessionId = UUID.randomUUID().toString();
         this.createdAt = LocalDateTime.now();
         this.lastUpdated = LocalDateTime.now();
-        this.messageHistory = new ArrayList<>();
+        this.messageHistory = Collections.synchronizedList(new ArrayList<>());
         this.userPreferences = new ConcurrentHashMap<>();
         this.sessionData = new ConcurrentHashMap<>();
-        this.actionHistory = new ArrayList<>();
-        this.errors = new ArrayList<>();
+        this.actionHistory = Collections.synchronizedList(new ArrayList<>());
+        this.errors = Collections.synchronizedList(new ArrayList<>());
         this.metadata = new ConcurrentHashMap<>();
         this.padState = new PadState();
     }
@@ -107,13 +107,13 @@ public class ConversationContext {
 
     private void addMessage(ConversationMessage.MessageType type, String content, ExecutionPlan plan) {
         ConversationMessage message = new ConversationMessage(type, content, null);
-        messageHistory.add(message);
-
-        // Maintient la taille de l'historique
-        while (messageHistory.size() > maxHistorySize) {
-            messageHistory.removeFirst();
+        synchronized (messageHistory) {
+            messageHistory.add(message);
+            // Maintient la taille de l'historique
+            while (messageHistory.size() > maxHistorySize) {
+                messageHistory.removeFirst();
+            }
         }
-
         updateTimestamp();
     }
 
@@ -121,12 +121,13 @@ public class ConversationContext {
      * Récupère les N derniers messages
      */
     public List<ConversationMessage> getRecentMessages(int count) {
-        if (messageHistory.isEmpty()) {
-            return new ArrayList<>();
+        synchronized (messageHistory) {
+            if (messageHistory.isEmpty()) {
+                return new ArrayList<>();
+            }
+            int start = Math.max(0, messageHistory.size() - count);
+            return new ArrayList<>(messageHistory.subList(start, messageHistory.size()));
         }
-
-        int start = Math.max(0, messageHistory.size() - count);
-        return new ArrayList<>(messageHistory.subList(start, messageHistory.size()));
     }
 
     /**
@@ -139,14 +140,16 @@ public class ConversationContext {
     }
 
     public String getFullConversation() {
-        StringBuilder sb = new StringBuilder();
-        for (ConversationMessage message : messageHistory) {
-            sb.append(message.getType().name())
-                    .append(": ")
-                    .append(message.getContent())
-                    .append("\n");
+        synchronized (messageHistory) {
+            StringBuilder sb = new StringBuilder();
+            for (ConversationMessage message : messageHistory) {
+                sb.append(message.getType().name())
+                        .append(": ")
+                        .append(message.getContent())
+                        .append("\n");
+            }
+            return sb.toString();
         }
-        return sb.toString();
     }
 
     /**
@@ -261,13 +264,13 @@ public class ConversationContext {
      */
     public void addError(String message, Exception exception) {
         ContextError error = new ContextError(message, exception);
-        errors.add(error);
-
-        // Maintient la taille des erreurs
-        while (errors.size() > maxErrorSize) {
-            errors.remove(0);
+        synchronized (errors) {
+            errors.add(error);
+            // Maintient la taille des erreurs
+            while (errors.size() > maxErrorSize) {
+                errors.remove(0);
+            }
         }
-
         updateTimestamp();
     }
 
@@ -369,7 +372,7 @@ public class ConversationContext {
         return new ArrayList<>(messageHistory);
     }
     public void setMessageHistory(List<ConversationMessage> messageHistory) {
-        this.messageHistory = new ArrayList<>(messageHistory);
+        this.messageHistory = Collections.synchronizedList(new ArrayList<>(messageHistory));
     }
 
     public Map<String, Object> getUserPreferences() {
@@ -390,14 +393,14 @@ public class ConversationContext {
         return new ArrayList<>(actionHistory);
     }
     public void setActionHistory(List<ExecutedAction> actionHistory) {
-        this.actionHistory = new ArrayList<>(actionHistory);
+        this.actionHistory = Collections.synchronizedList(new ArrayList<>(actionHistory));
     }
 
     public List<ContextError> getErrors() {
         return new ArrayList<>(errors);
     }
     public void setErrors(List<ContextError> errors) {
-        this.errors = new ArrayList<>(errors);
+        this.errors = Collections.synchronizedList(new ArrayList<>(errors));
     }
 
     public Map<String, String> getMetadata() {
