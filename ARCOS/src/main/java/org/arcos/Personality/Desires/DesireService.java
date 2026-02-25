@@ -103,16 +103,23 @@ public class DesireService
 
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) throws DesireCreationException {
         Prompt prompt = promptBuilder.buildDesirePrompt(opinionEntry, desireIntensity);
-        DesireEntry createdDesire;
 
         int retries = 3;
         for (int i = 0; i < retries; i++) {
-            createdDesire = llmClient.generateDesireResponse(prompt);
-            createdDesire.setOpinionId(opinionEntry.getId());
-            if (createdDesire.getIntensity() >= D_PENDING_THRESHOLD) {
-                createdDesire.setStatus(DesireEntry.Status.PENDING);
+            try {
+                DesireEntry createdDesire = llmClient.generateDesireResponse(prompt);
+                if (createdDesire == null) {
+                    log.warn("LLM returned null desire response (attempt {}/{})", i + 1, retries);
+                    continue;
+                }
+                createdDesire.setOpinionId(opinionEntry.getId());
+                if (createdDesire.getIntensity() >= D_PENDING_THRESHOLD) {
+                    createdDesire.setStatus(DesireEntry.Status.PENDING);
+                }
+                return createdDesire;
+            } catch (Exception e) {
+                log.warn("Failed to generate desire (attempt {}/{}): {}", i + 1, retries, e.getMessage());
             }
-            return createdDesire;
         }
         throw new DesireCreationException("Failed to create desire for opinion " + opinionEntry.getId() + " after " + retries + " retries.");
     }

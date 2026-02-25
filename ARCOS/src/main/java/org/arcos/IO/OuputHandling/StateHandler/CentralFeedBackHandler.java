@@ -22,6 +22,7 @@ public class CentralFeedBackHandler
 
             case ARCOS_START:
                 audioCueHandler.playArcosStart();
+                break;
             case WAKEUP_LONG:
                 audioCueHandler.playWakeUpSoundHard();
                 break;

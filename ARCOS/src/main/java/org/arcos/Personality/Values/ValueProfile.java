@@ -162,9 +162,9 @@ public class ValueProfile
     {
         return scores.values()
                 .stream()
-                .mapToInt(Double::intValue)
+                .mapToDouble(Double::doubleValue)
                 .average()
-                .orElse(50);
+                .orElse(50.0);
     }
 
     public EnumMap<DimensionSchwartz, Double> averageByDimension() {

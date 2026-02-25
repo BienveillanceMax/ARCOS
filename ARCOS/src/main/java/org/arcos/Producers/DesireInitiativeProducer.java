@@ -37,7 +37,7 @@ public class DesireInitiativeProducer {
         this.centralFeedBackHandler = centralFeedBackHandler;
     }
 
-    @Scheduled(fixedRate = 6000000) // Check every hour
+    @Scheduled(fixedRate = 3600000) // Check every hour
     public void checkDesiresAndInitiate() {
         log.info("Checking for high-intensity desires...");
         List<DesireEntry> pendingDesires = desireService.getPendingDesires();
@@ -72,12 +72,14 @@ public class DesireInitiativeProducer {
                 "DesireInitiativeProducer"
         );
 
-        // Push the event to the queue
-        eventQueue.offer(initiativeEvent);
-
-        // Update the desire's status to ACTIVE
-        desire.setStatus(DesireEntry.Status.ACTIVE);
-        desireService.storeDesire(desire);
+        // Only mark ACTIVE if the event was actually queued
+        boolean queued = eventQueue.offer(initiativeEvent);
+        if (queued) {
+            desire.setStatus(DesireEntry.Status.ACTIVE);
+            desireService.storeDesire(desire);
+        } else {
+            log.warn("Event queue full, could not queue initiative for desire {}", desire.getId());
+        }
     }
 }
 

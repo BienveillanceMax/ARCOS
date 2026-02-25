@@ -107,7 +107,10 @@ public class OpinionService {
         if (!sufficientlySimilarDocs.isEmpty()) {
             for (Document doc : sufficientlySimilarDocs) {
                 OpinionEntry existingOpinion = fromDocument(doc);
-                opinionEntries.add(updateOpinion(existingOpinion, opinionEntry)); ///hmmm todo tests for duplication  
+                OpinionEntry updated = updateOpinion(existingOpinion, opinionEntry);
+                if (updated != null) {
+                    opinionEntries.add(updated);
+                }
             }
         } else {
             opinionEntries.add(addOpinion(opinionEntry, memory));

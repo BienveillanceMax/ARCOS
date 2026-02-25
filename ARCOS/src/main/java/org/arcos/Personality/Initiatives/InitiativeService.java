@@ -10,22 +10,19 @@ import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Opinions.OpinionService;
 import org.arcos.Personality.PersonalityOrchestrator;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.Comparator;
 import java.util.List;
 
-@Service
 @Slf4j
 public class InitiativeService {
 
-    private final DesireService desireService;
     private final OpinionService opinionService;
     private final MemoryService memoryService;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
     private final PersonalityOrchestrator personalityOrchestrator;
+    private final DesireService desireService;
 
     public InitiativeService(DesireService desireService, OpinionService opinionService,
                              MemoryService memoryService, LLMClient llmClient,
@@ -38,29 +35,11 @@ public class InitiativeService {
         this.personalityOrchestrator = personalityOrchestrator;
     }
 
-    @Scheduled(fixedDelay = 60000) // Check every minute
-    public void checkPendingDesires() {
-        log.info("Checking for pending desires...");
-        List<DesireEntry> pending = desireService.getPendingDesires();
-        if (pending == null || pending.isEmpty()) {
-            return;
-        }
-
-        // Pick highest intensity
-        pending.sort(Comparator.comparingDouble(DesireEntry::getIntensity).reversed());
-        DesireEntry topDesire = pending.get(0);
-
-        log.info("Executing initiative for desire: {} (Intensity: {})", topDesire.getLabel(), topDesire.getIntensity());
-
-        // Mark as ACTIVE during execution? Or just keep PENDING?
-        // User said: "Si cette initiative réussit ... il sera supprimé, sinon il sera gardé en 'Pending'".
-        // I will keep it as PENDING during execution, but if I crash I don't want to deadlock.
-        // Let's execute.
-
-        executeInitiative(topDesire);
-    }
-
-    private void executeInitiative(DesireEntry desire) {
+    /**
+     * Process an initiative for a given desire. Called by the Orchestrator
+     * when it receives an INITIATIVE event from DesireInitiativeProducer.
+     */
+    public void processInitiative(DesireEntry desire) {
         try {
             // Gather context
             List<MemoryEntry> memories = memoryService.searchMemories(desire.getLabel(), 5);
