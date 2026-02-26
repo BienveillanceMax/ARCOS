@@ -1,8 +1,8 @@
 org/arcos/Producers/WakeWordProducer.class
 org/arcos/LLM/Prompts/PromptBuilder.class
 org/arcos/IO/OuputHandling/StateHandler/CentralFeedBackHandler$1.class
-org/arcos/Tools/Actions/PythonActions.class
 org/arcos/Memory/LongTermMemory/Models/DesireEntry.class
+org/arcos/Tools/Actions/PythonActions.class
 org/arcos/Personality/Values/ValueProfile.class
 org/arcos/LLM/Client/LLMClient.class
 org/arcos/IO/OuputHandling/StateHandler/FeedBackEvent.class
@@ -17,7 +17,6 @@ org/arcos/LLM/MistralTimeoutConfig.class
 org/arcos/Personality/Desires/DesireService.class
 org/arcos/Memory/ContextError.class
 org/arcos/LLM/MistralTimeoutConfig$1.class
-org/arcos/IO/OuputHandling/StateHandler/EventType.class
 org/arcos/Orchestrator/Orchestrator.class
 org/arcos/Memory/LongTermMemory/Repositories/BaseVectorRepository.class
 org/arcos/Tools/Actions/ActionResult.class
@@ -39,8 +38,8 @@ org/arcos/Tools/CalendarTool/CalendarToolConfig.class
 org/arcos/Personality/Values/ValueProfile$PredefinedProfile.class
 org/arcos/IO/OuputHandling/StateHandler/AudioCue/AudioCueFeedbackHandler.class
 org/arcos/Memory/ConversationMessage$MessageType.class
-org/arcos/Tools/PythonTool/PythonExecutor$ExecutionResult.class
 org/arcos/Personality/Mood/PadState.class
+org/arcos/Tools/PythonTool/PythonExecutor$ExecutionResult.class
 org/arcos/Personality/Initiatives/InitiativeService.class
 org/arcos/LLM/Client/ResponseObject/MemoryResponse.class
 org/arcos/Orchestrator/Entities/ExecutionPlan.class
@@ -56,6 +55,7 @@ org/arcos/Memory/LongTermMemory/Models/OpinionEntry$1.class
 org/arcos/ArcosApplication.class
 org/arcos/Exceptions/DesireCreationException.class
 org/arcos/Tools/PythonTool/PythonExecutor.class
+org/arcos/IO/OuputHandling/StateHandler/UXEventType.class
 org/arcos/Producers/DesireInitiativeProducer.class
 org/arcos/Orchestrator/InitiativeService.class
 org/arcos/Tools/Actions/SearchActions.class
@@ -74,8 +74,8 @@ org/arcos/Tools/SearchTool/BraveSearchService$SearchResult.class
 org/arcos/LLM/Client/ResponseObject/DesireResponse.class
 org/arcos/Personality/Mood/MoodVoiceMapper.class
 org/arcos/Tools/SearchTool/BraveSearchService$BraveApiResponse.class
-org/arcos/Memory/ConversationContext.class
 org/arcos/Memory/LongTermMemory/Models/DesireEntry$1.class
+org/arcos/Memory/ConversationContext.class
 org/arcos/Producers/SpeechToTextProducer.class
 org/arcos/Tools/SearchTool/BraveSearchService$Freshness.class
 org/arcos/EventBus/Events/Event.class

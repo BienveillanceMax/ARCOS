@@ -127,5 +127,50 @@ class DesireServiceTest {
         assertNull(result);
         verify(desireRepository, never()).save(any());
     }
+
+    @Test
+    void createDesire_WhenLLMReturnsNullTwiceThenSucceeds_ShouldReturnDesireOnThirdAttempt() throws DesireCreationException {
+        // Given — high intensity to pass D_CREATE_THRESHOLD
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry(); // associatedDesire = ""
+        opinionEntry.setPolarity(1.0);
+        opinionEntry.setStability(1.0);
+
+        DesireEntry validDesire = ObjectCreationUtils.createIntensePendingDesireEntry(opinionEntry.getId());
+
+        when(valueProfile.averageByDimension(any())).thenReturn(80.0);
+        when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn(new Prompt("prompt"));
+        when(llmClient.generateDesireResponse(any(Prompt.class)))
+                .thenReturn(null)        // attempt 1: null
+                .thenReturn(null)        // attempt 2: null
+                .thenReturn(validDesire); // attempt 3: success
+
+        // When
+        DesireEntry result = desireService.processOpinion(opinionEntry);
+
+        // Then
+        assertNotNull(result);
+        verify(llmClient, times(3)).generateDesireResponse(any(Prompt.class));
+        verify(desireRepository).save(any());
+    }
+
+    @Test
+    void createDesire_WhenLLMAlwaysReturnsNull_ShouldReturnNullAfterThreeAttempts() throws DesireCreationException {
+        // Given
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry(); // associatedDesire = ""
+        opinionEntry.setPolarity(1.0);
+        opinionEntry.setStability(1.0);
+
+        when(valueProfile.averageByDimension(any())).thenReturn(80.0);
+        when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn(new Prompt("prompt"));
+        when(llmClient.generateDesireResponse(any(Prompt.class))).thenReturn(null); // always null
+
+        // When
+        DesireEntry result = desireService.processOpinion(opinionEntry);
+
+        // Then
+        assertNull(result);
+        verify(llmClient, times(3)).generateDesireResponse(any(Prompt.class));
+        verify(desireRepository, never()).save(any());
+    }
 }
 

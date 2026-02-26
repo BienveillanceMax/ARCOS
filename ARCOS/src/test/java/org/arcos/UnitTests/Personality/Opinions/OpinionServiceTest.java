@@ -134,4 +134,48 @@ class OpinionServiceTest {
         assertNotNull(result);
         assertEquals(2, result.size());
     }
+
+    @Test
+    void processInteraction_WhenSimilarOpinionDiesOnUpdate_ShouldReturnEmptyListWithNoNulls() {
+        // Given
+        MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
+
+        // New opinion from LLM with contradicting polarity (-0.8) to force stability to 0
+        OpinionEntry newOpinion = ObjectCreationUtils.createOpinionEntry();
+        newOpinion.setPolarity(-0.8);
+
+        // Existing opinion in DB (polarity=+0.5, stability=0.1 from factory)
+        OpinionEntry existingOpinion = ObjectCreationUtils.createOpinionEntry();
+        Map<String, Object> payload = existingOpinion.getPayload();
+        payload.put("distance", (float) 0.05); // similarity = 0.95 >= 0.85 threshold
+        if (!payload.containsKey("canonicalText")) {
+            payload.put("canonicalText", "Je pense que l'on devrait tous s'aimer.");
+        }
+        Document existingDoc = new Document(existingOpinion.getSummary(), payload);
+
+        // Mocks
+        when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
+        when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
+        when(promptBuilder.buildCanonicalizationPrompt(anyString(), anyString())).thenReturn(new Prompt("canonicalPrompt"));
+        when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("Canonical Text");
+        when(opinionRepository.search(any())).thenReturn(List.of(existingDoc));
+
+        // ValueProfile: averageByDimension(dim) → 50.0 for imp; no-arg → {CONSERVATION: 50.0} for normVp=0
+        EnumMap<DimensionSchwartz, Double> dimMap = new EnumMap<>(DimensionSchwartz.class);
+        dimMap.put(DimensionSchwartz.CONSERVATION, 50.0);
+        dimMap.put(DimensionSchwartz.SELF_TRANSCENDENCE, 0.0);
+        dimMap.put(DimensionSchwartz.OPENNESS_TO_CHANGE, 0.0);
+        dimMap.put(DimensionSchwartz.SELF_ENHANCEMENT, 0.0);
+        when(valueProfile.averageByDimension(any())).thenReturn(50.0);
+        when(valueProfile.averageByDimension()).thenReturn(dimMap);
+        when(valueProfile.dimensionAverage()).thenReturn(50.0);
+
+        // When
+        List<OpinionEntry> result = opinionService.processInteraction(memoryEntry);
+
+        // Then: opinion died (stability dropped to 0), list must be empty and contain no nulls
+        assertNotNull(result);
+        assertTrue(result.isEmpty(), "Result should be empty when all similar opinions die");
+        assertTrue(result.stream().noneMatch(java.util.Objects::isNull), "Result must not contain null entries");
+    }
 }
