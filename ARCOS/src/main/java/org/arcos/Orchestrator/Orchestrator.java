@@ -17,6 +17,9 @@ import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.PadState;
+import org.arcos.PlannedAction.Models.PlannedActionEntry;
+import org.arcos.PlannedAction.PlannedActionExecutor;
+import org.arcos.PlannedAction.PlannedActionService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,6 +48,8 @@ public class Orchestrator
     private final MoodService moodService;
     private final MoodVoiceMapper moodVoiceMapper;
     private final CentralFeedBackHandler centralFeedBackHandler;
+    private final PlannedActionExecutor plannedActionExecutor;
+    private final PlannedActionService plannedActionService;
 
     private volatile LocalDateTime lastInteracted;
     private volatile boolean running = true;
@@ -61,7 +66,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -74,6 +79,8 @@ public class Orchestrator
         this.personalityOrchestrator = personalityOrchestrator;
         this.moodService = moodService;
         this.moodVoiceMapper = moodVoiceMapper;
+        this.plannedActionExecutor = plannedActionExecutor;
+        this.plannedActionService = plannedActionService;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -99,6 +106,17 @@ public class Orchestrator
 
             ttsHandler.speakAsync(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
 
+        } else if (event.getType() == EventType.PLANNED_ACTION) {
+            PlannedActionEntry action = (PlannedActionEntry) event.getPayload();
+            try {
+                String result = plannedActionExecutor.execute(action);
+                ttsHandler.speakAsync(result);
+                if (!action.isHabit()) {
+                    plannedActionService.markCompleted(action);
+                }
+            } catch (Exception e) {
+                log.error("Error executing planned action {}", action.getId(), e);
+            }
         }
 
     }

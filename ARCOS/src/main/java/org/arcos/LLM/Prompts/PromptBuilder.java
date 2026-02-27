@@ -9,6 +9,8 @@ import org.arcos.Personality.Mood.PadState;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.Personality.Values.Entities.ValueSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
+import org.arcos.PlannedAction.Models.PlannedActionEntry;
+import org.arcos.Tools.Actions.ActionResult;
 import com.google.api.services.calendar.model.Event;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
@@ -211,6 +213,94 @@ public class PromptBuilder {
         model.put("assistantMessage", assistantMessage);
 
         return new PromptTemplate(templateText).create(model);
+    }
+
+    public Prompt buildReWOOPlanPrompt(PlannedActionEntry entry) {
+        String templateText = """
+        Tu es un planificateur d'actions pour Calcifer. Ton rôle est de créer un plan d'exécution mécanique (ReWOO) pour une action planifiée.
+
+        **Action à planifier :** {label}
+        **Type :** {actionType}
+
+        ## Outils disponibles
+
+        1. **Chercher_sur_Internet** — Paramètres : `query` (String) — Recherche web via Brave Search
+        2. **Lister_les_evenements_a_venir** — Paramètres : `maxResults` (int) — Liste les prochains événements du calendrier
+        3. **Ajouter_un_evenement_au_calendrier** — Paramètres : `title`, `description`, `location`, `startDateTimeStr`, `endDateTimeStr` (String)
+        4. **Supprimer_un_evenement** — Paramètres : `title` (String) — Supprime un événement du jour
+        5. **Python_Execution** — Paramètres : `code` (String) — Exécute du code Python
+
+        ## Règles
+        - Maximum 5 étapes
+        - Séquence linéaire (pas de branches)
+        - Utilise `$varName` dans les paramètres pour référencer le résultat d'une étape précédente
+        - Le `synthesisPromptTemplate` doit contenir des placeholders `{varName}` pour injecter les résultats
+        - La synthèse sera lue à voix haute : elle doit être naturelle et fluide
+
+        ## Exemple (briefing matinal)
+
+        ```json
+        {
+          "executionPlan": {
+            "steps": [
+              {"stepId": 1, "toolName": "Lister_les_evenements_a_venir", "parameters": {"maxResults": 5}, "outputVariable": "agenda", "description": "Récupérer les événements du calendrier"},
+              {"stepId": 2, "toolName": "Chercher_sur_Internet", "parameters": {"query": "actualités France aujourd'hui"}, "outputVariable": "actus", "description": "Chercher les actualités"},
+              {"stepId": 3, "toolName": "Chercher_sur_Internet", "parameters": {"query": "météo Lyon aujourd'hui"}, "outputVariable": "meteo", "description": "Chercher la météo"}
+            ]
+          },
+          "synthesisPromptTemplate": "Fais un briefing matinal concis et naturel à partir de ces données. Agenda : {agenda}. Actualités : {actus}. Météo : {meteo}."
+        }
+        ```
+
+        Génère le plan pour l'action décrite ci-dessus.
+        """;
+
+        Map<String, Object> model = new HashMap<>();
+        model.put("label", entry.getLabel());
+        model.put("actionType", entry.getActionType().name());
+
+        return new PromptTemplate(templateText).create(model);
+    }
+
+    public Prompt buildPlannedActionSynthesisPrompt(PlannedActionEntry entry, Map<String, ActionResult> stepResults) {
+        StringBuilder system = new StringBuilder();
+        system.append(getCalciferPersonality());
+        system.append(getValueProfile());
+        system.append("\n## Tâche : Synthèse d'action planifiée\n\n");
+        system.append("Tu dois formuler une synthèse orale naturelle pour l'action '").append(entry.getLabel()).append("'.\n\n");
+
+        String template = entry.getSynthesisPromptTemplate();
+        if (template != null) {
+            for (Map.Entry<String, ActionResult> stepEntry : stepResults.entrySet()) {
+                String varPlaceholder = "{" + stepEntry.getKey() + "}";
+                String resultText = stepEntry.getValue().isSuccess()
+                        ? stepEntry.getValue().getMessage()
+                        : "(données indisponibles)";
+                Object data = stepEntry.getValue().getData();
+                if (data != null) {
+                    resultText = data.toString();
+                }
+                template = template.replace(varPlaceholder, resultText);
+            }
+            system.append("**Instructions :** ").append(template).append("\n");
+        } else {
+            system.append("**Résultats des étapes :**\n");
+            for (Map.Entry<String, ActionResult> stepEntry : stepResults.entrySet()) {
+                system.append("- ").append(stepEntry.getKey()).append(" : ");
+                if (stepEntry.getValue().isSuccess()) {
+                    Object data = stepEntry.getValue().getData();
+                    system.append(data != null ? data.toString() : stepEntry.getValue().getMessage());
+                } else {
+                    system.append("(indisponible)");
+                }
+                system.append("\n");
+            }
+            system.append("\nFormule une synthèse orale naturelle de ces résultats.\n");
+        }
+
+        system.append("\nLa réponse sera lue à voix haute. Sois concis, naturel, et directement prononçable.");
+
+        return new Prompt(new SystemMessage(system.toString()));
     }
 
     // ==================== SECTIONS COMMUNES ====================

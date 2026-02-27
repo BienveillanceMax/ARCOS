@@ -5,11 +5,12 @@ import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Models.Subject;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
+import org.arcos.PlannedAction.Models.ActionType;
+import org.arcos.PlannedAction.Models.PlannedActionEntry;
+import org.arcos.PlannedAction.Models.ReWOOPlan;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.UUID;
+import java.util.*;
 
 public class ObjectCreationUtils
 {
@@ -59,6 +60,49 @@ public class ObjectCreationUtils
         desireEntry.setCreatedAt(LocalDateTime.now());
         desireEntry.setLastUpdated(LocalDateTime.now());
         return desireEntry;
+    }
+
+    public static PlannedActionEntry createSimpleReminderEntry() {
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("Appeler le dentiste");
+        entry.setActionType(ActionType.TODO);
+        entry.setTriggerDatetime(LocalDateTime.now().plusHours(1));
+        return entry;
+    }
+
+    public static PlannedActionEntry createComplexHabitEntry() {
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("Briefing matinal");
+        entry.setActionType(ActionType.HABIT);
+        entry.setCronExpression("0 30 8 * * *");
+
+        ReWOOPlan.ReWOOStep step1 = new ReWOOPlan.ReWOOStep(
+                1,
+                "Lister_les_evenements_a_venir",
+                Map.of("maxResults", 5),
+                "agenda",
+                "Récupérer les événements du calendrier"
+        );
+
+        ReWOOPlan.ReWOOStep step2 = new ReWOOPlan.ReWOOStep(
+                2,
+                "Chercher_sur_Internet",
+                Map.of("query", "actualités France aujourd'hui"),
+                "actus",
+                "Chercher les actualités"
+        );
+
+        ReWOOPlan.ReWOOStep step3 = new ReWOOPlan.ReWOOStep(
+                3,
+                "Chercher_sur_Internet",
+                Map.of("query", "météo Lyon aujourd'hui"),
+                "meteo",
+                "Chercher la météo"
+        );
+
+        entry.setExecutionPlan(new ReWOOPlan(List.of(step1, step2, step3)));
+        entry.setSynthesisPromptTemplate("Fais un briefing matinal. Agenda : {agenda}. Actualités : {actus}. Météo : {meteo}.");
+        return entry;
     }
 
     public static EnumMap<DimensionSchwartz, Double> createAverageByDimension() {

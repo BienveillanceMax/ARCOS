@@ -18,12 +18,17 @@ import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.PadState;
 import org.arcos.Personality.PersonalityOrchestrator;
+import org.arcos.PlannedAction.Models.PlannedActionEntry;
+import org.arcos.PlannedAction.Models.ActionType;
+import org.arcos.PlannedAction.PlannedActionExecutor;
+import org.arcos.PlannedAction.PlannedActionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import reactor.core.publisher.Flux;
 
@@ -73,6 +78,12 @@ class OrchestratorTest {
     @Mock
     private DesireService desireService;
 
+    @Mock
+    private PlannedActionExecutor plannedActionExecutor;
+
+    @Mock
+    private PlannedActionService plannedActionService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -86,8 +97,11 @@ class OrchestratorTest {
                 initiativeService,
                 desireService,
                 moodService,
-                moodVoiceMapper
+                moodVoiceMapper,
+                plannedActionExecutor,
+                plannedActionService
         );
+        ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);
     }
 
     @Test
@@ -95,8 +109,10 @@ class OrchestratorTest {
         // Given
         String userQuery = "test query";
         Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, userQuery, "test");
-        String responseChunk1 = "Test ";
-        String responseChunk2 = "answer.";
+        // Sentence splitting triggers on punctuation (.?!), so "Première phrase." and " Deuxième phrase."
+        // arrive as separate chunks that each contain a sentence boundary
+        String responseChunk1 = "Première phrase.";
+        String responseChunk2 = " Deuxième phrase.";
         String fullResponse = responseChunk1 + responseChunk2;
         Flux<String> responseStream = Flux.just(responseChunk1, responseChunk2);
         MoodUpdate moodUpdate = new MoodUpdate();
@@ -112,17 +128,16 @@ class OrchestratorTest {
         when(conversationContext.getPadState()).thenReturn(new PadState());
         when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
 
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class), anyFloat(), anyFloat(), anyFloat());
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class), anyFloat(), anyFloat(), anyFloat())).thenReturn(null);
 
         // When
         orchestrator.dispatch(wakeWordEvent);
 
         // Then
-        // Verify streaming part
+        // Verify streaming part — each chunk has a sentence boundary so each produces a speakAsync call
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
         verify(llmClient).generateStreamingChatResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk1), anyFloat(), anyFloat(), anyFloat());
-        verify(piperEmbeddedTTSModule, times(1)).speak(eq(responseChunk2), anyFloat(), anyFloat(), anyFloat());
+        verify(piperEmbeddedTTSModule, times(2)).speakAsync(any(String.class), anyFloat(), anyFloat(), anyFloat());
 
         // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);
@@ -151,20 +166,59 @@ class OrchestratorTest {
     }
 
     @Test
+    void dispatch_PlannedActionEvent_ShouldExecuteAndSpeak() {
+        // Given
+        PlannedActionEntry action = new PlannedActionEntry();
+        action.setLabel("Appeler le dentiste");
+        action.setActionType(ActionType.TODO);
+        Event<PlannedActionEntry> plannedActionEvent = new Event<>(EventType.PLANNED_ACTION, action, "test");
+
+        when(plannedActionExecutor.execute(action)).thenReturn("Rappel : Appeler le dentiste");
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class))).thenReturn(null);
+
+        // When
+        orchestrator.dispatch(plannedActionEvent);
+
+        // Then
+        verify(plannedActionExecutor).execute(action);
+        verify(piperEmbeddedTTSModule).speakAsync("Rappel : Appeler le dentiste");
+        verify(plannedActionService).markCompleted(action);
+    }
+
+    @Test
+    void dispatch_PlannedActionHabitEvent_ShouldNotMarkCompleted() {
+        // Given
+        PlannedActionEntry habit = new PlannedActionEntry();
+        habit.setLabel("Briefing matinal");
+        habit.setActionType(ActionType.HABIT);
+        Event<PlannedActionEntry> plannedActionEvent = new Event<>(EventType.PLANNED_ACTION, habit, "test");
+
+        when(plannedActionExecutor.execute(habit)).thenReturn("Voici votre briefing...");
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class))).thenReturn(null);
+
+        // When
+        orchestrator.dispatch(plannedActionEvent);
+
+        // Then
+        verify(plannedActionExecutor).execute(habit);
+        verify(piperEmbeddedTTSModule).speakAsync("Voici votre briefing...");
+        verify(plannedActionService, never()).markCompleted(any());
+    }
+
+    @Test
     void dispatch_CalendarEvent_ShouldGenerateAndSpeakResponse() {
         // Given
         String calendarEventPayload = "test calendar event";
         Event<String> calendarEvent = new Event<>(EventType.CALENDAR_EVENT_SCHEDULER, calendarEventPayload, "test");
         when(promptBuilder.buildSchedulerAlertPrompt(calendarEventPayload)).thenReturn(new Prompt("test prompt"));
         when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("test response");
-        doNothing().when(piperEmbeddedTTSModule).speak(any(String.class));
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class))).thenReturn(null);
 
         // When
         orchestrator.dispatch(calendarEvent);
 
         // Then
         verify(llmClient).generateToollessResponse(any(Prompt.class));
-        verify(piperEmbeddedTTSModule).speak("test response");
+        verify(piperEmbeddedTTSModule).speakAsync("test response");
     }
 }
-
