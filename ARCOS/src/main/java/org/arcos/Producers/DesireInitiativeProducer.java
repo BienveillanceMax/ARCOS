@@ -23,6 +23,7 @@ import java.util.List;
 @Slf4j
 public class DesireInitiativeProducer {
 
+
     private static final double INITIATIVE_THRESHOLD = 0.8;
 
     private final EventQueue eventQueue;
