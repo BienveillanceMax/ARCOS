@@ -16,8 +16,6 @@ import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.Events;
-import org.springframework.stereotype.Service;
-
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -28,7 +26,6 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 
-@Service
 public class CalendarService {
 
     private static final String APPLICATION_NAME = "ARCOS AI Assistant";
@@ -37,6 +34,16 @@ public class CalendarService {
     // Mise à jour des scopes pour permettre l'écriture
     private static final List<String> SCOPES = Collections.singletonList(CalendarScopes.CALENDAR);
     private static final String CREDENTIALS_FILE_PATH = "/client_secrets.json";
+
+    private final boolean available;
+
+    public CalendarService() {
+        this.available = CalendarService.class.getResourceAsStream(CREDENTIALS_FILE_PATH) != null;
+    }
+
+    public boolean isAvailable() {
+        return available;
+    }
 
     private Credential getCredentials() throws IOException, GeneralSecurityException {
         final NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();

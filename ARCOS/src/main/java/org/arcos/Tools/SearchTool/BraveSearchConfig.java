@@ -1,8 +1,10 @@
 package org.arcos.Tools.SearchTool;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+@Slf4j
 @Configuration
 public class BraveSearchConfig {
 
@@ -10,8 +12,10 @@ public class BraveSearchConfig {
     public BraveSearchService braveSearchService() {
         String apiKey = System.getenv("BRAVE_SEARCH_API_KEY");
         if (apiKey == null || apiKey.isEmpty()) {
-            throw new IllegalStateException("BRAVE_SEARCH_API_KEY environment variable not set.");
+            log.warn("BRAVE_SEARCH_API_KEY absent — recherche web désactivée.");
+            return new BraveSearchService();
         }
+        log.info("BraveSearchService initialisé.");
         return new BraveSearchService();
     }
 }

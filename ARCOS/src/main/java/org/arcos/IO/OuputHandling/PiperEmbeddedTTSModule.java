@@ -1,4 +1,5 @@
 package org.arcos.IO.OuputHandling;
+import lombok.extern.slf4j.Slf4j;
 import java.io.*;
 import java.net.URL;
 import java.nio.file.*;
@@ -6,6 +7,7 @@ import java.util.concurrent.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+@Slf4j
 public class PiperEmbeddedTTSModule {
     private static final String PIPER_VERSION = "2023.11.14-2";
     private static final String PIPER_DIR = System.getProperty("user.home") + "/.piper-tts";
@@ -21,15 +23,23 @@ public class PiperEmbeddedTTSModule {
     private String piperExecutable;
     private File modelFile;
     private File configFile;
+    private boolean enabled = false;
 
     public PiperEmbeddedTTSModule() {
         this.generationExecutor = Executors.newSingleThreadExecutor();
         this.playbackExecutor = Executors.newSingleThreadExecutor();
         try {
             initialize();
+            this.enabled = true;
+            log.info("Piper TTS initialisé avec succès.");
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            log.warn("Piper TTS désactivé : {}", e.getMessage());
+            this.enabled = false;
         }
+    }
+
+    public boolean isEnabled() {
+        return enabled;
     }
 
     private void initialize() throws Exception {
@@ -39,10 +49,10 @@ public class PiperEmbeddedTTSModule {
 
         // Check for Piper installation
         if (!isPiperInstalled()) {
-            System.out.println("Piper TTS not found. Downloading and installing...");
+            log.info("Piper TTS non trouvé. Téléchargement en cours...");
             downloadAndInstallPiper();
         } else {
-            System.out.println("Piper TTS found at: " + piperExecutable);
+            log.info("Piper TTS trouvé : {}", piperExecutable);
         }
 
         // Load model from resources
@@ -69,7 +79,7 @@ public class PiperEmbeddedTTSModule {
         String arch = getArchitecture();
         String downloadUrl = getPiperDownloadUrl(os, arch);
 
-        System.out.println("Downloading from: " + downloadUrl);
+        log.info("Téléchargement depuis : {}", downloadUrl);
 
         // Determine file extension based on URL
         String fileName = downloadUrl.endsWith(".zip") ? "piper.zip" : "piper.tar.gz";
@@ -79,17 +89,17 @@ public class PiperEmbeddedTTSModule {
             Files.copy(in, archiveFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
         }
 
-        System.out.println("Downloaded to: " + archiveFile.getAbsolutePath());
+        log.info("Téléchargé : {}", archiveFile.getAbsolutePath());
 
         // Extract archive
-        System.out.println("Extracting archive...");
+        log.info("Extraction de l'archive...");
         extractArchive(archiveFile, new File(PIPER_DIR));
 
-        System.out.println("Extraction complete, deleting archive...");
+        log.info("Extraction terminée, suppression de l'archive.");
         archiveFile.delete();
 
         // List files after extraction for debugging
-        System.out.println("Files after extraction:");
+        log.debug("Fichiers après extraction :");
         listFiles(new File(PIPER_DIR), "  ");
 
         // Find and set executable
@@ -99,13 +109,13 @@ public class PiperEmbeddedTTSModule {
             throw new RuntimeException("Could not locate piper executable after extraction");
         }
 
-        System.out.println("Found Piper executable at: " + piperExecutable);
+        log.info("Exécutable Piper trouvé : {}", piperExecutable);
 
         // Make executable on Unix systems
         if (!os.equals("windows")) {
             File exeFile = new File(piperExecutable);
             exeFile.setExecutable(true);
-            System.out.println("Set executable permissions");
+            log.debug("Permissions exécutables définies.");
         }
     }
 
@@ -113,7 +123,7 @@ public class PiperEmbeddedTTSModule {
         File[] files = dir.listFiles();
         if (files != null) {
             for (File file : files) {
-                System.out.println(indent + file.getName() + (file.isDirectory() ? "/" : ""));
+                log.debug("{}{}{}", indent, file.getName(), file.isDirectory() ? "/" : "");
                 if (file.isDirectory() && !file.getName().equals("models")) {
                     listFiles(file, indent + "  ");
                 }
@@ -142,7 +152,7 @@ public class PiperEmbeddedTTSModule {
     }
 
     private void extractArchive(File archive, File destDir) throws Exception {
-        System.out.println("Extracting " + archive.getName() + " to " + destDir.getAbsolutePath());
+        log.info("Extraction de {} vers {}", archive.getName(), destDir.getAbsolutePath());
         if (archive.getName().endsWith(".zip")) {
             extractZip(archive, destDir);
         } else if (archive.getName().endsWith(".tar.gz") || archive.getName().endsWith(".tgz")) {
@@ -185,7 +195,7 @@ public class PiperEmbeddedTTSModule {
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    System.out.println("tar: " + line);
+                    log.debug("piper: {}", line);
                 }
             }
 
@@ -199,7 +209,7 @@ public class PiperEmbeddedTTSModule {
                 throw new RuntimeException("Failed to extract tar.gz file, exit code: " + exitCode);
             }
         } catch (IOException e) {
-            System.err.println("tar command not available, trying alternative extraction...");
+            log.warn("Commande tar non disponible.");
             // Fallback: manual extraction using Java (requires additional libraries)
             throw new RuntimeException("tar command not available. Please install tar or manually extract Piper.", e);
         }
@@ -209,18 +219,18 @@ public class PiperEmbeddedTTSModule {
         String os = getOperatingSystem();
         String exeName = os.equals("windows") ? "piper.exe" : "piper";
 
-        System.out.println("Searching for " + exeName + " in " + PIPER_DIR);
+        log.debug("Recherche de {} dans {}", exeName, PIPER_DIR);
 
         // Search in PIPER_DIR and subdirectories
         File[] files = new File(PIPER_DIR).listFiles();
         if (files != null) {
-            System.out.println("Found " + files.length + " files/directories in PIPER_DIR");
+            log.debug("Trouvé {} fichiers/répertoires dans PIPER_DIR", files.length);
             for (File file : files) {
-                System.out.println("  Checking: " + file.getName());
+                log.debug("  Checking: {}", file.getName());
                 File exe = findFileRecursive(file, exeName);
                 if (exe != null) {
                     piperExecutable = exe.getAbsolutePath();
-                    System.out.println("Found executable at: " + piperExecutable);
+                    log.debug("Exécutable trouvé : {}", piperExecutable);
 
                     // Set executable permissions immediately on Unix systems
                     if (!os.equals("windows")) {
@@ -232,12 +242,12 @@ public class PiperEmbeddedTTSModule {
                                 Process p = pb.start();
                                 boolean finished = p.waitFor(10, TimeUnit.SECONDS);
                                 if (!finished) p.destroyForcibly();
-                                System.out.println("Set executable permissions using chmod");
+                                log.debug("Permissions exécutables définies via chmod.");
                             } catch (Exception e) {
-                                System.out.println("chmod failed, using Java setExecutable: " + e.getMessage());
+                                log.debug("chmod échoué, utilisation de Java setExecutable : {}", e.getMessage());
                             }
                         } catch (Exception e) {
-                            System.err.println("Failed to set executable permissions: " + e.getMessage());
+                            log.warn("Échec de la définition des permissions exécutables : {}", e.getMessage());
                         }
                     }
                     return;
@@ -247,19 +257,19 @@ public class PiperEmbeddedTTSModule {
 
         // Fallback to expected location
         piperExecutable = PIPER_DIR + "/" + exeName;
-        System.out.println("Using fallback path: " + piperExecutable);
+        log.debug("Utilisation du chemin de secours : {}", piperExecutable);
     }
 
     private File findFileRecursive(File dir, String filename) {
         if (dir.isFile() && dir.getName().equals(filename)) {
-            System.out.println("    Found file: " + dir.getAbsolutePath());
+            log.debug("    Fichier trouvé : {}", dir.getAbsolutePath());
             return dir;
         }
         if (dir.isDirectory()) {
             File[] files = dir.listFiles();
             if (files != null) {
                 for (File file : files) {
-                    System.out.println("    Scanning: " + file.getAbsolutePath() + (file.isDirectory() ? " (dir)" : " (file)"));
+                    log.debug("    Scanning: {}{}", file.getAbsolutePath(), file.isDirectory() ? " (dir)" : " (file)");
                     File result = findFileRecursive(file, filename);
                     if (result != null) return result;
                 }
@@ -276,12 +286,12 @@ public class PiperEmbeddedTTSModule {
 
         // Try to load from resources
         if (!modelFile.exists()) {
-            System.out.println("Extracting model from resources...");
+            log.info("Extraction du modèle depuis les ressources...");
             copyResourceToFile(GLADOS_MODEL_PATH, modelFile);
         }
 
         if (!configFile.exists()) {
-            System.out.println("Extracting config from resources...");
+            log.info("Extraction de la config depuis les ressources...");
             copyResourceToFile(GLADOS_CONFIG_PATH, configFile);
         }
 
@@ -302,7 +312,7 @@ public class PiperEmbeddedTTSModule {
 
     private void verifyInstallation() {
         try {
-            System.out.println("Verifying Piper installation at: " + piperExecutable);
+            log.info("Vérification de l'installation Piper : {}", piperExecutable);
 
             File exeFile = new File(piperExecutable);
             if (!exeFile.exists()) {
@@ -316,7 +326,7 @@ public class PiperEmbeddedTTSModule {
             // Double-check and set executable permissions before running
             String os = getOperatingSystem();
             if (!os.equals("windows") && !exeFile.canExecute()) {
-                System.err.println("Piper executable is not executable, attempting to fix...");
+                log.warn("Exécutable Piper non exécutable, tentative de correction...");
                 exeFile.setExecutable(true, false);
 
                 // Try chmod as backup
@@ -325,9 +335,9 @@ public class PiperEmbeddedTTSModule {
                     Process chmodProcess = chmodPb.start();
                     boolean finished = chmodProcess.waitFor(10, TimeUnit.SECONDS);
                     if (!finished) chmodProcess.destroyForcibly();
-                    System.out.println("Applied chmod +x to " + piperExecutable);
+                    log.debug("chmod +x appliqué : {}", piperExecutable);
                 } catch (Exception e) {
-                    System.err.println("chmod failed: " + e.getMessage());
+                    log.warn("chmod échoué : {}", e.getMessage());
                 }
 
                 // Verify it's now executable
@@ -343,9 +353,8 @@ public class PiperEmbeddedTTSModule {
             // Read output for debugging
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                 String line;
-                System.out.println("Piper output:");
                 while ((line = reader.readLine()) != null) {
-                    System.out.println(line);
+                    log.debug("piper: {}", line);
                 }
             }
 
@@ -355,23 +364,28 @@ public class PiperEmbeddedTTSModule {
                 throw new RuntimeException("Piper verification timed out after 30 seconds");
             }
             int exitCode = process.exitValue();
-            System.out.println("Piper verification exit code: " + exitCode);
+            log.debug("Piper vérification exit code: {}", exitCode);
 
             if (exitCode != 0) {
                 throw new RuntimeException("Piper verification failed with exit code: " + exitCode);
             }
 
-            System.out.println("Piper verification successful!");
+            log.info("Piper vérification réussie.");
         } catch (Exception e) {
             throw new RuntimeException("Error verifying Piper installation: " + e.getMessage(), e);
         }
     }
 
     public Future<Void> speakAsync(String text) {
+        if (!enabled) {
+            log.debug("TTS désactivé, ignoré : {}", text.substring(0, Math.min(30, text.length())));
+            return java.util.concurrent.CompletableFuture.completedFuture(null);
+        }
         return speakAsync(text, 1.0f, 0.667f, 0.8f);
     }
 
     public Future<Void> speakAsync(String text, float lengthScale, float noiseScale, float noiseW) {
+        if (!enabled) return java.util.concurrent.CompletableFuture.completedFuture(null);
         return generationExecutor.submit(() -> {
             try {
                 File audioFile = generateAudio(text, lengthScale, noiseScale, noiseW);
@@ -379,25 +393,25 @@ public class PiperEmbeddedTTSModule {
                     try {
                         playAudio(audioFile);
                     } catch (Exception e) {
-                        System.err.println("Error playing audio: " + e.getMessage());
-                        e.printStackTrace();
+                        log.error("Erreur lecture audio : {}", e.getMessage(), e);
                     } finally {
                         audioFile.delete();
                     }
                 });
             } catch (Exception e) {
-                System.err.println("Error generating audio: " + e.getMessage());
-                e.printStackTrace();
+                log.error("Erreur génération audio : {}", e.getMessage(), e);
             }
             return null;
         });
     }
 
     public void speak(String text) {
+        if (!enabled) return;
         speak(text, 1.0f, 0.667f, 0.8f);
     }
 
     public void speak(String text, float lengthScale, float noiseScale, float noiseW) {
+        if (!enabled) return;
         try {
             File audioFile = generateAudio(text, lengthScale, noiseScale, noiseW);
             playAudio(audioFile);
@@ -411,7 +425,7 @@ public class PiperEmbeddedTTSModule {
         // Create temp file for audio output
         File audioFile = File.createTempFile("piper_output_", ".wav");
 
-        System.out.println("Output file: " + audioFile.getAbsolutePath());
+        log.debug("Fichier audio : {}", audioFile.getAbsolutePath());
 
         // Build command
         ProcessBuilder pb = new ProcessBuilder(
@@ -438,7 +452,7 @@ public class PiperEmbeddedTTSModule {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("Piper: " + line);
+                log.debug("piper: {}", line);
             }
         }
 
@@ -449,7 +463,7 @@ public class PiperEmbeddedTTSModule {
             throw new RuntimeException("Piper TTS generation timed out after 30 seconds");
         }
         int exitCode = process.exitValue();
-        System.out.println("Piper exit code: " + exitCode);
+        log.debug("Piper exit code: {}", exitCode);
 
         if (exitCode != 0) {
             throw new RuntimeException("Piper process failed with exit code: " + exitCode);
@@ -461,7 +475,7 @@ public class PiperEmbeddedTTSModule {
         }
 
         long fileSize = audioFile.length();
-        System.out.println("Audio file size: " + fileSize + " bytes");
+        log.debug("Taille fichier audio : {} bytes", fileSize);
 
         if (fileSize == 0) {
             throw new RuntimeException("Audio file is empty");
@@ -474,7 +488,7 @@ public class PiperEmbeddedTTSModule {
         String os = getOperatingSystem();
         ProcessBuilder pb;
 
-        System.out.println("Playing audio on " + os + ": " + audioFile.getAbsolutePath());
+        log.debug("Lecture audio sur {} : {}", os, audioFile.getAbsolutePath());
 
         switch (os) {
             case "linux":
@@ -504,7 +518,7 @@ public class PiperEmbeddedTTSModule {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println("Audio player: " + line);
+                log.debug("piper: {}", line);
             }
         }
 
@@ -514,7 +528,7 @@ public class PiperEmbeddedTTSModule {
             throw new RuntimeException("Audio playback timed out after 60 seconds");
         }
         int exitCode = process.exitValue();
-        System.out.println("Audio player exit code: " + exitCode);
+        log.debug("Audio player exit code: {}", exitCode);
 
         if (exitCode != 0) {
             throw new RuntimeException("Audio playback failed with exit code: " + exitCode);

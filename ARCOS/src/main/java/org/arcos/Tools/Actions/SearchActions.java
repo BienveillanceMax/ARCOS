@@ -25,6 +25,12 @@ public class SearchActions
     @Tool(name = "Chercher_sur_Internet", description = "Recherche des informations sur le web. [Instruction : ne précise tes sources que si cela a un vrai intérêt.]" +
             "Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats.")
     public ActionResult searchTheWeb(String query) {
+        if (!searchService.isAvailable()) {
+            log.warn("Recherche web demandée mais BRAVE_SEARCH_API_KEY absent.");
+            return ActionResult.failure("Recherche web non disponible : BRAVE_SEARCH_API_KEY non configurée.", null)
+                    .withExecutionTime(0);
+        }
+
         log.info("Recherche d'info sur le web");
         log.info("{}", query);
 

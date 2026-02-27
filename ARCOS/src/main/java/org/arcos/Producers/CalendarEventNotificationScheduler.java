@@ -5,9 +5,9 @@ import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-
 
 import java.io.IOException;
 import java.security.GeneralSecurityException;
@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
 
+@Slf4j
 @Service
 public class CalendarEventNotificationScheduler {
 
@@ -28,11 +29,16 @@ public class CalendarEventNotificationScheduler {
 
     @Scheduled(cron = "0 0 * * * *") // Run every hour at the beginning of the hour
     public void scheduleEventNotifications() {
+        if (!calendarService.isAvailable()) {
+            log.debug("CalendarService désactivé, notifications ignorées.");
+            return;
+        }
+
         LocalDateTime now = LocalDateTime.now();
         int currentHour = now.getHour();
 
         if (currentHour >= 23 || currentHour < 9) {
-            System.out.println("It's night time. No notifications will be sent.");
+            log.debug("Nuit ({}h) : aucune notification calendrier envoyée.", currentHour);
             return;
         }
 
@@ -50,8 +56,7 @@ public class CalendarEventNotificationScheduler {
                 }
             }
         } catch (IOException | GeneralSecurityException e) {
-            e.printStackTrace();
+            log.error("Erreur lors de la vérification des événements calendrier", e);
         }
     }
 }
-

@@ -187,6 +187,20 @@
             <version>1.76.0</version>
         </dependency>
 
+        <!-- JLine3 — terminal interactif pour le wizard de configuration -->
+        <dependency>
+            <groupId>org.jline</groupId>
+            <artifactId>jline</artifactId>
+            <version>3.26.3</version>
+        </dependency>
+
+        <!-- Jansi — support ANSI cross-platform (inclus avec JLine3) -->
+        <dependency>
+            <groupId>org.fusesource.jansi</groupId>
+            <artifactId>jansi</artifactId>
+            <version>2.4.1</version>
+        </dependency>
+
     </dependencies>
 
     <build>

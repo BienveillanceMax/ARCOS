@@ -1,0 +1,18 @@
+{
+  "fca7014d-0ce7-4afe-8fb3-183b855574d8" : {
+    "habit" : false,
+    "simpleReminder" : true,
+    "id" : "fca7014d-0ce7-4afe-8fb3-183b855574d8",
+    "label" : "Appeler le dentiste",
+    "actionType" : "TODO",
+    "status" : "COMPLETED",
+    "triggerDatetime" : "2026-02-27T19:08:47.882704312",
+    "cronExpression" : null,
+    "executionPlan" : null,
+    "synthesisPromptTemplate" : null,
+    "createdAt" : "2026-02-27T18:08:47.882677107",
+    "lastExecutedAt" : null,
+    "executionCount" : 0,
+    "lastExecutionResult" : null
+  }
+}

@@ -32,13 +32,14 @@ import java.time.format.DateTimeFormatter;
 public class WakeWordProducer implements Runnable {
 
     private Porcupine porcupine;
-    private final String[] keywords;
-    private final int audioDeviceIndex;
-    private final SpeechToText speechToText;
+    private String[] keywords;
+    private int audioDeviceIndex;
+    private SpeechToText speechToText;
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private volatile Thread wakeWordThread;
+    private boolean porcupineEnabled = false;
 
 
     private static final int MIC_SAMPLE_RATE = 44100;
@@ -51,18 +52,22 @@ public class WakeWordProducer implements Runnable {
 
     @EventListener(ApplicationReadyEvent.class)
     public void startAfterStartup() {
+        if (!porcupineEnabled) {
+            log.info("WakeWordProducer désactivé — thread non démarré.");
+            return;
+        }
         if (this.micDataLine != null) {
             wakeWordThread = new Thread(this, "wakeword-producer");
             wakeWordThread.setDaemon(true);
             wakeWordThread.start();
         } else {
-            log.warn("No audio input device found or configured. Wake word detection thread will not start.");
+            log.warn("Aucun device audio disponible. Wake word non démarré.");
         }
     }
 
     @PreDestroy
     public void shutdown() {
-        log.info("WakeWordProducer shutting down");
+        log.info("WakeWordProducer arrêt");
         if (wakeWordThread != null) {
             wakeWordThread.interrupt();
         }
@@ -77,32 +82,39 @@ public class WakeWordProducer implements Runnable {
 
     @Autowired
     public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl, CentralFeedBackHandler centralFeedBackHandler) {
-        log.info("Initializing WakeWordProducer");
+        log.info("Initialisation WakeWordProducer");
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = eventQueue;
-        String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
-        String porcupineModelName = "porcupine_params_fr.pv";
-        String[] keywordPaths;
 
         try {
-            keywordPaths = new String[]{getKeywordPath("Calcifer.ppn")};
-        } catch (IllegalArgumentException e) {
-            keywordPaths = new String[]{getKeywordPath(keywordName)};
-        }
-        String porcupineModelPath = getPorcupineModelPath(porcupineModelName);
+            String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
+            String porcupineModelName = "porcupine_params_fr.pv";
+            String[] keywordPaths;
 
-        File keywordFile = new File(keywordPaths[0]);
-        if (!keywordFile.exists()) {
-            throw new IllegalArgumentException(String.format("Keyword file at '%s' does not exist", keywordPaths[0]));
-        }
-        this.keywords = keywordPaths;
-        this.audioDeviceIndex = 10; // TODO SELECT THE RIGHT INPUT
-        initializePorcupine(keywordPaths, porcupineModelPath);
-        initializeAudio();
-        if (this.micDataLine != null) {
-            this.speechToText = new SpeechToText(fasterWhisperUrl);
-        } else {
-            this.speechToText = null;
+            try {
+                keywordPaths = new String[]{getKeywordPath("Calcifer.ppn")};
+            } catch (IllegalArgumentException e) {
+                log.debug("Calcifer.ppn absent, fallback vers {}", keywordName);
+                keywordPaths = new String[]{getKeywordPath(keywordName)};
+            }
+            String porcupineModelPath = getPorcupineModelPath(porcupineModelName);
+
+            File keywordFile = new File(keywordPaths[0]);
+            if (!keywordFile.exists()) {
+                throw new IllegalArgumentException(String.format("Fichier keyword '%s' inexistant", keywordPaths[0]));
+            }
+            this.keywords = keywordPaths;
+            this.audioDeviceIndex = 10;
+            initializePorcupine(keywordPaths, porcupineModelPath);
+            initializeAudio();
+            if (this.micDataLine != null) {
+                this.speechToText = new SpeechToText(fasterWhisperUrl);
+            }
+            this.porcupineEnabled = true;
+            log.info("WakeWordProducer initialisé avec succès.");
+        } catch (Exception e) {
+            log.warn("Wake word désactivé : {}. ARCOS démarrera sans détection du mot de réveil.", e.getMessage());
+            this.porcupineEnabled = false;
         }
     }
 
@@ -189,6 +201,10 @@ public class WakeWordProducer implements Runnable {
 
     @Override
     public void run() {
+        if (!porcupineEnabled || porcupine == null) {
+            log.warn("WakeWordProducer.run() appelé mais Porcupine non initialisé.");
+            return;
+        }
         final int porcupineFrameLength = porcupine.getFrameLength();
         final int micFrameSize = (int) Math.ceil(porcupineFrameLength * MIC_SAMPLE_RATE / (double) PORCUPINE_SAMPLE_RATE) * BYTES_PER_SAMPLE;
 

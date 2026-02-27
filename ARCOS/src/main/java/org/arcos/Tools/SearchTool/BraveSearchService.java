@@ -47,6 +47,10 @@ public class BraveSearchService {
         this.objectMapper = new ObjectMapper();
     }
 
+    public boolean isAvailable() {
+        return apiKey != null && !apiKey.isEmpty();
+    }
+
     /**
      * Effectue une recherche web avec des paramètres par défaut
      */
