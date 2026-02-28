@@ -23,7 +23,8 @@ public abstract class BaseVectorRepository<T>
     protected final String collectionName;
 
 
-    protected BaseVectorRepository(QdrantClient client, EmbeddingModel embeddingModel, String collectionName) {
+    protected BaseVectorRepository(QdrantClient client, EmbeddingModel embeddingModel, String collectionName,
+                                    int embeddingDimension, Collections.Distance distanceMetric) {
         Boolean collectionInitialized = false;
 
         try {
@@ -38,8 +39,8 @@ public abstract class BaseVectorRepository<T>
             try {
                 client.createCollectionAsync(collectionName,
                                 Collections.VectorParams.newBuilder()
-                                        .setDistance(Collections.Distance.Cosine)
-                                        .setSize(1024)
+                                        .setDistance(distanceMetric)
+                                        .setSize(embeddingDimension)
                                         .build())
                         .get();
             } catch (Exception e) {
@@ -72,4 +73,16 @@ public abstract class BaseVectorRepository<T>
     }
 
     public abstract Optional<Document> findById(String id);
+
+    protected static Collections.Distance parseDistanceMetric(String metric) {
+        if (metric == null) return Collections.Distance.Cosine;
+        switch (metric.toUpperCase()) {
+            case "EUCLID":    return Collections.Distance.Euclid;
+            case "DOT":       return Collections.Distance.Dot;
+            case "MANHATTAN": return Collections.Distance.Manhattan;
+            case "COSINE":
+            default:
+                return Collections.Distance.Cosine;
+        }
+    }
 }

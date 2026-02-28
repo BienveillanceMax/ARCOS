@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.Personality.Desires;
 
+import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Exceptions.DesireCreationException;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
@@ -44,9 +45,15 @@ class DesireServiceTest {
     @Mock
     private OpinionRepository opinionRepository;
 
+    @Mock
+    private PersonalityProperties personalityProperties;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(personalityProperties.getDesireCreateThreshold()).thenReturn(0.5);
+        when(personalityProperties.getDesirePendingThreshold()).thenReturn(0.7);
+        when(personalityProperties.getDesireSmoothingFactor()).thenReturn(0.7);
     }
 
     @Test

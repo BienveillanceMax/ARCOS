@@ -1,5 +1,6 @@
 package org.arcos;
 
+import org.arcos.Boot.Banner.AsciiBanner;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
@@ -19,6 +20,9 @@ public class ArcosApplication
 {
 
     public static void main(String[] args) {
+        // Bannière ASCII avant le wizard et le démarrage Spring
+        AsciiBanner.print();
+
         // STORY-001 : détection automatique de configuration manquante (pre-Spring)
         // STORY-023 : relancement du wizard via --setup / --reconfigure
         WizardRunner.runIfNeeded(args);

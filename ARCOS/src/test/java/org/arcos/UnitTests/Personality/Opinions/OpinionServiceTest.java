@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.Personality.Opinions;
 
+import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
@@ -40,9 +41,14 @@ class OpinionServiceTest {
     @Mock
     private ValueProfile valueProfile;
 
+    @Mock
+    private PersonalityProperties personalityProperties;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(personalityProperties.getOpinionSearchTopk()).thenReturn(10);
+        when(personalityProperties.getOpinionSimilarityThreshold()).thenReturn(0.85);
     }
 
     @Test

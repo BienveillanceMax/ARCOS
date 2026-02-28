@@ -3,9 +3,9 @@ package org.arcos.UnitTests.Tools;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.SearchActions;
 import org.arcos.Tools.SearchTool.BraveSearchService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import lombok.extern.slf4j.Slf4j;
@@ -24,8 +24,12 @@ class SearchActionsTest {
     @Mock
     private BraveSearchService searchService;
 
-    @InjectMocks
     private SearchActions searchActions;
+
+    @BeforeEach
+    void setUp() {
+        searchActions = new SearchActions(searchService, 5);
+    }
 
     @Test
     void searchTheWeb_WhenServiceNotAvailable_ShouldReturnFailureResult() {

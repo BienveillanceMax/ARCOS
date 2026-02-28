@@ -1,5 +1,6 @@
 package org.arcos.Producers;
 
+import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventPriority;
@@ -24,18 +25,19 @@ import java.util.List;
 public class DesireInitiativeProducer {
 
 
-    private static final double INITIATIVE_THRESHOLD = 0.8;
-
     private final EventQueue eventQueue;
     private final DesireService desireService;
     private final CentralFeedBackHandler centralFeedBackHandler;
-
+    private final PersonalityProperties personalityProperties;
 
     @Autowired
-    public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService, CentralFeedBackHandler centralFeedBackHandler) {
+    public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService,
+                                    CentralFeedBackHandler centralFeedBackHandler,
+                                    PersonalityProperties personalityProperties) {
         this.eventQueue = eventQueue;
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
+        this.personalityProperties = personalityProperties;
     }
 
     @Scheduled(fixedRate = 3600000) // Check every hour
@@ -44,7 +46,7 @@ public class DesireInitiativeProducer {
         List<DesireEntry> pendingDesires = desireService.getPendingDesires();
         log.info("High intensity desires found: {}", pendingDesires.size());
         for (DesireEntry desire : pendingDesires) {
-            if (desire.getIntensity() >= INITIATIVE_THRESHOLD) {
+            if (desire.getIntensity() >= personalityProperties.getInitiativeThreshold()) {
                 if (isGoodMomentToInitiate(desire)) {
                     log.info("High-intensity desire found, initiating... {}", desire.getLabel());
                     centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
@@ -58,7 +60,7 @@ public class DesireInitiativeProducer {
         // Placeholder for modular logic to determine the right moment.
         // This can be expanded to check for user presence, conversation state, etc.
 
-        if (LocalTime.now().isAfter(LocalTime.MIDNIGHT) && LocalTime.now().isBefore(LocalTime.of(9,0))) {
+        if (LocalTime.now().isAfter(LocalTime.MIDNIGHT) && LocalTime.now().isBefore(LocalTime.of(personalityProperties.getInitiativeNoInitiativeUntilHour(), 0))) {
             return false;
         }
         return true;

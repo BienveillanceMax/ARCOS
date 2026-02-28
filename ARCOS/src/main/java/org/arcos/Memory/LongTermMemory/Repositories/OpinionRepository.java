@@ -1,5 +1,6 @@
 package org.arcos.Memory.LongTermMemory.Repositories;
 
+import org.arcos.Configuration.QdrantProperties;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Qdrant.QdrantClientProvider;
 import io.qdrant.client.grpc.Points;
@@ -17,8 +18,10 @@ import java.util.Optional;
 public class OpinionRepository extends BaseVectorRepository<OpinionEntry>
 {
     @Autowired
-    public OpinionRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel) {
-        super(provider.getClient(), embeddingModel, "Opinions");
+    public OpinionRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel, QdrantProperties qdrantProperties) {
+        super(provider.getClient(), embeddingModel, "Opinions",
+                qdrantProperties.getEmbeddingDimension(),
+                parseDistanceMetric(qdrantProperties.getDistanceMetric()));
     }
 
     public Optional<Document> findById(String id) {

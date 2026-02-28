@@ -1,5 +1,6 @@
 package org.arcos.Memory.LongTermMemory.Repositories;
 
+import org.arcos.Configuration.QdrantProperties;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Qdrant.QdrantClientProvider;
 import io.qdrant.client.grpc.Points;
@@ -17,8 +18,10 @@ import java.util.Optional;
 public class MemoryRepository extends BaseVectorRepository<MemoryEntry>
 {
     @Autowired
-    public MemoryRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel) {
-        super(provider.getClient(), embeddingModel, "Memories");
+    public MemoryRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel, QdrantProperties qdrantProperties) {
+        super(provider.getClient(), embeddingModel, "Memories",
+                qdrantProperties.getEmbeddingDimension(),
+                parseDistanceMetric(qdrantProperties.getDistanceMetric()));
     }
 
     public Optional<Document> findById(String id) {

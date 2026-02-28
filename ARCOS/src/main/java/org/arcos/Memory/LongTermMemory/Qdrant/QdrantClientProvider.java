@@ -4,6 +4,7 @@ import io.qdrant.client.QdrantClient;
 import io.qdrant.client.QdrantGrpcClient;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.arcos.Configuration.QdrantProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -14,17 +15,17 @@ import java.util.concurrent.TimeUnit;
 @Getter
 public class QdrantClientProvider {
 
-    static final int DEFAULT_MAX_RETRIES = 6;
-    static final long DEFAULT_INITIAL_BACKOFF_MS = 1_000;
-    static final long DEFAULT_MAX_BACKOFF_MS = 30_000;
-
     private final QdrantClient client;
 
     public QdrantClientProvider(
             @Value("${qdrant.host}") String host,
-            @Value("${qdrant.port}") int port
+            @Value("${qdrant.port}") int port,
+            QdrantProperties qdrantProperties
     ) {
-        this.client = createClientWithRetry(host, port, DEFAULT_MAX_RETRIES, DEFAULT_INITIAL_BACKOFF_MS, DEFAULT_MAX_BACKOFF_MS);
+        this.client = createClientWithRetry(host, port,
+                qdrantProperties.getMaxRetries(),
+                qdrantProperties.getInitialBackoffMs(),
+                qdrantProperties.getMaxBackoffMs());
     }
 
     // Constructeur package-private pour les tests, permettant de réduire les délais de retry

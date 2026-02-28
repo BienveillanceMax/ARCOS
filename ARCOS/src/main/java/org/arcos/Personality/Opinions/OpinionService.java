@@ -1,5 +1,6 @@
 package org.arcos.Personality.Opinions;
 
+import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
@@ -30,26 +31,25 @@ public class OpinionService {
     private final PromptBuilder promptBuilder;
     private final OpinionRepository opinionRepository;
     private final LLMClient llmClient;
+    private final PersonalityProperties personalityProperties;
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
+    // ---- Hyperparamètres (constants internes du modèle, non exposés en config) ----
+    private static final double W_EXPERIENCE = 0.70;
+    private static final double W_COHERENCE = 0.30;
+    private static final double REINFORCE_BASE = 0.05;
+    private static final double CONTRADICT_BASE = 0.08;
+    private static final double STABILITY_GROWTH = 0.02;
+    private static final double STABILITY_SHRINK = 0.03;
+    private static final double RHO_NETWORK = 0.25;
 
-    // ---- Hyperparamètres ----
-    private static final double W_EXPERIENCE = 0.70;   // poids experience dans polarity
-    private static final double W_COHERENCE = 0.30;    // poids coherence valeur -> polarity
-
-    private static final double REINFORCE_BASE = 0.05; // gain confiance quand cohérent
-    private static final double CONTRADICT_BASE = 0.08; // perte confiance si contradictoire
-
-    private static final double STABILITY_GROWTH = 0.02; // croissance stabilité si renforcé
-    private static final double STABILITY_SHRINK = 0.03; // baisse stabilité si contradictoire
-
-    private static final double RHO_NETWORK = 0.25; // poids du réseau dans expEffective
-
-    public OpinionService(LLMClient llmClient, OpinionRepository opinionRepository, PromptBuilder promptBuilder, ValueProfile valueProfile) {
+    public OpinionService(LLMClient llmClient, OpinionRepository opinionRepository, PromptBuilder promptBuilder,
+                          ValueProfile valueProfile, PersonalityProperties personalityProperties) {
         this.llmClient = llmClient;
         this.opinionRepository = opinionRepository;
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
+        this.personalityProperties = personalityProperties;
     }
 
     private static double clamp(double v, double lo, double hi) {
@@ -94,13 +94,13 @@ public class OpinionService {
                 ? opinionEntry.getCanonicalText()
                 : opinionEntry.getSubject();
 
-        SearchRequest searchRequest = SearchRequest.builder().query(searchQuery).topK(10).build();
+        SearchRequest searchRequest = SearchRequest.builder().query(searchQuery).topK(personalityProperties.getOpinionSearchTopk()).build();
         List<Document> similarOpinionDocs = opinionRepository.search(searchRequest);
 
         List<Document> sufficientlySimilarDocs = similarOpinionDocs.stream()
                 .filter(doc -> {
                     Float distance = (Float) doc.getMetadata().get("distance");
-                    return (1 - distance) >= 0.85;
+                    return (1 - distance) >= personalityProperties.getOpinionSimilarityThreshold();
                 })
                 .collect(Collectors.toList());
 

@@ -1,5 +1,6 @@
 package org.arcos.Memory.LongTermMemory.Qdrant;
 
+import org.arcos.Configuration.QdrantProperties;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -72,13 +73,16 @@ class QdrantClientProviderTest {
     }
 
     @Test
-    void defaultConstants_ShouldHaveExpectedValues() {
-        // Given / When / Then
-        assertEquals(6, QdrantClientProvider.DEFAULT_MAX_RETRIES,
+    void qdrantPropertiesDefaults_ShouldHaveExpectedValues() {
+        // Given / When
+        QdrantProperties props = new QdrantProperties();
+
+        // Then
+        assertEquals(6, props.getMaxRetries(),
                 "Le nombre de tentatives par défaut doit être 6");
-        assertEquals(1_000L, QdrantClientProvider.DEFAULT_INITIAL_BACKOFF_MS,
+        assertEquals(1_000L, props.getInitialBackoffMs(),
                 "Le backoff initial par défaut doit être 1000ms");
-        assertEquals(30_000L, QdrantClientProvider.DEFAULT_MAX_BACKOFF_MS,
+        assertEquals(30_000L, props.getMaxBackoffMs(),
                 "Le backoff maximum par défaut doit être 30000ms");
     }
 }

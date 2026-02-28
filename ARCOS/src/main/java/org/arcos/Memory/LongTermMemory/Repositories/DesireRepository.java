@@ -1,5 +1,6 @@
 package org.arcos.Memory.LongTermMemory.Repositories;
 
+import org.arcos.Configuration.QdrantProperties;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Qdrant.QdrantClientProvider;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
@@ -21,8 +22,10 @@ public class DesireRepository extends BaseVectorRepository<DesireEntry>
 {
 
     @Autowired
-    public DesireRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel) {
-        super(provider.getClient(), embeddingModel, "Desires");
+    public DesireRepository(QdrantClientProvider provider, EmbeddingModel embeddingModel, QdrantProperties qdrantProperties) {
+        super(provider.getClient(), embeddingModel, "Desires",
+                qdrantProperties.getEmbeddingDimension(),
+                parseDistanceMetric(qdrantProperties.getDistanceMetric()));
     }
 
     @RateLimiter(name = "mistral_free")
