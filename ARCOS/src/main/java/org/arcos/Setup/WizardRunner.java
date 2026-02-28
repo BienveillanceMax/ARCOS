@@ -150,7 +150,7 @@ public class WizardRunner {
 
         out.println();
         out.println(orange + "╔══════════════════════════════════════════════════════╗" + reset);
-        out.println(orange + "║  " + bold + "A R C O S" + reset + orange + "  —  Wizard de Configuration          ║" + reset);
+        out.println(orange + "║    " + bold + "A R C O S" + reset + orange + "  —  Wizard de Configuration             ║" + reset);
         out.println(orange + "╚══════════════════════════════════════════════════════╝" + reset);
         out.println();
         out.println(gray + "  Ce wizard vous guidera pour configurer ARCOS en ~10 minutes." + reset);
