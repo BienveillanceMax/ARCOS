@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.arcos.EventBus.EventQueue;
-import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Client.PlannedActionLLMClient;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.PlannedAction.Models.ActionStatus;
@@ -31,7 +31,7 @@ class PlannedActionServiceTest {
     private EventQueue eventQueue;
 
     @Mock
-    private LLMClient llmClient;
+    private PlannedActionLLMClient llmClient;
 
     @Mock
     private PromptBuilder promptBuilder;

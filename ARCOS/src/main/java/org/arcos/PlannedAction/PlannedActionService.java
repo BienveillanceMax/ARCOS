@@ -11,7 +11,6 @@ import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
-import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Client.PlannedActionLLMClient;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.arcos.LLM.Prompts.PromptBuilder;
@@ -43,7 +42,7 @@ public class PlannedActionService {
 
     private final TaskScheduler taskScheduler;
     private final EventQueue eventQueue;
-    private final LLMClient llmClient;
+    private final PlannedActionLLMClient llmClient;
     private final PromptBuilder promptBuilder;
 
     private final Map<String, PlannedActionEntry> actions = new ConcurrentHashMap<>();
@@ -52,7 +51,7 @@ public class PlannedActionService {
     private final ObjectMapper objectMapper;
 
     public PlannedActionService(EventQueue eventQueue,
-                                 LLMClient llmClient,
+                                 PlannedActionLLMClient llmClient,
                                  PromptBuilder promptBuilder) {
         this.eventQueue = eventQueue;
         this.llmClient = llmClient;
