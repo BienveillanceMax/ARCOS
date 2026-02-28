@@ -12,6 +12,7 @@ import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Client.PlannedActionLLMClient;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.PlannedAction.Models.ActionStatus;

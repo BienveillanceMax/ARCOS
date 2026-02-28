@@ -21,11 +21,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.context.annotation.Bean;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 @Slf4j
-@Service
+@Component
 public class LLMClient
 {
 
@@ -63,6 +65,12 @@ public class LLMClient
        */
     }
 
+    @RateLimiter(name = "mistral_free")
+    public PlannedActionPlanResponse generatePlannedActionPlanResponse(Prompt prompt) {
+        return chatClient.prompt(prompt)
+                .call()
+                .entity(new BeanOutputConverter<>(PlannedActionPlanResponse.class, objectMapper));
+    }
 
     @RateLimiter(name = "mistral_free")
     public String generateChatResponse(Prompt prompt) {
@@ -94,7 +102,7 @@ public class LLMClient
     @RateLimiter(name = "mistral_free")
     public OpinionEntry generateOpinionResponse(Prompt prompt) {
         OpinionResponse response = chatClient.prompt(prompt)
-                .tools(calendarActions, pythonActions, searchActions, plannedActionActions)
+                .tools(pythonActions, searchActions)
                 .call()
                 .entity(new BeanOutputConverter<>(OpinionResponse.class, this.objectMapper));
         if (response == null || response.getSummary() == null || response.getSummary().isBlank()) {
@@ -129,12 +137,5 @@ public class LLMClient
         return chatClient.prompt(prompt)
                 .call()
                 .entity(converter);
-    }
-
-    @RateLimiter(name = "mistral_free")
-    public PlannedActionPlanResponse generatePlannedActionPlanResponse(Prompt prompt) {
-        return chatClient.prompt(prompt)
-                .call()
-                .entity(new BeanOutputConverter<>(PlannedActionPlanResponse.class, objectMapper));
     }
 }
