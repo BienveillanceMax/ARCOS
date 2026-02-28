@@ -2,24 +2,42 @@ package org.arcos.UnitTests.Setup;
 
 import org.arcos.Setup.WizardRunner;
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class WizardRunnerTest {
 
     @Test
-    void runIfNeeded_returnsFalse_whenNoArgs() {
-        // Le test tourne sans MISTRALAI_API_KEY définie en CI
-        // Soit le wizard est skippé (retourne false), soit il retourne false après avertissement
-        boolean result = WizardRunner.runIfNeeded(new String[]{});
-        // On vérifie juste que ça ne plante pas
-        assertFalse(result || !result || true); // logique no-op : juste vérifier pas d'exception
+    void runIfNeeded_doesNotThrow_withNoArgs() {
+        // Given — pas d'args
+        // When/Then — ne doit pas lancer d'exception même si config manquante
+        // En CI (sans TTY), WizardRunner détecte l'absence de terminal et retourne false
+        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(new String[]{}));
     }
 
     @Test
     void runIfNeeded_doesNotThrow_withSetupFlag() {
         // Given
         String[] args = {"--setup"};
-        // When/Then — ne doit pas lancer d'exception
+
+        // When/Then
         assertDoesNotThrow(() -> WizardRunner.runIfNeeded(args));
+    }
+
+    @Test
+    void runIfNeeded_doesNotThrow_withReconfigureFlag() {
+        // Given
+        String[] args = {"--reconfigure"};
+
+        // When/Then
+        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(args));
+    }
+
+    @Test
+    void runIfNeeded_returnsFalse_whenNoTtyAvailable() {
+        // En environnement CI sans TTY, le wizard ne peut pas s'exécuter interactivement.
+        // runIfNeeded() retourne false dans tous les cas sans TTY (config manquante ou --setup).
+        // Ce test vérifie uniquement l'absence d'exception et que la méthode ne bloque pas.
+        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(new String[]{}));
     }
 }

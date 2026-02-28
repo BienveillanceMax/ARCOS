@@ -1,5 +1,6 @@
 package org.arcos.Producers;
 
+import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.WakeWordEvent;
 import org.arcos.IO.InputHandling.SpeechToText;
@@ -38,17 +39,12 @@ public class WakeWordProducer implements Runnable {
     private TargetDataLine micDataLine;
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
+    private final AudioProperties audioProperties;
     private volatile Thread wakeWordThread;
     private boolean porcupineEnabled = false;
 
-
-    private static final int MIC_SAMPLE_RATE = 44100;
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
-
-    // Silence detection parameters
-    private static final int SILENCE_THRESHOLD = 1000;
-    private static final long SILENCE_DURATION_MS = 1200;
 
     @EventListener(ApplicationReadyEvent.class)
     public void startAfterStartup() {
@@ -81,10 +77,12 @@ public class WakeWordProducer implements Runnable {
     }
 
     @Autowired
-    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl, CentralFeedBackHandler centralFeedBackHandler) {
+    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl,
+                            CentralFeedBackHandler centralFeedBackHandler, AudioProperties audioProperties) {
         log.info("Initialisation WakeWordProducer");
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = eventQueue;
+        this.audioProperties = audioProperties;
 
         try {
             String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
@@ -104,7 +102,7 @@ public class WakeWordProducer implements Runnable {
                 throw new IllegalArgumentException(String.format("Fichier keyword '%s' inexistant", keywordPaths[0]));
             }
             this.keywords = keywordPaths;
-            this.audioDeviceIndex = 10;
+            this.audioDeviceIndex = audioProperties.getInputDeviceIndex();
             initializePorcupine(keywordPaths, porcupineModelPath);
             initializeAudio();
             if (this.micDataLine != null) {
@@ -155,7 +153,7 @@ public class WakeWordProducer implements Runnable {
     }
 
     private void initializeAudio() {
-        AudioFormat sourceFormat = new AudioFormat(MIC_SAMPLE_RATE, 16, 1, true, false);
+        AudioFormat sourceFormat = new AudioFormat(audioProperties.getSampleRate(), 16, 1, true, false);
         DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, sourceFormat);
 
         this.micDataLine = getAudioDevice(this.audioDeviceIndex, dataLineInfo);
@@ -205,8 +203,9 @@ public class WakeWordProducer implements Runnable {
             log.warn("WakeWordProducer.run() appelé mais Porcupine non initialisé.");
             return;
         }
+        final int micSampleRate = audioProperties.getSampleRate();
         final int porcupineFrameLength = porcupine.getFrameLength();
-        final int micFrameSize = (int) Math.ceil(porcupineFrameLength * MIC_SAMPLE_RATE / (double) PORCUPINE_SAMPLE_RATE) * BYTES_PER_SAMPLE;
+        final int micFrameSize = (int) Math.ceil(porcupineFrameLength * micSampleRate / (double) PORCUPINE_SAMPLE_RATE) * BYTES_PER_SAMPLE;
 
         byte[] micBuffer = new byte[micFrameSize];
         short[] porcupineBuffer = new short[porcupineFrameLength];
@@ -229,7 +228,7 @@ public class WakeWordProducer implements Runnable {
                             .asShortBuffer()
                             .get(micSamples);
 
-                    // Simple downsampling
+                    // Simple downsampling from mic rate to Porcupine rate
                     downsample(micSamples, samplesRead, resampledBuffer, porcupineFrameLength);
 
                     // Check for wake word
@@ -279,9 +278,10 @@ public class WakeWordProducer implements Runnable {
 
         speechToText.reset();
 
+        final int micSampleRate = audioProperties.getSampleRate();
         // Read audio at 16kHz for Whisper (downsample on the fly)
         final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20; // 50ms frames
-        final int micFrameSize = (int) Math.ceil(whisperFrameSize * MIC_SAMPLE_RATE / (double) PORCUPINE_SAMPLE_RATE);
+        final int micFrameSize = (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE);
 
         byte[] micBuffer = new byte[micFrameSize];
         byte[] whisperBuffer = new byte[whisperFrameSize];
@@ -331,16 +331,19 @@ public class WakeWordProducer implements Runnable {
                     // Check if we should stop due to silence
                     if (hasDetectedSpeech && isSilent) {
                         long silenceDuration = System.currentTimeMillis() - lastSoundTime;
-                        if (silenceDuration >= SILENCE_DURATION_MS) {
-                            log.info("Detected {}ms of silence, processing transcription...", SILENCE_DURATION_MS);
+                        long silenceDurationMs = audioProperties.getSilenceDurationMs();
+                        if (silenceDuration >= silenceDurationMs) {
+                            log.info("Detected {}ms of silence, processing transcription...", silenceDurationMs);
                             break;
                         }
                     }
 
                     // Safety timeout
                     long totalRecordingTime = System.currentTimeMillis() - recordingStartTime;
-                    if (totalRecordingTime > 30000) {
-                        log.info("Maximum recording time reached (30s), processing transcription...");
+                    long maxRecordingMs = (long) audioProperties.getMaxRecordingSeconds() * 1000;
+                    if (totalRecordingTime > maxRecordingMs) {
+                        log.info("Maximum recording time reached ({}s), processing transcription...",
+                                audioProperties.getMaxRecordingSeconds());
                         break;
                     }
                 }
@@ -371,7 +374,7 @@ public class WakeWordProducer implements Runnable {
         }
 
         double rms = Math.sqrt((double) sum / sampleCount);
-        return rms < SILENCE_THRESHOLD;
+        return rms < audioProperties.getSilenceThreshold();
     }
 
     public static void showAudioDevices() {

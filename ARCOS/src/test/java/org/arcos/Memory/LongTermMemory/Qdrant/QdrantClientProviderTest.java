@@ -1,12 +1,15 @@
-package org.arcos.UnitTests.Memory;
+package org.arcos.Memory.LongTermMemory.Qdrant;
 
-import org.arcos.Memory.LongTermMemory.Qdrant.QdrantClientProvider;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Test placé dans le même package que QdrantClientProvider pour accéder
+ * au constructeur et aux constantes package-private.
+ */
 @ExtendWith(MockitoExtension.class)
 class QdrantClientProviderTest {
 

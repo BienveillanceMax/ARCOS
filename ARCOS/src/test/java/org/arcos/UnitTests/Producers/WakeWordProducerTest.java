@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.Producers;
 
+import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Producers.WakeWordProducer;
@@ -22,6 +23,10 @@ class WakeWordProducerTest {
 
     @Mock
     private CentralFeedBackHandler centralFeedBackHandler;
+
+    private AudioProperties defaultAudioProperties() {
+        return new AudioProperties();
+    }
 
     @Test
     void constructor_WhenPorcupineResourcesAbsent_ShouldNotThrowAndDisablePorcupine() {
@@ -75,7 +80,7 @@ class WakeWordProducerTest {
         // On s'assure uniquement que l'instanciation se termine sans crash.
         WakeWordProducer[] holder = new WakeWordProducer[1];
         assertThatCode(() -> {
-            holder[0] = new WakeWordProducer(eventQueue, "http://localhost:9000", centralFeedBackHandler);
+            holder[0] = new WakeWordProducer(eventQueue, "http://localhost:9000", centralFeedBackHandler, defaultAudioProperties());
         }).doesNotThrowAnyException();
         return holder[0];
     }
