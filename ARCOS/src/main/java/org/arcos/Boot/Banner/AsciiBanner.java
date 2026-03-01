@@ -4,15 +4,14 @@ import org.arcos.Setup.UI.AnsiPalette;
 import org.arcos.Setup.UI.TerminalCapabilities;
 
 /**
- * Bannière ASCII d'ARCOS avec dégradé de couleurs feu.
- * Dégradé vertical : ambre (sommet des flammes) → rouge (base).
- * Fallback TERM=dumb : texte brut sans codes ANSI.
+ * ASCII banner for ARCOS with red identity gradient.
+ * Gradient: BRIGHT → BRIGHT → PRIMARY → PRIMARY → DEEP → DEEP
+ * Fallback TERM=dumb: plain text without ANSI codes.
  */
 public final class AsciiBanner {
 
     private AsciiBanner() {}
 
-    // Lignes du logo ARCOS en ASCII art (blocs unicode)
     private static final String[] LOGO_LINES = {
         " █████╗ ██████╗  ██████╗ ██████╗ ███████╗",
         "██╔══██╗██╔══██╗██╔════╝██╔═══██╗██╔════╝",
@@ -22,14 +21,14 @@ public final class AsciiBanner {
         "╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝ ╚═════╝╚══════╝ "
     };
 
-    // Dégradé feu : ambre → orange vif → orange sombre → rouge
-    private static final String[] FIRE_GRADIENT = {
-        AnsiPalette.AMBER,
-        AnsiPalette.ORANGE_BRIGHT,
-        AnsiPalette.ORANGE_BRIGHT,
-        AnsiPalette.ORANGE_DARK,
-        AnsiPalette.ORANGE_DARK,
-        AnsiPalette.RED
+    // Red identity gradient: bright → primary → deep
+    private static final String[] RED_GRADIENT = {
+        AnsiPalette.BRIGHT,
+        AnsiPalette.BRIGHT,
+        AnsiPalette.PRIMARY,
+        AnsiPalette.PRIMARY,
+        AnsiPalette.DEEP,
+        AnsiPalette.DEEP
     };
 
     private static final int BANNER_WIDTH = 58;
@@ -43,18 +42,18 @@ public final class AsciiBanner {
     }
 
     private static void printColored() {
-        String border = AnsiPalette.ORANGE_DARK + "─".repeat(BANNER_WIDTH) + AnsiPalette.RESET;
+        String border = AnsiPalette.PRIMARY + "─".repeat(BANNER_WIDTH) + AnsiPalette.RESET;
         System.out.println();
         System.out.println(border);
         System.out.println();
 
         for (int i = 0; i < LOGO_LINES.length; i++) {
-            String color = FIRE_GRADIENT[i];
+            String color = RED_GRADIENT[i];
             System.out.println("  " + color + LOGO_LINES[i] + AnsiPalette.RESET);
         }
 
         System.out.println();
-        String subtitle = AnsiPalette.GRAY_LIGHT + "  ARTIFICIAL COGNITIVE SYSTEM" + AnsiPalette.RESET;
+        String subtitle = AnsiPalette.MUTED + "  ARTIFICIAL COGNITIVE SYSTEM" + AnsiPalette.RESET;
         System.out.println(subtitle);
         System.out.println();
         System.out.println(border);

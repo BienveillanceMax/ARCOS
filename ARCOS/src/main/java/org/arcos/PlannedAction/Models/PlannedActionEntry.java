@@ -1,5 +1,6 @@
 package org.arcos.PlannedAction.Models;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
@@ -52,10 +53,12 @@ public class PlannedActionEntry {
         this.executionCount = 0;
     }
 
+    @JsonIgnore
     public boolean isSimpleReminder() {
         return executionPlan == null || executionPlan.getSteps() == null || executionPlan.getSteps().isEmpty();
     }
 
+    @JsonIgnore
     public boolean isHabit() {
         return actionType == ActionType.HABIT;
     }

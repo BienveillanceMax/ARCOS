@@ -1,46 +1,44 @@
 package org.arcos.Setup.Steps;
 
+import org.arcos.Setup.StepDefinition;
 import org.arcos.Setup.UI.AnsiPalette;
-import org.arcos.Setup.UI.TerminalCapabilities;
+import org.arcos.Setup.UI.WizardDisplay;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
-import org.jline.terminal.Terminal;
 
-import java.io.PrintWriter;
 import java.util.List;
 
 /**
- * Étape 3 du wizard : sélection du profil de personnalité fondamentale.
- * Propose CALCIFER, K2SO, GLADOS, DEFAULT avec descriptions riches.
+ * Step III — ANIMA: Personality profile selection.
+ * Compact horizontal gauge layout: 2 lines per profile.
+ * All text in English.
  */
 public class PersonalityStep implements WizardStep {
 
-    private record ProfileOption(String key, String displayName, String description, String values) {}
+    /** Trait value for compact gauge display. */
+    public record TraitValue(String abbreviation, int value) {}
+
+    private record ProfileOption(String key, String displayName, String description,
+                                 List<TraitValue> traits) {}
 
     private static final List<ProfileOption> PROFILES = List.of(
             new ProfileOption("CALCIFER", "CALCIFER",
-                    "Esprit du feu loyal et indépendant du Château Ambulant.\n" +
-                    "  Curieux, chaleureux et attaché à la liberté personnelle.",
-                    "Autonomie ★★★  Bienveillance ★★★  Hédonisme ★★"),
+                    "Fire spirit — loyal, curious, freedom-seeking",
+                    List.of(new TraitValue("AUT", 85), new TraitValue("BNV", 90), new TraitValue("HED", 60))),
             new ProfileOption("K2SO", "K-2SO",
-                    "Droïde reprogrammé de Rogue One — fiable, sarcastique, orienté mission.\n" +
-                    "  Direct, loyal, respectueux des règles et statisticien à ses heures.",
-                    "Fiabilité ★★★  Règles ★★★  Autonomie ★★"),
+                    "Reprogrammed droid — reliable, blunt, sarcastic",
+                    List.of(new TraitValue("FIA", 90), new TraitValue("REG", 80), new TraitValue("AUT", 70))),
             new ProfileOption("GLADOS", "GLaDOS",
-                    "IA de Portal obsédée par le contrôle et les tests scientifiques.\n" +
-                    "  Manipulatrice, analytique, peu soucieuse du bien-être d'autrui.",
-                    "Pouvoir ★★★  Achievement ★★★  Bienveillance ✗"),
-            new ProfileOption("DEFAULT", "NEUTRE",
-                    "Profil équilibré — toutes les valeurs à 50.0.\n" +
-                    "  Comportement neutre et adaptable.",
-                    "Toutes les valeurs = 50/100")
+                    "Control AI — analytical, cold, manipulative",
+                    List.of(new TraitValue("POW", 90), new TraitValue("ACH", 90), new TraitValue("BNV", 10))),
+            new ProfileOption("DEFAULT", "DEFAULT",
+                    "Balanced profile — all values 50/100",
+                    List.of())
     );
 
     @Override
     public String getName() {
-        return "Personnalité";
+        return "ANIMA";
     }
 
     @Override
@@ -54,26 +52,52 @@ public class PersonalityStep implements WizardStep {
     }
 
     @Override
-    public StepResult execute(Terminal terminal, WizardContext context) {
-        PrintWriter out = terminal.writer();
-        boolean color = TerminalCapabilities.isColorSupported();
+    public StepDefinition getStepDefinition() {
+        return StepDefinition.ANIMA;
+    }
 
-        printHeader(out, color);
-        printProfiles(out, color);
+    @Override
+    public StepResult execute(WizardDisplay display, WizardContext context) {
+        boolean color = display.isColorSupported();
+
+        display.printLine("Select personality profile:");
+        display.printLine("");
+
+        for (int i = 0; i < PROFILES.size(); i++) {
+            ProfileOption p = PROFILES.get(i);
+            String nameColor = color ? AnsiPalette.BRIGHT : "";
+            String reset = color ? AnsiPalette.RESET : "";
+
+            display.printLine("[" + (i + 1) + "]  " + nameColor + p.displayName() + reset
+                    + " \u2014 " + p.description());
+
+            // Compact horizontal gauges on second line
+            if (!p.traits().isEmpty()) {
+                StringBuilder gauges = new StringBuilder("     ");
+                for (int t = 0; t < p.traits().size(); t++) {
+                    TraitValue tv = p.traits().get(t);
+                    gauges.append(display.gaugeCompact(tv.abbreviation(), tv.value()));
+                    if (t < p.traits().size() - 1) gauges.append("   ");
+                }
+                display.printLine(gauges.toString());
+            }
+
+            display.printLine("");
+        }
 
         String currentProfile = context.getModel().getPersonalityProfile();
         String defaultHint = (currentProfile != null && !currentProfile.isBlank())
-                ? " [actuel: " + currentProfile + "]" : "";
+                ? " [current: " + currentProfile + "]" : "";
 
         while (true) {
-            String input = readLine(terminal, "  Votre choix (1-4)" + defaultHint + " : ");
+            String input = display.readLine("\u25b8 (1-4)" + defaultHint + " ");
 
             if (input == null || input.isBlank()) {
                 if (currentProfile != null && !currentProfile.isBlank()) {
-                    printSuccess(out, "Profil conservé : " + currentProfile, color);
-                    return StepResult.success("Profil conservé : " + currentProfile);
+                    display.printLine(okText("Profile kept: " + currentProfile, color));
+                    return StepResult.success("Profile kept: " + currentProfile);
                 }
-                printError(out, "Veuillez choisir un profil (1-4).", color);
+                display.showError("Choose a profile (1-4).");
                 continue;
             }
 
@@ -82,76 +106,28 @@ public class PersonalityStep implements WizardStep {
                 if (choice >= 1 && choice <= PROFILES.size()) {
                     ProfileOption chosen = PROFILES.get(choice - 1);
                     context.getModel().setPersonalityProfile(chosen.key());
-                    printSuccess(out, "Profil sélectionné : " + chosen.displayName(), color);
-                    return StepResult.success("Profil : " + chosen.key());
+                    display.printLine(okText("Profile selected: " + chosen.displayName(), color));
+                    return StepResult.success("Profile: " + chosen.key());
                 } else {
-                    printError(out, "Choisissez entre 1 et " + PROFILES.size() + ".", color);
+                    display.showError("Choose between 1 and " + PROFILES.size() + ".");
                 }
             } catch (NumberFormatException e) {
-                // Accepter aussi la saisie directe du nom de profil
+                // Accept profile name input
                 String upper = input.trim().toUpperCase();
-                boolean found = false;
                 for (ProfileOption p : PROFILES) {
                     if (p.key().equals(upper) || p.displayName().toUpperCase().equals(upper)) {
                         context.getModel().setPersonalityProfile(p.key());
-                        printSuccess(out, "Profil sélectionné : " + p.displayName(), color);
-                        found = true;
-                        return StepResult.success("Profil : " + p.key());
+                        display.printLine(okText("Profile selected: " + p.displayName(), color));
+                        return StepResult.success("Profile: " + p.key());
                     }
                 }
-                if (!found) {
-                    printError(out, "Profil inconnu. Entrez un chiffre (1-4) ou le nom du profil.", color);
-                }
+                display.showError("Unknown profile. Enter a number (1-4) or profile name.");
             }
         }
     }
 
-    private void printHeader(PrintWriter out, boolean color) {
-        String cyan = color ? AnsiPalette.CYAN : "";
-        String bold = color ? AnsiPalette.BOLD : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println();
-        out.println(cyan + bold + "── ÉTAPE 3 : Personnalité ───────────────────────────────" + reset);
-        out.println("  Choisissez la personnalité fondamentale d'ARCOS.");
-        out.println("  Ce profil détermine ses valeurs, opinions et comportement autonome.");
-        out.println();
-    }
-
-    private void printProfiles(PrintWriter out, boolean color) {
-        String orange = color ? AnsiPalette.ORANGE_BRIGHT : "";
-        String amber = color ? AnsiPalette.AMBER : "";
-        String gray = color ? AnsiPalette.GRAY_LIGHT : "";
-        String reset = color ? AnsiPalette.RESET : "";
-
-        for (int i = 0; i < PROFILES.size(); i++) {
-            ProfileOption p = PROFILES.get(i);
-            out.println(amber + "  [" + (i + 1) + "] " + orange + p.displayName() + reset);
-            for (String line : p.description().split("\n")) {
-                out.println(gray + "      " + line + reset);
-            }
-            out.println(gray + "      " + p.values() + reset);
-            out.println();
-        }
-    }
-
-    private String readLine(Terminal terminal, String prompt) {
-        try {
-            LineReader reader = LineReaderBuilder.builder().terminal(terminal).build();
-            return reader.readLine(prompt);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void printSuccess(PrintWriter out, String message, boolean color) {
-        String green = color ? AnsiPalette.GREEN : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println("  " + green + "✓" + reset + " " + message);
-    }
-
-    private void printError(PrintWriter out, String message, boolean color) {
-        String red = color ? AnsiPalette.RED : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println("  " + red + "✗" + reset + " " + message);
+    private String okText(String msg, boolean color) {
+        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
+        return "[OK] " + msg;
     }
 }

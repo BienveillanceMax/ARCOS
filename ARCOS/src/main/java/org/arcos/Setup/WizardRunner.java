@@ -6,24 +6,27 @@ import org.arcos.Setup.Steps.AudioDeviceStep;
 import org.arcos.Setup.Steps.PersonalityStep;
 import org.arcos.Setup.Steps.RecapStep;
 import org.arcos.Setup.Steps.ServiceCheckStep;
-import org.arcos.Setup.UI.AnsiPalette;
+import org.arcos.Setup.UI.FallbackRenderer;
+import org.arcos.Setup.UI.ScreenManager;
 import org.arcos.Setup.UI.TerminalCapabilities;
+import org.arcos.Setup.UI.WizardDisplay;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.List;
 
 /**
- * Orchestre le wizard de configuration interactif d'ARCOS.
- * Tourne AVANT SpringApplication.run() — aucune dépendance Spring.
+ * Orchestrates the ARCOS configuration wizard.
+ * Runs BEFORE SpringApplication.run() — no Spring dependencies.
  *
- * Usage : WizardRunner.runIfNeeded(args) dans ArcosApplication.main()
- * Retourne true si le wizard a été exécuté avec succès et que Spring peut démarrer.
- * Retourne false si le wizard a été annulé ou si la configuration est déjà complète.
+ * Detects rendering mode:
+ * - Full-screen (ScreenManager) when alternate screen supported and terminal large enough
+ * - Fallback (FallbackRenderer) for TERM=dumb, pipe, or small terminals
+ *
+ * Usage: WizardRunner.runIfNeeded(args) in ArcosApplication.main()
  */
 public class WizardRunner {
 
@@ -32,12 +35,10 @@ public class WizardRunner {
     private WizardRunner() {}
 
     /**
-     * Lance le wizard si la configuration est incomplète ou si --setup est passé en argument.
-     * STORY-001 : détection automatique de configuration manquante.
-     * STORY-023 : relancement du wizard à la demande via --setup / --reconfigure.
+     * Launches the wizard if configuration is incomplete or --setup flag is passed.
      *
-     * @param args arguments de la ligne de commande
-     * @return true si le wizard a été exécuté et la configuration sauvegardée avec succès
+     * @param args command line arguments
+     * @return true if the wizard ran and saved configuration successfully
      */
     public static boolean runIfNeeded(String[] args) {
         boolean forceSetup = containsArg(args, "--setup") || containsArg(args, "--reconfigure");
@@ -45,46 +46,41 @@ public class WizardRunner {
         boolean configMissing = !detector.isConfigurationComplete();
 
         if (!forceSetup && !configMissing) {
-            log.debug("Configuration complète — wizard non nécessaire.");
+            log.debug("Configuration complete — wizard not needed.");
             return false;
         }
 
-        // Vérifier qu'un terminal interactif est disponible (pas de TTY = CI, redirection, daemon)
         if (System.console() == null) {
             if (configMissing) {
-                log.error("Configuration ARCOS incomplète et aucun terminal interactif disponible.");
-                log.error("Créez un fichier .env avec MISTRALAI_API_KEY=votre_clé puis relancez ARCOS.");
+                log.error("ARCOS configuration incomplete and no interactive terminal available.");
+                log.error("Create a .env file with MISTRALAI_API_KEY=your_key then restart ARCOS.");
             } else {
-                log.debug("Wizard --setup demandé mais aucun TTY disponible — ignoré.");
+                log.debug("Wizard --setup requested but no TTY available — ignored.");
             }
             return false;
         }
 
         if (configMissing) {
-            log.info("Configuration ARCOS incomplète — lancement du wizard de configuration.");
+            log.info("ARCOS configuration incomplete — launching configuration wizard.");
         } else {
-            log.info("Relancement du wizard de configuration (--setup).");
+            log.info("Relaunching configuration wizard (--setup).");
         }
 
-        // Charger la configuration existante pour pré-remplir le wizard
         ConfigurationModel existingConfig = detector.loadExistingConfiguration();
         WizardContext context = new WizardContext(existingConfig);
 
         try {
             return runWizard(context);
         } catch (Exception e) {
-            log.error("Erreur inattendue dans le wizard : {}", e.getMessage(), e);
-            System.err.println("Erreur dans le wizard de configuration. " +
-                    "Configurez manuellement votre .env (voir .env.example).");
+            log.error("Unexpected error in wizard: {}", e.getMessage(), e);
+            System.err.println("Error in configuration wizard. " +
+                    "Configure manually via .env (see .env.example).");
             return false;
         }
     }
 
     /**
-     * Exécute le wizard interactif avec JLine3.
-     *
-     * @param context contexte mutable du wizard (peut contenir une config existante)
-     * @return true si la configuration a été sauvegardée avec succès
+     * Runs the interactive wizard with JLine3.
      */
     static boolean runWizard(WizardContext context) {
         try (Terminal terminal = TerminalBuilder.builder()
@@ -92,42 +88,68 @@ public class WizardRunner {
                 .jansi(true)
                 .build()) {
 
-            PrintWriter out = terminal.writer();
-            printWelcomeBanner(out);
+            // Select rendering mode
+            boolean fullScreen = TerminalCapabilities.isFullScreenSupported()
+                    && TerminalCapabilities.isMinimumWidthMet(terminal)
+                    && TerminalCapabilities.isMinimumHeightMet(terminal);
 
-            // Étapes du wizard dans l'ordre
-            List<WizardStep> steps = List.of(
-                    new ApiKeyStep(),
-                    new AudioDeviceStep(),
-                    new PersonalityStep(),
-                    new ServiceCheckStep(),
-                    new RecapStep()
-            );
+            WizardDisplay display = fullScreen
+                    ? new ScreenManager(terminal)
+                    : new FallbackRenderer(terminal);
 
-            for (WizardStep step : steps) {
-                WizardStep.StepResult result = step.execute(terminal, context);
-                if (!result.success()) {
-                    log.warn("Étape '{}' échouée : {}", step.getName(), result.message());
-                    if (step.isRequired() && !result.skipped()) {
-                        out.println();
-                        String red = TerminalCapabilities.isColorSupported() ? AnsiPalette.RED : "";
-                        String reset = TerminalCapabilities.isColorSupported() ? AnsiPalette.RESET : "";
-                        out.println(red + "  ✗ Wizard interrompu : " + result.message() + reset);
-                        out.println("  Configurez manuellement votre .env (voir .env.example).");
-                        out.flush();
-                        return false;
+            try {
+                List<StepDefinition> stepDefs = List.of(
+                        StepDefinition.NEXUS, StepDefinition.VOX,
+                        StepDefinition.ANIMA, StepDefinition.CORPUS,
+                        StepDefinition.FIAT);
+
+                display.initializeSteps(stepDefs);
+                display.drawFrame();
+
+                List<WizardStep> steps = List.of(
+                        new ApiKeyStep(),
+                        new AudioDeviceStep(),
+                        new PersonalityStep(),
+                        new ServiceCheckStep(),
+                        new RecapStep()
+                );
+
+                for (int i = 0; i < steps.size(); i++) {
+                    WizardStep step = steps.get(i);
+                    display.activateStep(i);
+
+                    WizardStep.StepResult result = step.execute(display, context);
+
+                    if (result.success()) {
+                        display.completeStep(i);
+                    } else {
+                        if (step.isRequired() && !result.skipped()) {
+                            log.warn("Step '{}' failed: {}", step.getName(), result.message());
+
+                            // Check if user wants to restart (RecapStep returns failure for cancel)
+                            if ("FIAT".equals(step.getName()) && result.message().contains("cancelled")) {
+                                display.close();
+                                // Restart wizard
+                                return runWizard(context);
+                            }
+
+                            display.showError("Wizard interrupted: " + result.message());
+                            display.printLine("Configure manually via .env (see .env.example).");
+                            display.waitForKey();
+                            return false;
+                        }
                     }
                 }
+
+                return true;
+            } finally {
+                display.close();
             }
 
-            out.flush();
-            return true;
-
         } catch (IOException e) {
-            log.error("Impossible d'initialiser le terminal JLine3 : {}", e.getMessage());
-            // Fallback : affichage simple sans couleurs
-            System.err.println("Terminal interactif non disponible. " +
-                    "Configurez manuellement votre .env (voir .env.example).");
+            log.error("Cannot initialize JLine3 terminal: {}", e.getMessage());
+            System.err.println("Interactive terminal not available. " +
+                    "Configure manually via .env (see .env.example).");
             return false;
         }
     }
@@ -138,25 +160,5 @@ public class WizardRunner {
             if (target.equals(arg)) return true;
         }
         return false;
-    }
-
-    private static void printWelcomeBanner(PrintWriter out) {
-        boolean color = TerminalCapabilities.isColorSupported();
-        String orange = color ? AnsiPalette.ORANGE_BRIGHT : "";
-        String amber = color ? AnsiPalette.AMBER : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        String bold = color ? AnsiPalette.BOLD : "";
-        String gray = color ? AnsiPalette.GRAY_LIGHT : "";
-
-        out.println();
-        out.println(orange + "╔══════════════════════════════════════════════════════╗" + reset);
-        out.println(orange + "║    " + bold + "A R C O S" + reset + orange + "  —  Wizard de Configuration             ║" + reset);
-        out.println(orange + "╚══════════════════════════════════════════════════════╝" + reset);
-        out.println();
-        out.println(gray + "  Ce wizard vous guidera pour configurer ARCOS en ~10 minutes." + reset);
-        out.println(gray + "  Les clés API sont stockées dans .env (permissions 600)." + reset);
-        out.println(gray + "  Pour reconfigurer plus tard : java -jar arcos.jar --setup" + reset);
-        out.println();
-        out.flush();
     }
 }

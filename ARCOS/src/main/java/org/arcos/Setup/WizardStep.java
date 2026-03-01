@@ -1,33 +1,38 @@
 package org.arcos.Setup;
 
-import org.jline.terminal.Terminal;
+import org.arcos.Setup.UI.WizardDisplay;
 
 /**
- * Interface commune pour toutes les étapes du wizard de configuration ARCOS.
- * Chaque étape est responsable d'une partie de la collecte de configuration.
- * Aucune dépendance Spring — plain Java uniquement.
+ * Interface for all wizard configuration steps.
+ * Each step is responsible for one part of the configuration collection.
+ * No Spring dependencies — plain Java only.
  */
 public interface WizardStep {
 
-    /** Nom court de l'étape, affiché dans les logs et les en-têtes. */
+    /** Short name for logs and headers. */
     String getName();
 
-    /** true si cette étape est obligatoire (ex: clé Mistral AI). */
+    /** True if this step is mandatory (e.g., Mistral API key). */
     boolean isRequired();
 
-    /** true si l'utilisateur peut passer cette étape (affiche l'option "Passer"). */
+    /** True if the user can skip this step. */
     boolean isSkippable();
 
-    /**
-     * Exécute l'étape interactive.
-     *
-     * @param terminal terminal JLine3 pour l'entrée/sortie interactive
-     * @param context  contexte mutable du wizard (les valeurs collectées sont stockées ici)
-     * @return résultat de l'étape
-     */
-    StepResult execute(Terminal terminal, WizardContext context);
+    /** Returns the step definition (Latin name, Roman numeral). */
+    default StepDefinition getStepDefinition() {
+        return StepDefinition.NEXUS; // override in subclasses
+    }
 
-    /** Résultat de l'exécution d'une étape. */
+    /**
+     * Execute the interactive step.
+     *
+     * @param display wizard display abstraction for rendering and input
+     * @param context mutable wizard context (collected values stored here)
+     * @return step result
+     */
+    StepResult execute(WizardDisplay display, WizardContext context);
+
+    /** Result of step execution. */
     record StepResult(boolean success, boolean skipped, String message) {
 
         public static StepResult success(String message) {

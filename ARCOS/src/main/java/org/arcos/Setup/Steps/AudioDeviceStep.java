@@ -1,28 +1,25 @@
 package org.arcos.Setup.Steps;
 
+import org.arcos.Setup.StepDefinition;
 import org.arcos.Setup.UI.AnsiPalette;
-import org.arcos.Setup.UI.TerminalCapabilities;
+import org.arcos.Setup.UI.WizardDisplay;
 import org.arcos.Setup.Validation.AudioDeviceEnumerator;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
-import org.jline.terminal.Terminal;
 
-import java.io.PrintWriter;
 import java.util.List;
 
 /**
- * Étape 2 du wizard : sélection du microphone parmi les périphériques compatibles.
- * - Auto-sélection si un seul périphérique disponible
- * - Menu numéroté si plusieurs périphériques
- * - Sauvegarde arcos.audio.input-device-index dans WizardContext
+ * Step II — VOX: Microphone selection.
+ * - Auto-selects if only 1 device
+ * - Numbered menu if multiple devices
+ * All text in English.
  */
 public class AudioDeviceStep implements WizardStep {
 
     @Override
     public String getName() {
-        return "Microphone";
+        return "VOX";
     }
 
     @Override
@@ -36,109 +33,80 @@ public class AudioDeviceStep implements WizardStep {
     }
 
     @Override
-    public StepResult execute(Terminal terminal, WizardContext context) {
-        PrintWriter out = terminal.writer();
-        boolean color = TerminalCapabilities.isColorSupported();
+    public StepDefinition getStepDefinition() {
+        return StepDefinition.VOX;
+    }
 
-        printHeader(out, color);
+    @Override
+    public StepResult execute(WizardDisplay display, WizardContext context) {
+        boolean color = display.isColorSupported();
 
         List<AudioDeviceEnumerator.AudioDevice> devices = AudioDeviceEnumerator.getInputDevices();
 
         if (devices.isEmpty()) {
-            printWarning(out, "Aucun périphérique audio d'entrée détecté.", color);
-            out.println("  ARCOS utilisera la sélection automatique du système.");
-            out.println("  Vous pouvez configurer l'index manuellement dans application-local.yaml.");
+            display.printLine(warnText("No audio input device detected.", color));
+            display.printLine("ARCOS will use system auto-selection.");
             context.getModel().setAudioDeviceIndex(-1);
-            context.addWarning("Aucun microphone détecté — index audio = -1 (auto)");
-            return StepResult.success("Aucun microphone détecté — mode auto.");
+            context.addWarning("No microphone detected — audio index = -1 (auto)");
+            return StepResult.success("No microphone detected — auto mode.");
         }
 
         if (devices.size() == 1) {
             AudioDeviceEnumerator.AudioDevice device = devices.get(0);
             context.getModel().setAudioDeviceIndex(device.index());
-            String msg = String.format("✓ Micro auto-sélectionné : %s (index %d)", device.name(), device.index());
-            printSuccess(out, msg, color);
+            String msg = "Auto-selected: " + device.name() + " (index " + device.index() + ")";
+            display.printLine(okText(msg, color));
             return StepResult.success(msg);
         }
 
-        // Plusieurs périphériques : afficher un menu
-        out.println("  Périphériques d'entrée compatibles détectés :");
-        out.println();
+        // Multiple devices — show menu
+        display.printLine("Select microphone:");
+        display.printLine("");
         for (AudioDeviceEnumerator.AudioDevice device : devices) {
-            String cyan = color ? AnsiPalette.CYAN : "";
-            String reset = color ? AnsiPalette.RESET : "";
-            out.printf("  %s[%d]%s %s%n", cyan, device.index(), reset, device.name());
+            display.printLine("[" + device.index() + "]  " + device.name());
         }
-        out.println();
+        display.printLine("");
 
-        // Lire le choix
         int currentIndex = context.getModel().getAudioDeviceIndex();
-        String defaultHint = currentIndex >= 0 ? " [actuel: " + currentIndex + "]" : "";
+        String defaultHint = currentIndex >= 0 ? " [current: " + currentIndex + "]" : "";
 
         while (true) {
-            String input = readLine(terminal, "  Index du microphone" + defaultHint + " : ");
+            String input = display.readLine("\u25b8" + defaultHint + " ");
             if (input == null || input.isBlank()) {
                 if (currentIndex >= 0) {
-                    printSuccess(out, "Index conservé : " + currentIndex, color);
-                    return StepResult.success("Microphone conservé : index " + currentIndex);
+                    display.printLine(okText("Kept index: " + currentIndex, color));
+                    return StepResult.success("Microphone kept: index " + currentIndex);
                 }
-                printError(out, "Veuillez entrer un index valide.", color);
+                display.showError("Enter a valid index.");
                 continue;
             }
             if ("s".equalsIgnoreCase(input.trim()) || "skip".equalsIgnoreCase(input.trim())) {
                 context.getModel().setAudioDeviceIndex(-1);
-                return StepResult.skipped("Sélection audio ignorée — mode auto.");
+                return StepResult.skipped("Audio selection skipped — auto mode.");
             }
             try {
                 int idx = Integer.parseInt(input.trim());
                 AudioDeviceEnumerator.AudioDevice chosen = AudioDeviceEnumerator.getDeviceAt(idx);
                 if (chosen != null) {
                     context.getModel().setAudioDeviceIndex(idx);
-                    printSuccess(out, "Microphone sélectionné : " + chosen.name() + " (index " + idx + ")", color);
-                    return StepResult.success("Microphone configuré : index " + idx);
+                    display.printLine(okText("Selected: " + chosen.name() + " (index " + idx + ")", color));
+                    return StepResult.success("Microphone configured: index " + idx);
                 } else {
-                    printError(out, "Index " + idx + " introuvable. Choisissez parmi les index listés.", color);
+                    display.showError("Index " + idx + " not found. Choose from the listed indices.");
                 }
             } catch (NumberFormatException e) {
-                printError(out, "Entrez un nombre entier ou 's' pour passer.", color);
+                display.showError("Enter a number or 's' to skip.");
             }
         }
     }
 
-    private void printHeader(PrintWriter out, boolean color) {
-        String cyan = color ? AnsiPalette.CYAN : "";
-        String bold = color ? AnsiPalette.BOLD : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println();
-        out.println(cyan + bold + "── ÉTAPE 2 : Microphone ─────────────────────────────────" + reset);
-        out.println("  Sélectionnez le microphone utilisé par ARCOS pour détecter le mot de réveil.");
-        out.println();
+    private String okText(String msg, boolean color) {
+        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
+        return "[OK] " + msg;
     }
 
-    private String readLine(Terminal terminal, String prompt) {
-        try {
-            LineReader reader = LineReaderBuilder.builder().terminal(terminal).build();
-            return reader.readLine(prompt);
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private void printSuccess(PrintWriter out, String message, boolean color) {
-        String green = color ? AnsiPalette.GREEN : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println("  " + green + "✓" + reset + " " + message);
-    }
-
-    private void printWarning(PrintWriter out, String message, boolean color) {
-        String yellow = color ? AnsiPalette.YELLOW : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println("  " + yellow + "⚠" + reset + " " + message);
-    }
-
-    private void printError(PrintWriter out, String message, boolean color) {
-        String red = color ? AnsiPalette.RED : "";
-        String reset = color ? AnsiPalette.RESET : "";
-        out.println("  " + red + "✗" + reset + " " + message);
+    private String warnText(String msg, boolean color) {
+        if (color) return AnsiPalette.WARN + "\u26a0" + AnsiPalette.RESET + " " + msg;
+        return "[!!] " + msg;
     }
 }

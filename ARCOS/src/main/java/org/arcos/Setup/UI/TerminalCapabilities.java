@@ -1,16 +1,21 @@
 package org.arcos.Setup.UI;
 
+import org.jline.terminal.Terminal;
+
 /**
- * Détection des capacités du terminal courant.
- * Utilisé pour désactiver les codes ANSI si le terminal ne les supporte pas.
+ * Terminal capability detection for ARCOS TUI.
+ * Used to select full-screen vs fallback rendering mode.
  */
 public final class TerminalCapabilities {
+
+    static final int MIN_WIDTH = 60;
+    static final int MIN_HEIGHT = 20;
 
     private TerminalCapabilities() {}
 
     /**
-     * Retourne true si le terminal supporte les couleurs ANSI.
-     * False si TERM=dumb, si pas de TTY, ou si CLICOLOR=false.
+     * Returns true if the terminal supports ANSI colors.
+     * False if TERM=dumb, no TTY, or CLICOLOR=false.
      */
     public static boolean isColorSupported() {
         if ("false".equalsIgnoreCase(System.getenv("CLICOLOR"))) {
@@ -23,7 +28,33 @@ public final class TerminalCapabilities {
     }
 
     /**
-     * Retourne la largeur du terminal, ou 80 par défaut.
+     * Returns true if the terminal supports full-screen alternate buffer mode.
+     * False for TERM=dumb, null, or "linux" (virtual console where box-drawing may not render).
+     */
+    public static boolean isFullScreenSupported() {
+        String term = System.getenv("TERM");
+        if (term == null || term.isEmpty()) return false;
+        if ("dumb".equalsIgnoreCase(term)) return false;
+        if ("linux".equalsIgnoreCase(term)) return false;
+        return System.console() != null;
+    }
+
+    /**
+     * Returns true if the terminal width meets the minimum (60 columns).
+     */
+    public static boolean isMinimumWidthMet(Terminal terminal) {
+        return terminal.getWidth() >= MIN_WIDTH;
+    }
+
+    /**
+     * Returns true if the terminal height meets the minimum (20 rows).
+     */
+    public static boolean isMinimumHeightMet(Terminal terminal) {
+        return terminal.getHeight() >= MIN_HEIGHT;
+    }
+
+    /**
+     * Returns the terminal width, or 80 by default.
      */
     public static int getTerminalWidth() {
         String columns = System.getenv("COLUMNS");
@@ -37,16 +68,17 @@ public final class TerminalCapabilities {
     }
 
     /**
-     * Supprime les codes ANSI d'une chaîne.
-     * Utile pour les rendus non-couleur (logs, tests).
+     * Strips ANSI escape codes from a string, including color codes,
+     * cursor positioning, and screen control sequences.
      */
     public static String strip(String text) {
         if (text == null) return null;
-        return text.replaceAll("\033\\[[0-9;]*m", "");
+        return text.replaceAll("\033\\[[0-9;]*[mHJKhlf]", "")
+                   .replaceAll("\033\\[\\?[0-9;]*[hl]", "");
     }
 
     /**
-     * Applique la couleur uniquement si supportée.
+     * Applies color only if supported.
      */
     public static String colorize(String ansiCode, String text) {
         if (isColorSupported()) {
