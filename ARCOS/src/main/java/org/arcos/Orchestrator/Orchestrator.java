@@ -10,6 +10,7 @@ import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
+import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.Memory.ConversationContext;
@@ -57,6 +58,7 @@ public class Orchestrator
     private final PlannedActionService plannedActionService;
     private final ExecutionHistoryService executionHistoryService;
 
+    private final ConversationSummaryService conversationSummaryService;
     private final WakeWordProducer wakeWordProducer;
     private final AudioProperties audioProperties;
     private volatile boolean isExecutingAction = false;
@@ -77,7 +79,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -95,6 +97,7 @@ public class Orchestrator
         this.executionHistoryService = executionHistoryService;
         this.wakeWordProducer = wakeWordProducer;
         this.audioProperties = audioProperties;
+        this.conversationSummaryService = conversationSummaryService;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -272,6 +275,8 @@ public class Orchestrator
 
                     context.addUserMessage(userQuery);
                     context.addAssistantMessage(finalResponse);
+                    conversationSummaryService.updateAsync(
+                            conversationSummaryService.getSummary(), userQuery, finalResponse);
                     updateMoodAsync(userQuery, finalResponse);
                     log.info("Complete response : " + fullResponse);
                     triggerPersonalityProcessing(lastInteracted);

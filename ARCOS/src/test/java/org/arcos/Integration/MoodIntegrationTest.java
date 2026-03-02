@@ -4,6 +4,7 @@ import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
+import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Personality.Mood.Mood;
 import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Mood.MoodUpdate;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class MoodIntegrationTest {
 
     @Mock LLMClient llmClient;
+    @Mock ConversationSummaryService conversationSummaryService;
     ValueProfile valueProfile;
     PromptBuilder promptBuilder;
     ConversationContext context;
@@ -30,7 +32,7 @@ public class MoodIntegrationTest {
     @BeforeEach
     void setUp() {
         valueProfile = new ValueProfile(); // Real object
-        promptBuilder = new PromptBuilder(valueProfile); // Real object
+        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3); // Real object
         context = new ConversationContext(); // Real object
         personalityProperties = new PersonalityProperties(); // Real object with defaults
         moodService = new MoodService(context, personalityProperties); // Service under test
@@ -38,13 +40,16 @@ public class MoodIntegrationTest {
 
     @Test
     void testMoodPromptGeneration() {
-        // 1. Verify Prompt Builder includes JSON instructions
+        // Verify Prompt Builder includes mood section in the conversational prompt
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "Hello");
         String promptContent = prompt.toString();
 
-        assertTrue(promptContent.contains("Tu dois répondre UNIQUEMENT au format JSON"));
-        assertTrue(promptContent.contains("mood_update"));
-        assertTrue(promptContent.contains("delta_pleasure"));
+        assertTrue(promptContent.contains("## Humeur Actuelle"),
+                "Le prompt conversationnel doit contenir la section humeur courante");
+        assertTrue(promptContent.contains("État Émotionnel"),
+                "Le prompt conversationnel doit contenir l'état émotionnel");
+        assertTrue(promptContent.contains("Calcifer"),
+                "Le prompt conversationnel doit contenir la personnalité Calcifer");
     }
 
     @Test

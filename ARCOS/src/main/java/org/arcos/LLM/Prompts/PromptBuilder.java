@@ -1,6 +1,7 @@
 package org.arcos.LLM.Prompts;
 
 import org.arcos.Memory.ConversationContext;
+import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
@@ -19,6 +20,7 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -32,10 +34,16 @@ import java.util.stream.Collectors;
 public class PromptBuilder {
 
     private final ValueProfile valueProfile;
+    private final ConversationSummaryService conversationSummaryService;
+    private final int recentMessagesCount;
 
     @Autowired
-    public PromptBuilder(ValueProfile valueProfile) {
+    public PromptBuilder(ValueProfile valueProfile,
+                         ConversationSummaryService conversationSummaryService,
+                         @Value("${arcos.conversation.summary.recent-messages-count:3}") int recentMessagesCount) {
         this.valueProfile = valueProfile;
+        this.conversationSummaryService = conversationSummaryService;
+        this.recentMessagesCount = recentMessagesCount;
     }
 
     // ==================== PROMPTS PUBLIQUES ====================
@@ -459,7 +467,10 @@ public class PromptBuilder {
     }
 
     private String getConversationContextIfPresent(ConversationContext context) {
-        if (context != null && !context.isEmpty()) {
+        String summary = conversationSummaryService.getSummary();
+        boolean hasSummary = summary != null && !summary.isBlank();
+        boolean hasContext = context != null && !context.isEmpty();
+        if (hasSummary || hasContext) {
             return "## Contexte de la Conversation\n\n" +
                     generateContextDescription(context) + "\n";
         }
@@ -523,18 +534,29 @@ public class PromptBuilder {
 
     private String generateContextDescription(ConversationContext context) {
         StringBuilder contextDesc = new StringBuilder();
-        if (context.getRecentMessages() != null && !context.getRecentMessages().isEmpty()) {
-            contextDesc.append("**Messages récents :**\n");
-            context.getRecentMessages().forEach(msg ->
-                    contextDesc.append("- ").append(msg).append("\n"));
-            contextDesc.append("\n");
+
+        String summary = conversationSummaryService.getSummary();
+        if (summary != null && !summary.isBlank()) {
+            contextDesc.append("**Résumé de la session :**\n")
+                    .append(summary).append("\n\n");
         }
 
-        if (context.getUserPreferences() != null && !context.getUserPreferences().isEmpty()) {
-            contextDesc.append("**Préférences de l'utilisateur :**\n");
-            context.getUserPreferences().forEach((key, value) ->
-                    contextDesc.append("- ").append(key).append(": ").append(value).append("\n"));
-            contextDesc.append("\n");
+        if (context != null) {
+            List<String> allRecent = context.getRecentMessages();
+            int fromIndex = Math.max(0, allRecent.size() - recentMessagesCount);
+            List<String> recent = allRecent.subList(fromIndex, allRecent.size());
+            if (!recent.isEmpty()) {
+                contextDesc.append("**Derniers échanges :**\n");
+                recent.forEach(msg -> contextDesc.append("- ").append(msg).append("\n"));
+                contextDesc.append("\n");
+            }
+
+            if (context.getUserPreferences() != null && !context.getUserPreferences().isEmpty()) {
+                contextDesc.append("**Préférences de l'utilisateur :**\n");
+                context.getUserPreferences().forEach((key, value) ->
+                        contextDesc.append("- ").append(key).append(": ").append(value).append("\n"));
+                contextDesc.append("\n");
+            }
         }
 
         return contextDesc.toString();

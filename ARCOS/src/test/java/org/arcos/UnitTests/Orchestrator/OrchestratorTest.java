@@ -2,6 +2,7 @@ package org.arcos.UnitTests.Orchestrator;
 
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
+import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
@@ -98,6 +99,9 @@ class OrchestratorTest {
     @Mock
     private AudioProperties audioProperties;
 
+    @Mock
+    private ConversationSummaryService conversationSummaryService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -116,7 +120,8 @@ class OrchestratorTest {
                 plannedActionService,
                 executionHistoryService,
                 wakeWordProducer,
-                audioProperties
+                audioProperties,
+                conversationSummaryService
         );
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);
     }
@@ -159,6 +164,7 @@ class OrchestratorTest {
         // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);
         verify(conversationContext).addAssistantMessage(fullResponse);
+        verify(conversationSummaryService).updateAsync(any(), eq(userQuery), eq(fullResponse));
 
         // Verify async part with timeout
         verify(moodService, timeout(1000)).applyMoodUpdate(any(MoodUpdate.class));
