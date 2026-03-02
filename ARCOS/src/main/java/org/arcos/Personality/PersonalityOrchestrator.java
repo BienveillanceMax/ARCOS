@@ -41,10 +41,13 @@ public class PersonalityOrchestrator
         MemoryEntry memoryEntry = null;
         int retries = 0;
         while (retries < ALLOWED_RETRIES) {
-
-            memoryEntry = memoryService.memorizeConversation(conversation);
-            if (memoryEntry != null) {
-                break;
+            try {
+                memoryEntry = memoryService.memorizeConversation(conversation);
+                if (memoryEntry != null) {
+                    break;
+                }
+            } catch (Exception e) {
+                log.warn("Tentative de mémorisation {} échouée : {}", retries + 1, e.getMessage());
             }
             retries++;
         }
@@ -67,11 +70,16 @@ public class PersonalityOrchestrator
         int retries = 0;
 
         while (retries < ALLOWED_RETRIES) {
-            opinionEntry = opinionService.processInteraction(memoryEntry);
-            if (opinionEntry == null) {
+            try {
+                opinionEntry = opinionService.processInteraction(memoryEntry);
+                if (opinionEntry == null) {
+                    retries++;
+                } else {
+                    break;
+                }
+            } catch (Exception e) {
+                log.warn("Tentative de formation d'opinion {} échouée : {}", retries + 1, e.getMessage());
                 retries++;
-            } else {
-                break;
             }
         }
         return opinionEntry;

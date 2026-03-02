@@ -1,5 +1,6 @@
 package org.arcos.Tools.Actions;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.arcos.Tools.WebPageTool.WebPageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -29,6 +30,7 @@ public class WebPageActions {
     @Tool(name = "Lire_une_page_web",
           description = "Lit et extrait le contenu textuel d'une page web à partir de son URL. "
                       + "Utile après une recherche pour approfondir un résultat.")
+    @CircuitBreaker(name = "webPage", fallbackMethod = "readWebPageFallback")
     public ActionResult readWebPage(String url) {
         long startTime = System.currentTimeMillis();
 
@@ -61,5 +63,10 @@ public class WebPageActions {
             return ActionResult.failure("Lecture interrompue : " + e.getMessage(), e)
                     .withExecutionTime(System.currentTimeMillis() - startTime);
         }
+    }
+
+    public ActionResult readWebPageFallback(String url, Throwable t) {
+        log.warn("Circuit breaker webPage ouvert : {}", t.getMessage());
+        return ActionResult.failure("Service de lecture de page temporairement indisponible.", null).withExecutionTime(0);
     }
 }

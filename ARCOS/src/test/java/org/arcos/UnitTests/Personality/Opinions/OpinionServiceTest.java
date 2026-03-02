@@ -6,13 +6,13 @@ import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
+import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Opinions.OpinionService;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
 import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -26,7 +26,6 @@ import static org.mockito.Mockito.*;
 
 class OpinionServiceTest {
 
-    @InjectMocks
     private OpinionService opinionService;
 
     @Mock
@@ -44,11 +43,18 @@ class OpinionServiceTest {
     @Mock
     private PersonalityProperties personalityProperties;
 
+    @Mock
+    private MoodService moodService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(personalityProperties.getOpinionSearchTopk()).thenReturn(10);
         when(personalityProperties.getOpinionSimilarityThreshold()).thenReturn(0.85);
+        when(personalityProperties.getOpinion()).thenReturn(new PersonalityProperties.OpinionParams());
+        when(moodService.getMoodOpinionVolatilityFactor()).thenReturn(1.0);
+        opinionService = new OpinionService(llmClient, opinionRepository, promptBuilder,
+                valueProfile, personalityProperties, moodService);
     }
 
     @Test

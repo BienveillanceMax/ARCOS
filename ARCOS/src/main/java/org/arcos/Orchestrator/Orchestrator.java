@@ -1,8 +1,11 @@
 package org.arcos.Orchestrator;
 
+import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
+import org.arcos.EventBus.Events.WakeWordEvent;
+import org.arcos.Producers.WakeWordProducer;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
@@ -54,6 +57,11 @@ public class Orchestrator
     private final PlannedActionService plannedActionService;
     private final ExecutionHistoryService executionHistoryService;
 
+    private final WakeWordProducer wakeWordProducer;
+    private final AudioProperties audioProperties;
+    private volatile boolean isExecutingAction = false;
+    private volatile boolean inConversationMode = false;
+
     private volatile LocalDateTime lastInteracted;
     private volatile boolean running = true;
     private DesireService desireService;
@@ -69,7 +77,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -85,6 +93,8 @@ public class Orchestrator
         this.plannedActionExecutor = plannedActionExecutor;
         this.plannedActionService = plannedActionService;
         this.executionHistoryService = executionHistoryService;
+        this.wakeWordProducer = wakeWordProducer;
+        this.audioProperties = audioProperties;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -92,25 +102,30 @@ public class Orchestrator
     public void dispatch(Event<?> event) {
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
-            processAndSpeak((String) event.getPayload());
+            boolean isMultiTurn = (event instanceof WakeWordEvent) && ((WakeWordEvent) event).isMultiTurn();
+            processAndSpeak((String) event.getPayload(), isMultiTurn);
+        } else if (event.getType() == EventType.LISTENING_WINDOW_TIMEOUT) {
+            inConversationMode = false;
+            log.info("Mode conversation terminé — retour veille standard");
         } else if (event.getType() == EventType.INITIATIVE) {
+            isExecutingAction = true;
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
                 centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
                 initiativeService.processInitiative(desire);
                 centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_END));
-
             } catch (Exception e) {
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
                 desire.setStatus(DesireEntry.Status.PENDING);
                 desire.setLastUpdated(java.time.LocalDateTime.now());
                 desireService.storeDesire(desire);
+            } finally {
+                isExecutingAction = false;
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
-
             ttsHandler.speakAsync(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
-
         } else if (event.getType() == EventType.PLANNED_ACTION) {
+            isExecutingAction = true;
             PlannedActionEntry action = (PlannedActionEntry) event.getPayload();
             try {
                 if (action.isReminderTrigger()) {
@@ -128,9 +143,10 @@ public class Orchestrator
             } catch (Exception e) {
                 log.error("Error executing planned action {}", action.getId(), e);
                 executionHistoryService.recordExecution(action, e.getMessage(), false);
+            } finally {
+                isExecutingAction = false;
             }
         }
-
     }
 
     public void start() {
@@ -178,7 +194,7 @@ public class Orchestrator
         return message.toString();
     }
 
-    private void processAndSpeak(String userQuery) {
+    private void processAndSpeak(String userQuery, boolean isMultiTurn) {
         log.info("Processing query: {}", userQuery);
 
         // Create the prompt for streaming response
@@ -188,7 +204,19 @@ public class Orchestrator
         // Get Voice Parameters based on current Mood
         PadState currentPad = context.getPadState();
         MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
-        generateFluxAndSpeak(streamingPrompt,userQuery,voiceParams);
+        // Callback post-TTS pour ouvrir la fenêtre de conversation (mode multi-tours)
+        Runnable onTtsDone = null;
+        if (audioProperties.isMultiTurnEnabled() && !isExecutingAction) {
+            onTtsDone = () -> {
+                if (!isExecutingAction) {
+                    inConversationMode = true;
+                    wakeWordProducer.openConversationWindow(audioProperties.getPostResponseListeningWindowMs());
+                    log.debug("Fenêtre de conversation ouverte ({} ms)", audioProperties.getPostResponseListeningWindowMs());
+                }
+            };
+        }
+
+        generateFluxAndSpeak(streamingPrompt, userQuery, voiceParams, onTtsDone);
 
 
 
@@ -196,7 +224,7 @@ public class Orchestrator
 
     }
 
-    private void generateFluxAndSpeak(Prompt streamingPrompt, String userQuery, MoodVoiceMapper.VoiceParams voiceParams) {
+    private void generateFluxAndSpeak(Prompt streamingPrompt, String userQuery, MoodVoiceMapper.VoiceParams voiceParams, Runnable onTtsDone) {
         StringBuilder sentenceBuffer = new StringBuilder();
         StringBuilder fullResponse = new StringBuilder();
         llmClient.generateStreamingChatResponse(streamingPrompt)
@@ -227,8 +255,16 @@ public class Orchestrator
                     if (sentenceBuffer.length() > 0) {
                         String cleanRelic = cleanForTTS(sentenceBuffer.toString());
                         if (!cleanRelic.isEmpty()) {
-                            ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                            if (onTtsDone != null) {
+                                ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW, onTtsDone);
+                            } else {
+                                ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
+                            }
+                        } else if (onTtsDone != null) {
+                            ttsHandler.afterPlayback(onTtsDone);
                         }
+                    } else if (onTtsDone != null) {
+                        ttsHandler.afterPlayback(onTtsDone);
                     }
 
                     // Pour la mémoire, on garde le texte original 'fullResponse' (avec le formatage)

@@ -2,6 +2,9 @@ package org.arcos.Producers;
 
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
+import org.arcos.EventBus.Events.Event;
+import org.arcos.EventBus.Events.EventPriority;
+import org.arcos.EventBus.Events.EventType;
 import org.arcos.EventBus.Events.WakeWordEvent;
 import org.arcos.IO.InputHandling.SpeechToText;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
@@ -45,6 +48,9 @@ public class WakeWordProducer implements Runnable {
 
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
+
+    private volatile boolean inConversationWindowMode = false;
+    private volatile long conversationWindowExpiry = 0L;
 
     @EventListener(ApplicationReadyEvent.class)
     public void startAfterStartup() {
@@ -215,6 +221,29 @@ public class WakeWordProducer implements Runnable {
 
         while (!Thread.currentThread().isInterrupted()) {
             try {
+                // --- Mode conversation : bypass Porcupine ---
+                if (inConversationWindowMode) {
+                    long remaining = conversationWindowExpiry - System.currentTimeMillis();
+                    if (remaining <= 0) {
+                        inConversationWindowMode = false;
+                        log.info("Fenêtre de conversation expirée sans parole détectée");
+                        emitListeningWindowTimeout();
+                        continue;
+                    }
+                    String transcription = recordAndTranscribeForConversation((int) remaining);
+                    inConversationWindowMode = false;
+                    if (transcription != null && !transcription.isEmpty()) {
+                        log.info(">>> [CONVERSATION] TRANSCRIBED: {}", transcription);
+                        WakeWordEvent event = new WakeWordEvent(transcription, "conversation", true);
+                        eventQueue.offer(event);
+                    } else {
+                        log.info(">>> [CONVERSATION] Aucune parole dans la fenêtre");
+                        emitListeningWindowTimeout();
+                    }
+                    continue;
+                }
+
+                // --- Mode veille standard : boucle Porcupine ---
                 // Read audio from microphone
                 int bytesRead = micDataLine.read(micBuffer, 0, micFrameSize);
 
@@ -375,6 +404,112 @@ public class WakeWordProducer implements Runnable {
 
         double rms = Math.sqrt((double) sum / sampleCount);
         return rms < audioProperties.getSilenceThreshold();
+    }
+
+    /**
+     * Ouvre une fenêtre d'écoute en mode conversation (sans mot de réveil).
+     * Appelée par l'Orchestrator après fin TTS si les conditions sont remplies.
+     * Thread-safe : les champs volatile garantissent la visibilité cross-thread.
+     *
+     * @param durationMs Durée de la fenêtre en ms
+     */
+    public void openConversationWindow(int durationMs) {
+        if (!porcupineEnabled) {
+            log.debug("openConversationWindow ignorée : Porcupine non actif");
+            return;
+        }
+        inConversationWindowMode = true;
+        conversationWindowExpiry = System.currentTimeMillis() + durationMs;
+        log.debug("Fenêtre conversation ouverte pour {}ms", durationMs);
+    }
+
+    private void emitListeningWindowTimeout() {
+        Event<Void> timeout = new Event<>(
+                EventType.LISTENING_WINDOW_TIMEOUT,
+                EventPriority.LOW,
+                null,
+                "WakeWordProducer"
+        );
+        eventQueue.offer(timeout);
+    }
+
+    private String recordAndTranscribeForConversation(int maxDurationMs) {
+        log.info("[CONVERSATION] Écoute pendant {}ms max...", maxDurationMs);
+
+        speechToText.reset();
+
+        final int micSampleRate = audioProperties.getSampleRate();
+        final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20;
+        final int micFrameSize = (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE);
+
+        byte[] micBuffer = new byte[micFrameSize];
+        byte[] whisperBuffer = new byte[whisperFrameSize];
+
+        long lastSoundTime = System.currentTimeMillis();
+        long recordingStartTime = System.currentTimeMillis();
+        boolean hasDetectedSpeech = false;
+
+        try {
+            while (true) {
+                int bytesRead = micDataLine.read(micBuffer, 0, micFrameSize);
+
+                if (bytesRead > 0) {
+                    int samplesRead = bytesRead / BYTES_PER_SAMPLE;
+                    short[] micSamples = new short[samplesRead];
+                    ByteBuffer.wrap(micBuffer, 0, bytesRead)
+                            .order(ByteOrder.LITTLE_ENDIAN)
+                            .asShortBuffer()
+                            .get(micSamples);
+
+                    int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
+                    short[] downsampled = new short[whisperSamples];
+                    downsample(micSamples, samplesRead, downsampled, whisperSamples);
+
+                    ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
+                    for (short s : downsampled) {
+                        bb.putShort(s);
+                    }
+
+                    boolean isSilent = isSilence(whisperBuffer);
+
+                    if (!isSilent) {
+                        lastSoundTime = System.currentTimeMillis();
+                        if (!hasDetectedSpeech) {
+                            hasDetectedSpeech = true;
+                            log.info("[CONVERSATION] Parole détectée, enregistrement...");
+                        }
+                    }
+
+                    speechToText.processAudio(whisperBuffer);
+
+                    if (hasDetectedSpeech && isSilent) {
+                        long silenceDuration = System.currentTimeMillis() - lastSoundTime;
+                        if (silenceDuration >= audioProperties.getConversationSilenceMs()) {
+                            log.info("[CONVERSATION] Silence de {}ms, traitement...", audioProperties.getConversationSilenceMs());
+                            break;
+                        }
+                    }
+
+                    long elapsed = System.currentTimeMillis() - recordingStartTime;
+                    if (elapsed >= maxDurationMs) {
+                        log.info("[CONVERSATION] Fenêtre de {}ms expirée", maxDurationMs);
+                        break;
+                    }
+                }
+            }
+
+            if (speechToText.hasMinimumAudio()) {
+                log.info("[CONVERSATION] Traitement de {}ms d'audio...", speechToText.getBufferedAudioDurationMs());
+                return speechToText.getTranscription();
+            } else {
+                log.info("[CONVERSATION] Pas assez d'audio pour la transcription");
+                return "";
+            }
+
+        } catch (Exception e) {
+            log.error("[CONVERSATION] Erreur lors de l'enregistrement", e);
+            return "";
+        }
     }
 
     public static void showAudioDevices() {

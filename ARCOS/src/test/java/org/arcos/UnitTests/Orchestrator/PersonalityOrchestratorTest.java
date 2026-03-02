@@ -65,7 +65,8 @@ class PersonalityOrchestratorTest {
     void processMemory_MemorizationFails_ShouldNotProceed() throws Exception {
         // Given
         String conversation = "test conversation";
-        when(memoryService.memorizeConversation(conversation)).thenThrow(new ResponseParsingException("test exception"));
+        doAnswer(inv -> { throw new ResponseParsingException("test exception"); })
+            .when(memoryService).memorizeConversation(conversation);
 
         // When
         personalityOrchestrator.processMemory(conversation);

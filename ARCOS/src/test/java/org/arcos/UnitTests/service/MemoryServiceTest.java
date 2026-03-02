@@ -141,7 +141,8 @@ class MemoryServiceTest {
         String conversation = "test conversation";
         Prompt prompt = new Prompt("test prompt");
         when(promptBuilder.buildMemoryPrompt(conversation)).thenReturn(prompt);
-        doThrow(new ResponseParsingException("LLM error")).when(llmClient).generateMemoryResponse(any(Prompt.class));
+        doAnswer(inv -> { throw new ResponseParsingException("LLM error"); })
+            .when(llmClient).generateMemoryResponse(any(Prompt.class));
 
         // When & Then
         assertThrows(ResponseParsingException.class, () -> memoryService.memorizeConversation(conversation));

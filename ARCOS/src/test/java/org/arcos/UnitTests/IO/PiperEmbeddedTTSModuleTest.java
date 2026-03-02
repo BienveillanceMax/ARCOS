@@ -1,11 +1,14 @@
 package org.arcos.UnitTests.IO;
 
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.File;
 import java.util.concurrent.Future;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -15,9 +18,20 @@ class PiperEmbeddedTTSModuleTest {
 
     private PiperEmbeddedTTSModule ttsModule;
 
+    @BeforeAll
+    static void skipIfPiperEnabled() {
+        // Ces tests vérifient le comportement quand Piper est ABSENT.
+        // Si le binaire est présent et fonctionnel, on ignore cette suite.
+        String piperDir = System.getProperty("user.home") + "/.piper-tts";
+        File piperFile = new File(piperDir + "/piper/piper");
+        Assumptions.assumeTrue(
+            !piperFile.exists() || !piperFile.canExecute(),
+            "Piper TTS installé — tests du mode désactivé ignorés"
+        );
+    }
+
     @BeforeEach
     void setUp() {
-        // Le constructeur échoue gracieusement dans l'environnement de test (Piper absent)
         ttsModule = new PiperEmbeddedTTSModule();
     }
 

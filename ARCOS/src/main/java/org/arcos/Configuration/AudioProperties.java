@@ -28,6 +28,15 @@ public class AudioProperties {
     /** Durée maximale d'enregistrement en secondes. */
     private int maxRecordingSeconds = 30;
 
+    /** Active la fenêtre d'écoute post-réponse (mode conversation multi-tours). */
+    private boolean multiTurnEnabled = true;
+
+    /** Durée de la fenêtre d'écoute post-réponse en ms. */
+    private int postResponseListeningWindowMs = 4000;
+
+    /** Durée de silence avant fermeture anticipée de la fenêtre de conversation en ms. */
+    private int conversationSilenceMs = 1500;
+
     public int getInputDeviceIndex() {
         return inputDeviceIndex;
     }
@@ -66,5 +75,29 @@ public class AudioProperties {
 
     public void setMaxRecordingSeconds(int maxRecordingSeconds) {
         this.maxRecordingSeconds = maxRecordingSeconds;
+    }
+
+    public boolean isMultiTurnEnabled() {
+        return multiTurnEnabled;
+    }
+
+    public void setMultiTurnEnabled(boolean multiTurnEnabled) {
+        this.multiTurnEnabled = multiTurnEnabled;
+    }
+
+    public int getPostResponseListeningWindowMs() {
+        return postResponseListeningWindowMs;
+    }
+
+    public void setPostResponseListeningWindowMs(int postResponseListeningWindowMs) {
+        this.postResponseListeningWindowMs = postResponseListeningWindowMs;
+    }
+
+    public int getConversationSilenceMs() {
+        return conversationSilenceMs;
+    }
+
+    public void setConversationSilenceMs(int conversationSilenceMs) {
+        this.conversationSilenceMs = conversationSilenceMs;
     }
 }

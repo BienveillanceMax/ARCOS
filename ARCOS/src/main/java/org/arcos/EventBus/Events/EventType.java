@@ -19,7 +19,8 @@ public enum EventType
     DEVICE_DISCONNECTED("Périphérique déconnecté"),
     INITIATIVE("Initiative"),
     CALENDAR_EVENT_SCHEDULER("Événement de calendrier"),
-    PLANNED_ACTION("Action planifiée à exécuter");
+    PLANNED_ACTION("Action planifiée à exécuter"),
+    LISTENING_WINDOW_TIMEOUT("Fin de fenêtre d'écoute conversation");
 
     private final String description;
 

@@ -1,5 +1,6 @@
 package org.arcos.Tools.Actions;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.arcos.Tools.WeatherTool.WeatherService;
 import org.arcos.Tools.WeatherTool.WeatherService.DailyForecast;
 import org.arcos.Tools.WeatherTool.WeatherService.WeatherResult;
@@ -25,6 +26,7 @@ public class WeatherActions {
                       + "Par défaut, utilise la localisation de l'appareil si aucune ville n'est précisée. "
                       + "forecastDays contrôle le nombre de jours de prévision (défaut 3, max 16). "
                       + "Ne nécessite pas de recherche web.")
+    @CircuitBreaker(name = "weather", fallbackMethod = "getWeatherFallback")
     public ActionResult getWeather(String city, int forecastDays) {
         long startTime = System.currentTimeMillis();
 
@@ -56,6 +58,11 @@ public class WeatherActions {
             return ActionResult.failure("Requête météo interrompue : " + e.getMessage(), e)
                     .withExecutionTime(System.currentTimeMillis() - startTime);
         }
+    }
+
+    public ActionResult getWeatherFallback(String city, int forecastDays, Throwable t) {
+        log.warn("Circuit breaker weather ouvert : {}", t.getMessage());
+        return ActionResult.failure("Service météo temporairement indisponible.", null).withExecutionTime(0);
     }
 
     private String formatWeatherResult(WeatherResult result) {

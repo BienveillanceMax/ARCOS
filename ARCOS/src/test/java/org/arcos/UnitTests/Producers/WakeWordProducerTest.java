@@ -69,6 +69,19 @@ class WakeWordProducerTest {
         assertThatCode(producer::shutdown).doesNotThrowAnyException();
     }
 
+    @Test
+    void openConversationWindow_WhenPorcupineDisabled_ShouldNotSetWindowMode() {
+        // Given
+        WakeWordProducer producer = buildProducerViaDegradedPath();
+
+        // When
+        assertThatCode(() -> producer.openConversationWindow(3000)).doesNotThrowAnyException();
+
+        // Then: inConversationWindowMode reste false (porcupineEnabled est false)
+        boolean mode = (boolean) ReflectionTestUtils.getField(producer, "inConversationWindowMode");
+        assertThat(mode).isFalse();
+    }
+
     /**
      * Crée un WakeWordProducer en passant par le chemin dégradé :
      * le constructeur intercepte l'absence des ressources Porcupine et

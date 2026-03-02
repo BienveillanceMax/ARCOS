@@ -78,6 +78,7 @@ class CalendarEventNotificationSchedulerTest {
     void scheduleEventNotifications_WhenHourIs9_ShouldCallCalendarService() throws Exception {
         // Given
         LocalDateTime morningTime = LocalDateTime.now().withHour(9).withMinute(0).withSecond(0).withNano(0);
+        when(calendarService.isAvailable()).thenReturn(true);
         when(calendarService.listUpcomingEvents(10)).thenReturn(java.util.Collections.emptyList());
 
         try (MockedStatic<LocalDateTime> mockedLocalDateTime = mockStatic(LocalDateTime.class, CALLS_REAL_METHODS)) {

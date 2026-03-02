@@ -1,5 +1,6 @@
 package org.arcos.Integration;
 
+import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
@@ -24,13 +25,15 @@ public class MoodIntegrationTest {
     PromptBuilder promptBuilder;
     ConversationContext context;
     MoodService moodService;
+    PersonalityProperties personalityProperties;
 
     @BeforeEach
     void setUp() {
         valueProfile = new ValueProfile(); // Real object
         promptBuilder = new PromptBuilder(valueProfile); // Real object
         context = new ConversationContext(); // Real object
-        moodService = new MoodService(context); // Service under test
+        personalityProperties = new PersonalityProperties(); // Real object with defaults
+        moodService = new MoodService(context, personalityProperties); // Service under test
     }
 
     @Test

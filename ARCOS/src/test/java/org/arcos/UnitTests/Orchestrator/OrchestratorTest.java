@@ -1,9 +1,11 @@
 package org.arcos.UnitTests.Orchestrator;
 
+import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
+import org.arcos.Producers.WakeWordProducer;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
@@ -90,6 +92,12 @@ class OrchestratorTest {
     @Mock
     private ExecutionHistoryService executionHistoryService;
 
+    @Mock
+    private WakeWordProducer wakeWordProducer;
+
+    @Mock
+    private AudioProperties audioProperties;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -106,7 +114,9 @@ class OrchestratorTest {
                 moodVoiceMapper,
                 plannedActionExecutor,
                 plannedActionService,
-                executionHistoryService
+                executionHistoryService,
+                wakeWordProducer,
+                audioProperties
         );
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);
     }
@@ -234,6 +244,20 @@ class OrchestratorTest {
         verify(plannedActionExecutor, never()).execute(any());
         verify(plannedActionService, never()).markCompleted(any());
         assertFalse(action.isReminderTrigger());
+    }
+
+    @Test
+    void dispatch_ListeningWindowTimeoutEvent_ShouldResetConversationMode() {
+        // Given
+        Event<Void> timeoutEvent = new Event<>(EventType.LISTENING_WINDOW_TIMEOUT, null, "WakeWordProducer");
+        ReflectionTestUtils.setField(orchestrator, "inConversationMode", true);
+
+        // When
+        orchestrator.dispatch(timeoutEvent);
+
+        // Then: inConversationMode reset to false
+        boolean mode = (boolean) ReflectionTestUtils.getField(orchestrator, "inConversationMode");
+        assertFalse(mode, "LISTENING_WINDOW_TIMEOUT doit remettre inConversationMode à false");
     }
 
     @Test

@@ -2,6 +2,7 @@ package org.arcos.Personality.Opinions;
 
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;
+import org.arcos.Personality.Mood.MoodService;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
@@ -32,24 +33,20 @@ public class OpinionService {
     private final OpinionRepository opinionRepository;
     private final LLMClient llmClient;
     private final PersonalityProperties personalityProperties;
+    private final MoodService moodService;
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
-    // ---- Hyperparamètres (constants internes du modèle, non exposés en config) ----
-    private static final double W_EXPERIENCE = 0.70;
-    private static final double W_COHERENCE = 0.30;
-    private static final double REINFORCE_BASE = 0.05;
-    private static final double CONTRADICT_BASE = 0.08;
-    private static final double STABILITY_GROWTH = 0.02;
-    private static final double STABILITY_SHRINK = 0.03;
-    private static final double RHO_NETWORK = 0.25;
+    // ---- Hyperparamètres externalisés via PersonalityProperties.OpinionParams ----
 
     public OpinionService(LLMClient llmClient, OpinionRepository opinionRepository, PromptBuilder promptBuilder,
-                          ValueProfile valueProfile, PersonalityProperties personalityProperties) {
+                          ValueProfile valueProfile, PersonalityProperties personalityProperties,
+                          MoodService moodService) {
         this.llmClient = llmClient;
         this.opinionRepository = opinionRepository;
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
         this.personalityProperties = personalityProperties;
+        this.moodService = moodService;
     }
 
     private static double clamp(double v, double lo, double hi) {
@@ -125,21 +122,26 @@ public class OpinionService {
     }
 
     private double calculateDeltaC(OpinionEntry opinionEntry, double networkConsistency, double imp, int sOld, int sExp) {
+        double reinforceBase = personalityProperties.getOpinion().getReinforceBase();
+        double contradictBase = personalityProperties.getOpinion().getContradictBase();
         double deltaC;
         if (sOld == 0) {
-            deltaC = REINFORCE_BASE * imp * (1.0 - opinionEntry.getConfidence()) * (0.75 + 0.5 * ((networkConsistency + 1.0) / 2.0));
+            deltaC = reinforceBase * imp * (1.0 - opinionEntry.getConfidence()) * (0.75 + 0.5 * ((networkConsistency + 1.0) / 2.0));
         } else if (sOld == sExp) {
             double netFactor = 1.0 + 0.5 * Math.max(0.0, networkConsistency);
-            deltaC = REINFORCE_BASE * imp * (1.0 - opinionEntry.getConfidence()) * netFactor;
+            deltaC = reinforceBase * imp * (1.0 - opinionEntry.getConfidence()) * netFactor;
         } else {
             double netFactor = 1.0 + 0.5 * Math.max(0.0, -networkConsistency);
-            deltaC = -CONTRADICT_BASE * imp * opinionEntry.getConfidence() * netFactor;
+            deltaC = -contradictBase * imp * opinionEntry.getConfidence() * netFactor;
         }
         return deltaC;
     }
 
     private double updateStabilityScore(OpinionEntry opinionEntry, double networkConsistency, double imp, OpinionEntry newOpinion) {
-        double expEffective = clamp((1.0 - RHO_NETWORK) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + RHO_NETWORK * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
+        double rhoNetwork = personalityProperties.getOpinion().getRhoNetwork();
+        double stabilityGrowth = personalityProperties.getOpinion().getStabilityGrowth();
+        double stabilityShrink = personalityProperties.getOpinion().getStabilityShrink();
+        double expEffective = clamp((1.0 - rhoNetwork) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + rhoNetwork * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
         int sOld = sign(newOpinion.getPolarity());
         int sExp = sign(expEffective);
         double signDelta = (sOld == sExp ? +1.0 : -1.0);
@@ -147,21 +149,33 @@ public class OpinionService {
 
         if (sOld == 0) signDelta = +0.5;
         double netStabFactor = 1.0 + 0.3 * ((networkConsistency + 1.0) / 2.0);
-        double stabilityDelta = (signDelta > 0 ? STABILITY_GROWTH : -STABILITY_SHRINK) * imp * Math.abs(deltaC) * netStabFactor;
+        double stabilityDelta = (signDelta > 0 ? stabilityGrowth : -stabilityShrink) * imp * Math.abs(deltaC) * netStabFactor;
         return clamp(opinionEntry.getStability() + stabilityDelta, 0.0, 1.0);
     }
 
     private double updateConfidenceScore(OpinionEntry opinionEntry, double networkConsistency, double imp) {
-        double expEffective = clamp((1.0 - RHO_NETWORK) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + RHO_NETWORK * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
+        double rhoNetwork = personalityProperties.getOpinion().getRhoNetwork();
+        double expEffective = clamp((1.0 - rhoNetwork) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + rhoNetwork * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
         int sOld = sign(opinionEntry.getPolarity());
         int sExp = sign(expEffective);
         double deltaC = calculateDeltaC(opinionEntry, networkConsistency, imp, sOld, sExp);
         return clamp(opinionEntry.getConfidence() + deltaC, 0.0, 1.0);
     }
 
-    private double updatePolarityScore(OpinionEntry opinionEntry, double networkConsistency, double coh) {
-        double expEffective = clamp((1.0 - RHO_NETWORK) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + RHO_NETWORK * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
-        double experienceComponent = W_EXPERIENCE * expEffective + W_COHERENCE * coh;
+    private double updatePolarityScore(OpinionEntry opinionEntry, double networkConsistency, double coh, MoodService moodService) {
+        double rhoNetwork = personalityProperties.getOpinion().getRhoNetwork();
+        double wExp = personalityProperties.getOpinion().getWeightExperience();
+        double wCoh = personalityProperties.getOpinion().getWeightCoherence();
+        double expEffective = clamp((1.0 - rhoNetwork) * clamp(opinionEntry.getPolarity(), -1.0, 1.0) + rhoNetwork * clamp(networkConsistency, -1.0, 1.0), -1.0, 1.0);
+
+        if (moodService != null) {
+            double volatilityFactor = moodService.getMoodOpinionVolatilityFactor();
+            wExp = Math.min(1.0, wExp * volatilityFactor);
+            wCoh = 1.0 - wExp;
+            log.debug("Facteur de stabilité ajusté par l humeur : {}", volatilityFactor);
+        }
+
+        double experienceComponent = wExp * expEffective + wCoh * coh;
         return clamp(opinionEntry.getPolarity() * opinionEntry.getStability() + (1.0 - opinionEntry.getStability()) * experienceComponent, -1.0, 1.0);
     }
 
@@ -190,7 +204,7 @@ public class OpinionService {
             return null; //Opinion deleted -> nothing more to do
         }
         existingOpinion.setConfidence(updateConfidenceScore(existingOpinion, networkConsistencyScore, newOpinionImportance));
-        existingOpinion.setPolarity(updatePolarityScore(existingOpinion, networkConsistencyScore, coherency));
+        existingOpinion.setPolarity(updatePolarityScore(existingOpinion, networkConsistencyScore, coherency, moodService));
         existingOpinion.setUpdatedAt(LocalDateTime.now());
 
         opinionRepository.save(toDocument(existingOpinion));

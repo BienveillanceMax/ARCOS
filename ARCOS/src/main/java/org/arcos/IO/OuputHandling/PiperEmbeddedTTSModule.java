@@ -405,6 +405,49 @@ public class PiperEmbeddedTTSModule {
         });
     }
 
+    /**
+     * Synthèse vocale async avec callback de complétion — déclenché après la fin de la lecture audio.
+     * Garantit l'ordre FIFO avec les chunks précédents via le playbackExecutor.
+     */
+    public void speakAsync(String text, float lengthScale, float noiseScale, float noiseW, Runnable onComplete) {
+        if (!enabled) {
+            if (onComplete != null) onComplete.run();
+            return;
+        }
+        generationExecutor.submit(() -> {
+            try {
+                File audioFile = generateAudio(text, lengthScale, noiseScale, noiseW);
+                playbackExecutor.submit(() -> {
+                    try {
+                        playAudio(audioFile);
+                    } catch (Exception e) {
+                        log.error("Erreur lecture audio : {}", e.getMessage(), e);
+                    } finally {
+                        audioFile.delete();
+                        if (onComplete != null) onComplete.run();
+                    }
+                });
+            } catch (Exception e) {
+                log.error("Erreur génération audio avec callback : {}", e.getMessage(), e);
+                if (onComplete != null) onComplete.run();
+            }
+        });
+    }
+
+    /**
+     * Enfile un callback dans la queue de lecture — il se déclenchera après tous les audios en attente.
+     * Utile quand il n'y a pas de reliquat à lire mais qu'on veut signaler la fin du TTS.
+     */
+    public void afterPlayback(Runnable callback) {
+        if (!enabled) {
+            if (callback != null) callback.run();
+            return;
+        }
+        playbackExecutor.submit(() -> {
+            if (callback != null) callback.run();
+        });
+    }
+
     public void speak(String text) {
         if (!enabled) return;
         speak(text, 1.0f, 0.667f, 0.8f);

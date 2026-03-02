@@ -1,13 +1,14 @@
 package org.arcos.Mood;
 
+import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Memory.ConversationContext;
 import org.arcos.Personality.Mood.Mood;
 import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.PadState;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -21,8 +22,15 @@ class MoodServiceTest {
     @Mock
     private ConversationContext context;
 
-    @InjectMocks
+    @Mock
+    private PersonalityProperties personalityProperties;
+
     private MoodService moodService;
+
+    @BeforeEach
+    void setUp() {
+        moodService = new MoodService(context, personalityProperties);
+    }
 
     @Test
     void testApplyMoodUpdate() {

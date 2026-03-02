@@ -15,8 +15,8 @@ class MoodVoiceMapperTest {
         PadState pad = new PadState(0.0, 1.0, 0.0);
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
-        // Base 1.0 - (1.0 * 0.2) = 0.8
-        assertEquals(0.8f, params.lengthScale, 0.01f);
+        // Base 1.2 - (1.0 * 0.2) = 1.0
+        assertEquals(1.0f, params.lengthScale, 0.01f);
     }
 
     @Test
@@ -25,8 +25,8 @@ class MoodVoiceMapperTest {
         PadState pad = new PadState(0.0, -1.0, 0.0);
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
-        // Base 1.0 - (-1.0 * 0.2) = 1.2
-        assertEquals(1.2f, params.lengthScale, 0.01f);
+        // Base 1.2 - (-1.0 * 0.2) = 1.4
+        assertEquals(1.4f, params.lengthScale, 0.01f);
     }
 
     @Test
@@ -34,7 +34,8 @@ class MoodVoiceMapperTest {
         PadState pad = new PadState(0.0, 0.0, 0.0);
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
-        assertEquals(1.0f, params.lengthScale, 0.01f);
+        // Base 1.2 - (0.0 * 0.2) = 1.2
+        assertEquals(1.2f, params.lengthScale, 0.01f);
         assertEquals(0.667f, params.noiseScale, 0.01f);
         assertEquals(0.8f, params.noiseW, 0.01f);
     }

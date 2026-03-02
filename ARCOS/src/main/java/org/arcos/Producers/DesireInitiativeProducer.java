@@ -2,6 +2,7 @@ package org.arcos.Producers;
 
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.EventBus.EventQueue;
+import org.arcos.Personality.Mood.MoodService;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
@@ -29,24 +30,30 @@ public class DesireInitiativeProducer {
     private final DesireService desireService;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final PersonalityProperties personalityProperties;
+    private final MoodService moodService;
 
     @Autowired
     public DesireInitiativeProducer(EventQueue eventQueue, DesireService desireService,
                                     CentralFeedBackHandler centralFeedBackHandler,
-                                    PersonalityProperties personalityProperties) {
+                                    PersonalityProperties personalityProperties,
+                                    MoodService moodService) {
         this.eventQueue = eventQueue;
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.personalityProperties = personalityProperties;
+        this.moodService = moodService;
     }
 
-    @Scheduled(fixedRate = 3600000) // Check every hour
+    @Scheduled(fixedRateString = "${arcos.personality.initiative-check-interval-ms:3600000}")
     public void checkDesiresAndInitiate() {
         log.info("Checking for high-intensity desires...");
         List<DesireEntry> pendingDesires = desireService.getPendingDesires();
         log.info("High intensity desires found: {}", pendingDesires.size());
+        double baseThreshold = personalityProperties.getInitiativeThreshold();
+        double adjustedThreshold = moodService.getEffectiveInitiativeThreshold(baseThreshold);
+        log.debug("Seuil d initiative ajusté par l humeur : base={} ajusté={}", baseThreshold, adjustedThreshold);
         for (DesireEntry desire : pendingDesires) {
-            if (desire.getIntensity() >= personalityProperties.getInitiativeThreshold()) {
+            if (desire.getIntensity() >= adjustedThreshold) {
                 if (isGoodMomentToInitiate(desire)) {
                     log.info("High-intensity desire found, initiating... {}", desire.getLabel());
                     centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
