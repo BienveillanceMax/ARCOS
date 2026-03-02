@@ -8,6 +8,7 @@ import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Tools.Actions.CalendarActions;
 import org.arcos.Tools.Actions.MemoryActions;
@@ -22,17 +23,26 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.context.annotation.Bean;
+import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
 @Slf4j
 @Component
 public class LLMClient
 {
+
+    private static final String MEMORY_ADVISOR_PROMPT_TEMPLATE = """
+            {query}
+
+            ## Souvenirs pertinents
+            {question_answer_context}
+            """;
 
     private final BeanOutputConverter<MoodUpdate> converter;
     private final ChatClient chatClient;
@@ -43,11 +53,20 @@ public class LLMClient
     private final MemoryActions memoryActions;
     private final WebPageActions webPageActions;
     private final WeatherActions weatherActions;
-
+    private final QuestionAnswerAdvisor questionAnswerAdvisor;
 
     private final ObjectMapper objectMapper;
 
-    public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions, PlannedActionActions plannedActionActions, MemoryActions memoryActions, WebPageActions webPageActions, WeatherActions weatherActions) {
+    public LLMClient(ChatClient.Builder chatClientBuilder,
+                     CalendarActions calendarActions,
+                     PythonActions pythonActions,
+                     SearchActions searchActions,
+                     PlannedActionActions plannedActionActions,
+                     MemoryActions memoryActions,
+                     WebPageActions webPageActions,
+                     WeatherActions weatherActions,
+                     MemoryRepository memoryRepository,
+                     @Value("${arcos.memory.advisor.top-k:3}") int memoryAdvisorTopK) {
         this.chatClient = chatClientBuilder.build();
         this.calendarActions = calendarActions;
         this.pythonActions = pythonActions;
@@ -56,6 +75,11 @@ public class LLMClient
         this.memoryActions = memoryActions;
         this.webPageActions = webPageActions;
         this.weatherActions = weatherActions;
+
+        this.questionAnswerAdvisor = QuestionAnswerAdvisor.builder(memoryRepository.getVectorStore())
+                .searchRequest(SearchRequest.builder().topK(memoryAdvisorTopK).build())
+                .promptTemplate(new PromptTemplate(MEMORY_ADVISOR_PROMPT_TEMPLATE))
+                .build();
 
         this.objectMapper = JsonMapper.builder()
                 .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
@@ -84,6 +108,7 @@ public class LLMClient
     @RateLimiter(name = "mistral_free")
     public String generateChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
+                .advisors(questionAnswerAdvisor)
                 .tools(calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions)
                 .call()
                 .content();
@@ -136,6 +161,7 @@ public class LLMClient
     @RateLimiter(name = "mistral_free")
     public Flux<String> generateStreamingChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
+                .advisors(questionAnswerAdvisor)
                 .tools(calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions)
                 .stream()
                 .content();

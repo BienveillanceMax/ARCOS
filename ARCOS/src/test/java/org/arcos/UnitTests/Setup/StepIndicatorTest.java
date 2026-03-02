@@ -79,6 +79,22 @@ class StepIndicatorTest {
     }
 
     @Test
+    void renderStepIndex_5steps_returns3Lines() {
+        List<StepState> steps = List.of(
+                new StepState("I", "NEXUS", StepIndicator.Status.COMPLETED),
+                new StepState("II", "VOX", StepIndicator.Status.COMPLETED),
+                new StepState("III", "ANIMA", StepIndicator.Status.COMPLETED),
+                new StepState("IV", "CORPUS", StepIndicator.Status.COMPLETED),
+                new StepState("V", "FIAT", StepIndicator.Status.ACTIVE)
+        );
+
+        String[] lines = StepIndicator.renderStepIndex(steps, 60, false);
+        assertEquals(3, lines.length);
+        assertTrue(lines[2].contains("FIAT"));
+        assertTrue(lines[2].contains("V"));
+    }
+
+    @Test
     void renderStepIndex_tooFewSteps_throwsException() {
         List<StepState> steps = List.of(
                 new StepState("I", "NEXUS", StepIndicator.Status.PENDING)

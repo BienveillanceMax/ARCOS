@@ -47,7 +47,7 @@ public class FallbackRenderer implements WizardDisplay {
 
     @Override
     public void drawFrame() {
-        int width = 60;
+        int width = effectiveWidth();
         out.println();
         out.println(BoxDrawing.headerBar(width, !color));
         out.println();
@@ -71,7 +71,7 @@ public class FallbackRenderer implements WizardDisplay {
         }
 
         out.println();
-        out.println(BoxDrawing.panelDivider(numeral, name, 60, !color));
+        out.println(BoxDrawing.panelDivider(numeral, name, effectiveWidth(), !color));
         out.println();
         out.flush();
     }
@@ -103,7 +103,7 @@ public class FallbackRenderer implements WizardDisplay {
 
     @Override
     public void statusLine(String label, String value, String detail, StatusColor statusColor) {
-        String line = StatusLineRenderer.render(label, value, detail, statusColor, 54, color);
+        String line = StatusLineRenderer.render(label, value, detail, statusColor, effectiveWidth() - 6, color);
         out.println("   " + line);
         out.flush();
     }
@@ -182,7 +182,7 @@ public class FallbackRenderer implements WizardDisplay {
 
     @Override
     public int getContentWidth() {
-        return 54; // 60 - 6 for margins
+        return effectiveWidth() - 6;
     }
 
     @Override
@@ -195,14 +195,14 @@ public class FallbackRenderer implements WizardDisplay {
         if (closed) return;
         closed = true;
         out.println();
-        out.println(BoxDrawing.footer(60, !color));
+        out.println(BoxDrawing.footer(effectiveWidth(), !color));
         out.println();
         out.flush();
     }
 
     private void drawStepIndex() {
         List<StepState> states = new ArrayList<>();
-        int count = Math.min(4, stepDefs != null ? stepDefs.size() : 0);
+        int count = stepDefs != null ? stepDefs.size() : 0;
         for (int i = 0; i < count; i++) {
             StepDefinition def = stepDefs.get(i);
             StepIndicator.Status status = i < stepStatuses.size()
@@ -214,9 +214,15 @@ public class FallbackRenderer implements WizardDisplay {
             states.add(new StepState("", "---", StepIndicator.Status.PENDING));
         }
 
-        String[] lines = StepIndicator.renderStepIndex(states, 54, color);
+        String[] lines = StepIndicator.renderStepIndex(states, effectiveWidth() - 6, color);
         for (String line : lines) {
             out.println("   " + line);
         }
+    }
+
+    /** Returns the terminal width capped at 60 (the max fallback frame width). */
+    private int effectiveWidth() {
+        int tw = terminal.getWidth();
+        return (tw > 0 && tw < 60) ? tw : 60;
     }
 }

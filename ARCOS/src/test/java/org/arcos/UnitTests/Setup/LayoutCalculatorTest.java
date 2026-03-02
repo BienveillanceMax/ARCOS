@@ -15,9 +15,9 @@ class LayoutCalculatorTest {
         // Then
         assertEquals(1, layout.headerRow());
         assertEquals(3, layout.stepIndexStart());
-        assertEquals(4, layout.stepIndexEnd());
-        assertEquals(6, layout.panelDividerRow());
-        assertEquals(8, layout.panelContentStart());
+        assertEquals(5, layout.stepIndexEnd());
+        assertEquals(7, layout.panelDividerRow());
+        assertEquals(9, layout.panelContentStart());
         assertEquals(24, layout.footerRow());
         assertTrue(layout.panelContentEnd() < layout.footerRow());
         assertTrue(layout.contentWidth() > 0);

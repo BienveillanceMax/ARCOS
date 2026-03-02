@@ -72,6 +72,10 @@ public abstract class BaseVectorRepository<T>
         return vectorStore.similaritySearch(searchRequest);
     }
 
+    public VectorStore getVectorStore() {
+        return vectorStore;
+    }
+
     public abstract Optional<Document> findById(String id);
 
     protected static Collections.Distance parseDistanceMetric(String metric) {

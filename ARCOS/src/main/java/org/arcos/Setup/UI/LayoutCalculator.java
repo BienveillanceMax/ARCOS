@@ -58,18 +58,18 @@ public final class LayoutCalculator {
         // Layout zones (1-based row indices):
         // Row 1: header bar
         // Row 2: empty
-        // Row 3-4: step index (2 rows)
-        // Row 5: empty
-        // Row 6: panel divider
-        // Row 7: empty
-        // Row 8 to (height-2): panel content
+        // Row 3-5: step index (3 rows: 2×2 grid + centered FIAT)
+        // Row 6: empty
+        // Row 7: panel divider
+        // Row 8: empty
+        // Row 9 to (height-2): panel content
         // Row (height-1): empty
         // Row height: footer
         int headerRow = 1;
         int stepIndexStart = 3;
-        int stepIndexEnd = 4;
-        int panelDividerRow = 6;
-        int panelContentStart = 8;
+        int stepIndexEnd = 5;
+        int panelDividerRow = 7;
+        int panelContentStart = 9;
         int footerRow = termHeight;
         int panelContentEnd = footerRow - 2;
 

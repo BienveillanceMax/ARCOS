@@ -26,6 +26,7 @@ public class ScreenManager implements WizardDisplay {
     private static final String HIDE_CURSOR = "\033[?25l";
     private static final String SHOW_CURSOR = "\033[?25h";
     private static final String CLEAR_LINE = "\033[2K";
+    private static final String CLEAR_TO_EOL = "\033[0K";
 
     private static final char[] SPINNER_FRAMES = {'◒', '◐', '◓', '◑'};
     private static final int SPINNER_INTERVAL_MS = 100;
@@ -348,9 +349,8 @@ public class ScreenManager implements WizardDisplay {
     // ── Private helpers ──────────────────────────────────────────────────
 
     private void drawStepIndex() {
-        // Build step states for the first 4 steps (NEXUS through CORPUS)
         List<StepState> states = new ArrayList<>();
-        int count = Math.min(4, stepDefs.size());
+        int count = Math.min(5, stepDefs.size());
         for (int i = 0; i < count; i++) {
             StepDefinition def = stepDefs.get(i);
             StepIndicator.Status status = i < stepStatuses.size()
@@ -358,7 +358,6 @@ public class ScreenManager implements WizardDisplay {
                     : StepIndicator.Status.PENDING;
             states.add(new StepState(def.romanNumeral(), def.latinName(), status));
         }
-        // Pad to 4 if needed
         while (states.size() < 4) {
             states.add(new StepState("", "---", StepIndicator.Status.PENDING));
         }
@@ -366,8 +365,16 @@ public class ScreenManager implements WizardDisplay {
         String[] indexLines = StepIndicator.renderStepIndex(states, layout.contentWidth(), true);
         writeAt(layout.stepIndexStart(), layout.leftMargin(),
                 BoxDrawing.contentRow(indexLines[0], layout.frameWidth(), false));
-        writeAt(layout.stepIndexEnd(), layout.leftMargin(),
+        writeAt(layout.stepIndexStart() + 1, layout.leftMargin(),
                 BoxDrawing.contentRow(indexLines[1], layout.frameWidth(), false));
+        if (indexLines.length > 2) {
+            writeAt(layout.stepIndexEnd(), layout.leftMargin(),
+                    BoxDrawing.contentRow(indexLines[2], layout.frameWidth(), false));
+        } else {
+            // Only 4 steps — clear the 3rd step-index row
+            writeAt(layout.stepIndexEnd(), layout.leftMargin(),
+                    BoxDrawing.emptyRow(layout.frameWidth(), false));
+        }
     }
 
     private void drawPanelDivider() {
@@ -385,9 +392,10 @@ public class ScreenManager implements WizardDisplay {
     private void positionCursorForInput(int row, String prompt) {
         writeLock.lock();
         try {
-            // Clear the line and position cursor
-            int col = layout.leftMargin() + 4; // inside border + margin
-            out.print("\033[" + row + ";" + col + "H" + CLEAR_LINE);
+            // Position cursor inside the border, then clear only to end-of-line
+            // so the left border ┃ (drawn by writeAt) is preserved.
+            int col = layout.leftMargin() + 4; // inside border + 2-space margin
+            out.print("\033[" + row + ";" + col + "H" + CLEAR_TO_EOL);
             out.print(SHOW_CURSOR);
             out.print("\033[" + row + ";" + col + "H");
             out.flush();

@@ -17,7 +17,8 @@ class FallbackRendererTest {
 
     private static final List<StepDefinition> ALL_STEPS = List.of(
             StepDefinition.NEXUS, StepDefinition.VOX,
-            StepDefinition.ANIMA, StepDefinition.CORPUS);
+            StepDefinition.ANIMA, StepDefinition.CORPUS,
+            StepDefinition.FIAT);
 
     private Terminal buildDumbTerminal(ByteArrayOutputStream baos) throws IOException {
         return TerminalBuilder.builder()
