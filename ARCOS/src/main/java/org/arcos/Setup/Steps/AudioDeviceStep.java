@@ -71,7 +71,7 @@ public class AudioDeviceStep implements WizardStep {
         String defaultHint = currentIndex >= 0 ? " [current: " + currentIndex + "]" : "";
 
         while (true) {
-            String input = display.readLine("\u25b8" + defaultHint + " ");
+            String input = display.readLine("\u25b8 (index or 's' to skip)" + defaultHint + " ");
             if (input == null || input.isBlank()) {
                 if (currentIndex >= 0) {
                     display.printLine(okText("Kept index: " + currentIndex, color));

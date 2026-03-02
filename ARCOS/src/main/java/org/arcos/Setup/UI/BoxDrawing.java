@@ -85,9 +85,42 @@ public final class BoxDrawing {
      */
     public static String contentRow(String text, int width, boolean plain) {
         String border = sideBorder(plain);
+        int maxVisible = width - 2 - 3 - 1; // borders + left margin + min 1 right padding
         int visibleTextLen = TerminalCapabilities.strip(text).length();
+        if (visibleTextLen > maxVisible) {
+            text = truncateToVisible(text, maxVisible);
+            visibleTextLen = maxVisible;
+        }
         int paddingRight = width - 2 - 3 - visibleTextLen;
         if (paddingRight < 1) paddingRight = 1;
         return border + "   " + text + " ".repeat(paddingRight) + border;
+    }
+
+    /**
+     * Truncates a string (possibly containing ANSI codes) to a maximum visible width.
+     */
+    private static String truncateToVisible(String text, int maxVisible) {
+        String stripped = TerminalCapabilities.strip(text);
+        if (stripped.length() <= maxVisible) return text;
+        // Walk the original string tracking visible characters
+        StringBuilder result = new StringBuilder();
+        int visible = 0;
+        int i = 0;
+        while (i < text.length() && visible < maxVisible) {
+            if (text.charAt(i) == '\033') {
+                // Copy entire ANSI escape sequence
+                int seqStart = i;
+                i++;
+                while (i < text.length() && !Character.isLetter(text.charAt(i))) i++;
+                if (i < text.length()) i++; // include the terminating letter
+                result.append(text, seqStart, i);
+            } else {
+                result.append(text.charAt(i));
+                visible++;
+                i++;
+            }
+        }
+        result.append(AnsiPalette.RESET);
+        return result.toString();
     }
 }

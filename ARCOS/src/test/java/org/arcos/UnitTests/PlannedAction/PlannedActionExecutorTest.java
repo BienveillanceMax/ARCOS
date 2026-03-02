@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.PlannedAction;
 
+import org.arcos.Configuration.PlannedActionProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.PlannedAction.Models.ActionType;
@@ -47,7 +48,7 @@ class PlannedActionExecutorTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        executor = new PlannedActionExecutor(calendarActions, searchActions, pythonActions, llmClient, promptBuilder);
+        executor = new PlannedActionExecutor(calendarActions, searchActions, pythonActions, llmClient, promptBuilder, new PlannedActionProperties());
     }
 
     @Test
@@ -171,6 +172,45 @@ class PlannedActionExecutorTest {
         // Then
         verify(searchActions).searchTheWeb("actualités");
         verify(pythonActions).executePythonCode("Résultat actu");
+    }
+
+    @Test
+    void execute_SimpleReminderWithContext_ShouldIncludeContext() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderWithContextEntry();
+
+        // When
+        String result = executor.execute(entry);
+
+        // Then
+        assertEquals("Rappel : Appeler le dentiste — Numéro : 04 72 00 00 00, motif : détartrage annuel", result);
+        verifyNoInteractions(calendarActions, searchActions, pythonActions, llmClient);
+    }
+
+    @Test
+    void execute_DeadlineSimpleReminder_ShouldReturnDeadlineMessage() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineEntry();
+
+        // When
+        String result = executor.execute(entry);
+
+        // Then
+        assertEquals("Échéance atteinte : Rendre le rapport", result);
+        verifyNoInteractions(calendarActions, searchActions, pythonActions, llmClient);
+    }
+
+    @Test
+    void execute_DeadlineWithContext_ShouldIncludeContext() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineEntry();
+        entry.setContext("Bureau du professeur Dupont");
+
+        // When
+        String result = executor.execute(entry);
+
+        // Then
+        assertEquals("Échéance atteinte : Rendre le rapport — Bureau du professeur Dupont", result);
     }
 
     @Test

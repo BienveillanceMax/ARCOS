@@ -91,12 +91,16 @@ public class RecapStep implements WizardStep {
         display.printLine("");
 
         // Confirmation
-        String input = display.readLine("[Y] Confirm   [A] Cancel and restart   \u25b8 ");
-        if (input == null || input.isBlank() || "y".equalsIgnoreCase(input.trim())) {
-            return doSave(display, model, color);
-        } else {
-            display.printLine(mutedText("Cancelled. No files written.", color));
-            return StepResult.failure("Save cancelled by user.");
+        while (true) {
+            String input = display.readLine("[Y] Confirm   [A] Cancel and restart   \u25b8 ");
+            if (input == null || input.isBlank() || "y".equalsIgnoreCase(input.trim())) {
+                return doSave(display, model, color);
+            } else if ("a".equalsIgnoreCase(input.trim())) {
+                display.printLine(mutedText("Cancelled. No files written.", color));
+                return StepResult.failure("Save cancelled by user.");
+            } else {
+                display.showError("Enter Y to confirm or A to cancel.");
+            }
         }
     }
 

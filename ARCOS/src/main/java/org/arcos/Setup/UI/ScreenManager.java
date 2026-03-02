@@ -277,6 +277,7 @@ public class ScreenManager implements WizardDisplay {
     @Override
     public SpinnerHandle showSpinner(String label) {
         int row = currentPanelRow;
+        currentPanelRow++; // claim this row for the spinner/result
         int absRow = layout.panelContentStart() + row;
 
         ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor(r -> {

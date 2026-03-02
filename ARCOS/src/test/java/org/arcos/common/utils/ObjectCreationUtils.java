@@ -6,6 +6,7 @@ import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Models.Subject;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.PlannedAction.Models.ActionType;
+import org.arcos.PlannedAction.Models.ExecutionHistoryEntry;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.Models.ReWOOPlan;
 
@@ -103,6 +104,45 @@ public class ObjectCreationUtils
         entry.setExecutionPlan(new ReWOOPlan(List.of(step1, step2, step3)));
         entry.setSynthesisPromptTemplate("Fais un briefing matinal. Agenda : {agenda}. Actualités : {actus}. Météo : {meteo}.");
         return entry;
+    }
+
+    public static PlannedActionEntry createSimpleReminderWithContextEntry() {
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("Appeler le dentiste");
+        entry.setActionType(ActionType.TODO);
+        entry.setTriggerDatetime(LocalDateTime.now().plusHours(1));
+        entry.setContext("Numéro : 04 72 00 00 00, motif : détartrage annuel");
+        return entry;
+    }
+
+    public static PlannedActionEntry createDeadlineEntry() {
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("Rendre le rapport");
+        entry.setActionType(ActionType.DEADLINE);
+        entry.setDeadlineDatetime(LocalDateTime.now().plusDays(1));
+        return entry;
+    }
+
+    public static PlannedActionEntry createDeadlineWithRemindersEntry() {
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("Rendre le rapport");
+        entry.setActionType(ActionType.DEADLINE);
+        entry.setDeadlineDatetime(LocalDateTime.now().plusDays(1));
+        entry.setReminderDatetimes(List.of(
+                LocalDateTime.now().plusHours(2),
+                LocalDateTime.now().plusHours(12)
+        ));
+        return entry;
+    }
+
+    public static ExecutionHistoryEntry createExecutionHistoryEntry() {
+        return new ExecutionHistoryEntry(
+                UUID.randomUUID().toString(),
+                "Appeler le dentiste",
+                "Rappel : Appeler le dentiste",
+                true,
+                null
+        );
     }
 
     public static EnumMap<DimensionSchwartz, Double> createAverageByDimension() {

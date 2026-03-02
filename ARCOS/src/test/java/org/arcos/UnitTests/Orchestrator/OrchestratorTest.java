@@ -18,6 +18,7 @@ import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.PadState;
 import org.arcos.Personality.PersonalityOrchestrator;
+import org.arcos.PlannedAction.ExecutionHistoryService;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.Models.ActionType;
 import org.arcos.PlannedAction.PlannedActionExecutor;
@@ -32,8 +33,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import reactor.core.publisher.Flux;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyFloat;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -84,6 +87,9 @@ class OrchestratorTest {
     @Mock
     private PlannedActionService plannedActionService;
 
+    @Mock
+    private ExecutionHistoryService executionHistoryService;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -99,7 +105,8 @@ class OrchestratorTest {
                 moodService,
                 moodVoiceMapper,
                 plannedActionExecutor,
-                plannedActionService
+                plannedActionService,
+                executionHistoryService
         );
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);
     }
@@ -182,6 +189,7 @@ class OrchestratorTest {
         // Then
         verify(plannedActionExecutor).execute(action);
         verify(piperEmbeddedTTSModule).speakAsync("Rappel : Appeler le dentiste");
+        verify(executionHistoryService).recordExecution(action, "Rappel : Appeler le dentiste", true);
         verify(plannedActionService).markCompleted(action);
     }
 
@@ -203,6 +211,29 @@ class OrchestratorTest {
         verify(plannedActionExecutor).execute(habit);
         verify(piperEmbeddedTTSModule).speakAsync("Voici votre briefing...");
         verify(plannedActionService, never()).markCompleted(any());
+    }
+
+    @Test
+    void dispatch_PlannedActionReminderEvent_ShouldSpeakReminderWithoutExecuting() {
+        // Given
+        PlannedActionEntry action = new PlannedActionEntry();
+        action.setLabel("Rendre le rapport");
+        action.setActionType(ActionType.DEADLINE);
+        action.setDeadlineDatetime(java.time.LocalDateTime.now().plusHours(3));
+        action.setReminderTrigger(true);
+        Event<PlannedActionEntry> plannedActionEvent = new Event<>(EventType.PLANNED_ACTION, action, "test");
+
+        when(piperEmbeddedTTSModule.speakAsync(any(String.class))).thenReturn(null);
+
+        // When
+        orchestrator.dispatch(plannedActionEvent);
+
+        // Then
+        verify(piperEmbeddedTTSModule).speakAsync(argThat(msg ->
+                msg.contains("Rappel : Rendre le rapport") && msg.contains("heure")));
+        verify(plannedActionExecutor, never()).execute(any());
+        verify(plannedActionService, never()).markCompleted(any());
+        assertFalse(action.isReminderTrigger());
     }
 
     @Test

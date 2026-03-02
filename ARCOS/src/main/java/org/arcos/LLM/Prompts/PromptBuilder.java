@@ -267,7 +267,11 @@ public class PromptBuilder {
         system.append(getCalciferPersonality());
         system.append(getValueProfile());
         system.append("\n## Tâche : Synthèse d'action planifiée\n\n");
-        system.append("Tu dois formuler une synthèse orale naturelle pour l'action '").append(entry.getLabel()).append("'.\n\n");
+        system.append("Tu dois formuler une synthèse orale naturelle pour l'action '").append(entry.getLabel()).append("'.\n");
+        if (entry.hasContext()) {
+            system.append("**Contexte :** ").append(entry.getContext()).append("\n");
+        }
+        system.append("\n");
 
         String template = entry.getSynthesisPromptTemplate();
         if (template != null) {

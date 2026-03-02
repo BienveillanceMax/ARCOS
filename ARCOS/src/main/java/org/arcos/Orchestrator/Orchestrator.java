@@ -17,6 +17,7 @@ import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.PadState;
+import org.arcos.PlannedAction.ExecutionHistoryService;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.PlannedAction.PlannedActionService;
@@ -30,6 +31,7 @@ import org.arcos.Personality.PersonalityOrchestrator;
 import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -50,6 +52,7 @@ public class Orchestrator
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final PlannedActionExecutor plannedActionExecutor;
     private final PlannedActionService plannedActionService;
+    private final ExecutionHistoryService executionHistoryService;
 
     private volatile LocalDateTime lastInteracted;
     private volatile boolean running = true;
@@ -66,7 +69,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -81,6 +84,7 @@ public class Orchestrator
         this.moodVoiceMapper = moodVoiceMapper;
         this.plannedActionExecutor = plannedActionExecutor;
         this.plannedActionService = plannedActionService;
+        this.executionHistoryService = executionHistoryService;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -109,13 +113,21 @@ public class Orchestrator
         } else if (event.getType() == EventType.PLANNED_ACTION) {
             PlannedActionEntry action = (PlannedActionEntry) event.getPayload();
             try {
-                String result = plannedActionExecutor.execute(action);
-                ttsHandler.speakAsync(result);
-                if (!action.isHabit()) {
-                    plannedActionService.markCompleted(action);
+                if (action.isReminderTrigger()) {
+                    String reminderMessage = buildReminderMessage(action);
+                    ttsHandler.speakAsync(reminderMessage);
+                    action.setReminderTrigger(false);
+                } else {
+                    String result = plannedActionExecutor.execute(action);
+                    ttsHandler.speakAsync(result);
+                    executionHistoryService.recordExecution(action, result, true);
+                    if (!action.isHabit()) {
+                        plannedActionService.markCompleted(action);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error executing planned action {}", action.getId(), e);
+                executionHistoryService.recordExecution(action, e.getMessage(), false);
             }
         }
 
@@ -145,6 +157,25 @@ public class Orchestrator
         moodExecutor.shutdownNow();
         personalityExecutor.shutdownNow();
         ttsHandler.shutdown();
+    }
+
+    private String buildReminderMessage(PlannedActionEntry action) {
+        StringBuilder message = new StringBuilder("Rappel : ").append(action.getLabel());
+        if (action.getDeadlineDatetime() != null) {
+            long minutesUntil = ChronoUnit.MINUTES.between(LocalDateTime.now(), action.getDeadlineDatetime());
+            if (minutesUntil > 60) {
+                long hours = minutesUntil / 60;
+                message.append(" — échéance dans ").append(hours).append(" heure").append(hours > 1 ? "s" : "");
+            } else if (minutesUntil > 0) {
+                message.append(" — échéance dans ").append(minutesUntil).append(" minute").append(minutesUntil > 1 ? "s" : "");
+            } else {
+                message.append(" — échéance dépassée");
+            }
+        }
+        if (action.hasContext()) {
+            message.append(" — ").append(action.getContext());
+        }
+        return message.toString();
     }
 
     private void processAndSpeak(String userQuery) {

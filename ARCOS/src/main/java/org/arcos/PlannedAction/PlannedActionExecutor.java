@@ -1,6 +1,7 @@
 package org.arcos.PlannedAction;
 
 import lombok.extern.slf4j.Slf4j;
+import org.arcos.Configuration.PlannedActionProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
@@ -24,15 +25,18 @@ public class PlannedActionExecutor {
 
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
+    private final PlannedActionProperties properties;
     private final Map<String, Function<Map<String, Object>, ActionResult>> toolRegistry;
 
     public PlannedActionExecutor(CalendarActions calendarActions,
                                   SearchActions searchActions,
                                   PythonActions pythonActions,
                                   LLMClient llmClient,
-                                  PromptBuilder promptBuilder) {
+                                  PromptBuilder promptBuilder,
+                                  PlannedActionProperties properties) {
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
+        this.properties = properties;
         this.toolRegistry = new HashMap<>();
 
         toolRegistry.put("Chercher_sur_Internet", params -> {
@@ -43,7 +47,7 @@ public class PlannedActionExecutor {
         toolRegistry.put("Lister_les_evenements_a_venir", params -> {
             int maxResults = params.containsKey("maxResults")
                     ? ((Number) params.get("maxResults")).intValue()
-                    : 5;
+                    : properties.getDefaultCalendarMaxResults();
             return calendarActions.listCalendarEvents(maxResults);
         });
 
@@ -68,8 +72,20 @@ public class PlannedActionExecutor {
     }
 
     public String execute(PlannedActionEntry action) {
+        if (action.isDeadline() && action.isSimpleReminder()) {
+            String message = "Échéance atteinte : " + action.getLabel();
+            if (action.hasContext()) {
+                message += " — " + action.getContext();
+            }
+            return message;
+        }
+
         if (action.isSimpleReminder()) {
-            return "Rappel : " + action.getLabel();
+            String reminder = "Rappel : " + action.getLabel();
+            if (action.hasContext()) {
+                reminder += " — " + action.getContext();
+            }
+            return reminder;
         }
 
         ReWOOPlan plan = action.getExecutionPlan();

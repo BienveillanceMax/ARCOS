@@ -26,6 +26,7 @@ public class FallbackRenderer implements WizardDisplay {
     private final Terminal terminal;
     private final PrintWriter out;
     private final boolean color;
+    private boolean closed = false;
     private List<StepDefinition> stepDefs;
     private final List<StepIndicator.Status> stepStatuses = new ArrayList<>();
 
@@ -191,6 +192,8 @@ public class FallbackRenderer implements WizardDisplay {
 
     @Override
     public void close() {
+        if (closed) return;
+        closed = true;
         out.println();
         out.println(BoxDrawing.footer(60, !color));
         out.println();

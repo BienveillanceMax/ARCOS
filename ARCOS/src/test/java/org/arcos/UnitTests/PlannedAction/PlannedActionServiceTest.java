@@ -3,6 +3,7 @@ package org.arcos.UnitTests.PlannedAction;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import org.arcos.Configuration.PlannedActionProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.LLM.Client.PlannedActionLLMClient;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
@@ -41,7 +42,7 @@ class PlannedActionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new PlannedActionService(eventQueue, llmClient, promptBuilder);
+        service = new PlannedActionService(eventQueue, llmClient, promptBuilder, new PlannedActionProperties());
     }
 
     @Test
@@ -187,5 +188,48 @@ class PlannedActionServiceTest {
         verify(eventQueue).offer(any());
         assertNotNull(entry.getLastExecutedAt());
         assertEquals(1, entry.getExecutionCount());
+    }
+
+    @Test
+    void createAction_Deadline_ShouldStoreAction() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineEntry();
+
+        // When
+        service.createAction(entry);
+
+        // Then
+        List<PlannedActionEntry> activeActions = service.listActiveActions();
+        assertEquals(1, activeActions.size());
+        assertTrue(activeActions.get(0).isDeadline());
+        assertEquals("Rendre le rapport", activeActions.get(0).getLabel());
+    }
+
+    @Test
+    void cancelAction_Deadline_ShouldDisable() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineWithRemindersEntry();
+        service.createAction(entry);
+
+        // When
+        boolean cancelled = service.cancelAction("rapport");
+
+        // Then
+        assertTrue(cancelled);
+        assertTrue(service.listActiveActions().isEmpty());
+    }
+
+    @Test
+    void onReminderTriggered_ShouldPushEventWithReminderFlag() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineWithRemindersEntry();
+        when(eventQueue.offer(any())).thenReturn(true);
+
+        // When
+        service.onReminderTriggered(entry);
+
+        // Then
+        verify(eventQueue).offer(any());
+        assertTrue(entry.isReminderTrigger());
     }
 }

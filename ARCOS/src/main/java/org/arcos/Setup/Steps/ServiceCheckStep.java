@@ -96,6 +96,7 @@ public class ServiceCheckStep implements WizardStep {
         }
 
         executor.shutdown();
+        try { executor.awaitTermination(5, TimeUnit.SECONDS); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
 
         display.printLine("");
 

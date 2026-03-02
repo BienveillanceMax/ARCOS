@@ -1,18 +1,19 @@
 {
-  "8fd5a99b-9025-496d-b00f-91e5bda7d2c9" : {
-    "habit" : false,
-    "simpleReminder" : true,
-    "id" : "8fd5a99b-9025-496d-b00f-91e5bda7d2c9",
+  "37f083ff-638a-4f92-876d-0469dd3d8fc3" : {
+    "id" : "37f083ff-638a-4f92-876d-0469dd3d8fc3",
     "label" : "Appeler le dentiste",
     "actionType" : "TODO",
     "status" : "COMPLETED",
-    "triggerDatetime" : "2026-02-28T19:51:38.655943383",
+    "triggerDatetime" : "2026-03-02T14:25:57.992000851",
     "cronExpression" : null,
     "executionPlan" : null,
     "synthesisPromptTemplate" : null,
-    "createdAt" : "2026-02-28T18:51:38.655916366",
+    "createdAt" : "2026-03-02T13:25:57.991992916",
     "lastExecutedAt" : null,
     "executionCount" : 0,
-    "lastExecutionResult" : null
+    "lastExecutionResult" : null,
+    "context" : null,
+    "deadlineDatetime" : null,
+    "reminderDatetimes" : null
   }
 }

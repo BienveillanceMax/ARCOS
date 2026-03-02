@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -46,6 +47,18 @@ public class PlannedActionEntry {
     @JsonProperty("lastExecutionResult")
     private String lastExecutionResult;
 
+    @JsonProperty("context")
+    private String context;
+
+    @JsonProperty("deadlineDatetime")
+    private LocalDateTime deadlineDatetime;
+
+    @JsonProperty("reminderDatetimes")
+    private List<LocalDateTime> reminderDatetimes;
+
+    @JsonIgnore
+    private transient boolean reminderTrigger;
+
     public PlannedActionEntry() {
         this.id = UUID.randomUUID().toString();
         this.status = ActionStatus.ACTIVE;
@@ -61,5 +74,20 @@ public class PlannedActionEntry {
     @JsonIgnore
     public boolean isHabit() {
         return actionType == ActionType.HABIT;
+    }
+
+    @JsonIgnore
+    public boolean hasContext() {
+        return context != null && !context.isBlank();
+    }
+
+    @JsonIgnore
+    public boolean isDeadline() {
+        return actionType == ActionType.DEADLINE;
+    }
+
+    @JsonIgnore
+    public boolean isReminderTrigger() {
+        return reminderTrigger;
     }
 }
