@@ -10,9 +10,12 @@ import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Tools.Actions.CalendarActions;
+import org.arcos.Tools.Actions.MemoryActions;
 import org.arcos.Tools.Actions.PlannedActionActions;
 import org.arcos.Tools.Actions.PythonActions;
 import org.arcos.Tools.Actions.SearchActions;
+import org.arcos.Tools.Actions.WeatherActions;
+import org.arcos.Tools.Actions.WebPageActions;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
@@ -37,16 +40,22 @@ public class LLMClient
     private final PythonActions pythonActions;
     private final SearchActions searchActions;
     private final PlannedActionActions plannedActionActions;
+    private final MemoryActions memoryActions;
+    private final WebPageActions webPageActions;
+    private final WeatherActions weatherActions;
 
 
     private final ObjectMapper objectMapper;
 
-    public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions, PlannedActionActions plannedActionActions) {
+    public LLMClient(ChatClient.Builder chatClientBuilder, CalendarActions calendarActions, PythonActions pythonActions, SearchActions searchActions, PlannedActionActions plannedActionActions, MemoryActions memoryActions, WebPageActions webPageActions, WeatherActions weatherActions) {
         this.chatClient = chatClientBuilder.build();
         this.calendarActions = calendarActions;
         this.pythonActions = pythonActions;
         this.searchActions = searchActions;
         this.plannedActionActions = plannedActionActions;
+        this.memoryActions = memoryActions;
+        this.webPageActions = webPageActions;
+        this.weatherActions = weatherActions;
 
         this.objectMapper = JsonMapper.builder()
                 .enable(JsonReadFeature.ALLOW_LEADING_PLUS_SIGN_FOR_NUMBERS)
@@ -75,7 +84,7 @@ public class LLMClient
     @RateLimiter(name = "mistral_free")
     public String generateChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
-                .tools(calendarActions, pythonActions, searchActions, plannedActionActions)
+                .tools(calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions)
                 .call()
                 .content();
     }
@@ -127,7 +136,7 @@ public class LLMClient
     @RateLimiter(name = "mistral_free")
     public Flux<String> generateStreamingChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
-                .tools(calendarActions, pythonActions, searchActions, plannedActionActions)
+                .tools(calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions)
                 .stream()
                 .content();
     }

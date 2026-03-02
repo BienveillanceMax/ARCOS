@@ -9,9 +9,12 @@ import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Tools.Actions.CalendarActions;
+import org.arcos.Tools.Actions.MemoryActions;
 import org.arcos.Tools.Actions.PlannedActionActions;
 import org.arcos.Tools.Actions.PythonActions;
 import org.arcos.Tools.Actions.SearchActions;
+import org.arcos.Tools.Actions.WeatherActions;
+import org.arcos.Tools.Actions.WebPageActions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
@@ -47,11 +50,20 @@ class LLMClientTest {
     @Mock
     private PlannedActionActions plannedActionActions;
 
+    @Mock
+    private MemoryActions memoryActions;
+
+    @Mock
+    private WebPageActions webPageActions;
+
+    @Mock
+    private WeatherActions weatherActions;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(chatClientBuilder.build()).thenReturn(chatClient);
-        llmClient = new LLMClient(chatClientBuilder, calendarActions, pythonActions, searchActions, plannedActionActions);
+        llmClient = new LLMClient(chatClientBuilder, calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions);
     }
 
     // ===== generateMemoryResponse =====

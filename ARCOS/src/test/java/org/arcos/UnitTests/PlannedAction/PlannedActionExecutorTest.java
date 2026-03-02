@@ -9,8 +9,11 @@ import org.arcos.PlannedAction.Models.ReWOOPlan;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.CalendarActions;
+import org.arcos.Tools.Actions.MemoryActions;
 import org.arcos.Tools.Actions.PythonActions;
 import org.arcos.Tools.Actions.SearchActions;
+import org.arcos.Tools.Actions.WeatherActions;
+import org.arcos.Tools.Actions.WebPageActions;
 import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,6 +41,15 @@ class PlannedActionExecutorTest {
     private PythonActions pythonActions;
 
     @Mock
+    private MemoryActions memoryActions;
+
+    @Mock
+    private WebPageActions webPageActions;
+
+    @Mock
+    private WeatherActions weatherActions;
+
+    @Mock
     private LLMClient llmClient;
 
     @Mock
@@ -48,7 +60,7 @@ class PlannedActionExecutorTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        executor = new PlannedActionExecutor(calendarActions, searchActions, pythonActions, llmClient, promptBuilder, new PlannedActionProperties());
+        executor = new PlannedActionExecutor(calendarActions, searchActions, pythonActions, memoryActions, webPageActions, weatherActions, llmClient, promptBuilder, new PlannedActionProperties());
     }
 
     @Test

@@ -8,8 +8,11 @@ import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.Models.ReWOOPlan;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.CalendarActions;
+import org.arcos.Tools.Actions.MemoryActions;
 import org.arcos.Tools.Actions.PythonActions;
 import org.arcos.Tools.Actions.SearchActions;
+import org.arcos.Tools.Actions.WeatherActions;
+import org.arcos.Tools.Actions.WebPageActions;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Component;
 
@@ -31,6 +34,9 @@ public class PlannedActionExecutor {
     public PlannedActionExecutor(CalendarActions calendarActions,
                                   SearchActions searchActions,
                                   PythonActions pythonActions,
+                                  MemoryActions memoryActions,
+                                  WebPageActions webPageActions,
+                                  WeatherActions weatherActions,
                                   LLMClient llmClient,
                                   PromptBuilder promptBuilder,
                                   PlannedActionProperties properties) {
@@ -68,6 +74,24 @@ public class PlannedActionExecutor {
         toolRegistry.put("Python_Execution", params -> {
             String code = (String) params.get("code");
             return pythonActions.executePythonCode(code);
+        });
+
+        toolRegistry.put("Chercher_dans_ma_memoire", params -> {
+            String query = (String) params.get("query");
+            String type = (String) params.get("type");
+            return memoryActions.searchMemory(query, type);
+        });
+
+        toolRegistry.put("Lire_une_page_web", params -> {
+            String url = (String) params.get("url");
+            return webPageActions.readWebPage(url);
+        });
+
+        toolRegistry.put("Consulter_la_meteo", params -> {
+            String city = (String) params.get("city");
+            int forecastDays = params.containsKey("forecastDays")
+                    ? ((Number) params.get("forecastDays")).intValue() : 3;
+            return weatherActions.getWeather(city, forecastDays);
         });
     }
 

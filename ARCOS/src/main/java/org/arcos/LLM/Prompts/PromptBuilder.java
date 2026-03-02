@@ -229,9 +229,12 @@ public class PromptBuilder {
         3. **Ajouter_un_evenement_au_calendrier** — Paramètres : `title`, `description`, `location`, `startDateTimeStr`, `endDateTimeStr` (String)
         4. **Supprimer_un_evenement** — Paramètres : `title` (String) — Supprime un événement du jour
         5. **Python_Execution** — Paramètres : `code` (String) — Exécute du code Python
+        6. **Chercher_dans_ma_memoire** — Paramètres : `query` (String), `type` (String: SOUVENIR/OPINION/DESIR) — Recherche dans la mémoire interne
+        7. **Lire_une_page_web** — Paramètres : `url` (String) — Lit le contenu textuel d'une page web
+        8. **Consulter_la_meteo** — Paramètres : `city` (String, optionnel), `forecastDays` (int, défaut 3) — Météo actuelle et prévisions. Localisation de l'appareil par défaut.
 
         ## Règles
-        - Maximum 5 étapes
+        - Maximum 7 étapes
         - Séquence linéaire (pas de branches)
         - Utilise `$varName` dans les paramètres pour référencer le résultat d'une étape précédente
         - Le `synthesisPromptTemplate` doit contenir des placeholders `{varName}` pour injecter les résultats
