@@ -25,9 +25,11 @@ import org.arcos.PlannedAction.ExecutionHistoryService;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.PlannedAction.PlannedActionService;
+import org.arcos.UserModel.Lifecycle.UserModelPipelineOrchestrator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import org.arcos.Personality.PersonalityOrchestrator;
 
@@ -36,8 +38,10 @@ import jakarta.annotation.PreDestroy;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -61,6 +65,7 @@ public class Orchestrator
     private final ConversationSummaryService conversationSummaryService;
     private final WakeWordProducer wakeWordProducer;
     private final AudioProperties audioProperties;
+    private final UserModelPipelineOrchestrator userModelPipeline;
     private volatile boolean isExecutingAction = false;
     private volatile boolean inConversationMode = false;
 
@@ -79,7 +84,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable UserModelPipelineOrchestrator userModelPipeline) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -98,6 +103,7 @@ public class Orchestrator
         this.wakeWordProducer = wakeWordProducer;
         this.audioProperties = audioProperties;
         this.conversationSummaryService = conversationSummaryService;
+        this.userModelPipeline = userModelPipeline;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -338,6 +344,16 @@ public class Orchestrator
                     String fullConversation = context.getFullConversation();
                     personalityOrchestrator.processMemory(fullConversation);
                     lastInteracted = LocalDateTime.now();
+                }
+
+                if (userModelPipeline != null) {
+                    List<String> userMessages = context.getRecentMessages().stream()
+                            .filter(msg -> msg.startsWith("USER: "))
+                            .map(msg -> msg.substring("USER: ".length()))
+                            .collect(java.util.stream.Collectors.toList());
+                    if (!userMessages.isEmpty()) {
+                        userModelPipeline.processConversationAsync(userMessages, false);
+                    }
                 }
             } catch (Exception e) {
                 log.error("Error during personality processing", e);

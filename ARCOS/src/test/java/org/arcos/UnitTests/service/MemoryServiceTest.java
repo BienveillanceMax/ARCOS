@@ -28,7 +28,6 @@ import static org.mockito.Mockito.*;
 
 class MemoryServiceTest {
 
-    @InjectMocks
     private MemoryService memoryService;
 
     @Mock
@@ -43,6 +42,8 @@ class MemoryServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        // userModelEnabled=false to preserve legacy behavior in existing tests
+        memoryService = new MemoryService(memoryRepository, llmClient, promptBuilder, false);
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {

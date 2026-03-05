@@ -5,10 +5,13 @@ import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.Subject;
 import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
+import org.arcos.UserModel.Models.MemoryAndObservationsResponse;
+import org.arcos.UserModel.Models.ObservationCandidateDto;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -25,13 +28,17 @@ public class MemoryService
     private final MemoryRepository memoryRepository;
     private final LLMClient llmClient;
     private final PromptBuilder promptBuilder;
+    private final boolean userModelEnabled;
+    private volatile List<ObservationCandidateDto> lastObservations;
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
 
-    public MemoryService(MemoryRepository memoryRepository, LLMClient llmClient, PromptBuilder promptBuilder) {
+    public MemoryService(MemoryRepository memoryRepository, LLMClient llmClient, PromptBuilder promptBuilder,
+                         @Value("${arcos.user-model.enabled:true}") boolean userModelEnabled) {
         this.memoryRepository = memoryRepository;
         this.llmClient = llmClient;
         this.promptBuilder = promptBuilder;
+        this.userModelEnabled = userModelEnabled;
     }
 
     public void storeMemory(MemoryEntry memoryEntry) {
@@ -61,15 +68,31 @@ public class MemoryService
     }
 
     public MemoryEntry memorizeConversation(String conversation) {
-
-
         Prompt memoryPrompt = promptBuilder.buildMemoryPrompt(conversation);
         log.info("Memory prompt = {}", memoryPrompt.toString());
+
+        if (userModelEnabled) {
+            MemoryAndObservationsResponse response = llmClient.generateMemoryAndObservationsResponse(memoryPrompt);
+            if (response != null && response.getContent() != null && !response.getContent().isBlank()) {
+                MemoryEntry memoryEntry = MemoryEntry.fromMemoryResponse(response);
+                storeMemory(memoryEntry);
+                this.lastObservations = response.getUserObservations();
+                return memoryEntry;
+            }
+            return null;
+        }
+
         MemoryEntry memoryEntry = llmClient.generateMemoryResponse(memoryPrompt);
         if (memoryEntry != null) {
             storeMemory(memoryEntry);
         }
         return memoryEntry;
+    }
+
+    public List<ObservationCandidateDto> getAndClearLastObservations() {
+        List<ObservationCandidateDto> obs = this.lastObservations;
+        this.lastObservations = null;
+        return obs;
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {

@@ -12,6 +12,8 @@ import org.arcos.Personality.Values.Entities.ValueSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.Tools.Actions.ActionResult;
+import org.arcos.UserModel.Models.UserProfileContext;
+import org.arcos.UserModel.Retrieval.UserModelRetrievalService;
 import com.google.api.services.calendar.model.Event;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
@@ -21,6 +23,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
@@ -36,14 +39,20 @@ public class PromptBuilder {
     private final ValueProfile valueProfile;
     private final ConversationSummaryService conversationSummaryService;
     private final int recentMessagesCount;
+    private final boolean userModelEnabled;
+    private final UserModelRetrievalService userModelRetrievalService;
 
     @Autowired
     public PromptBuilder(ValueProfile valueProfile,
                          ConversationSummaryService conversationSummaryService,
-                         @Value("${arcos.conversation.summary.recent-messages-count:3}") int recentMessagesCount) {
+                         @Value("${arcos.conversation.summary.recent-messages-count:3}") int recentMessagesCount,
+                         @Value("${arcos.user-model.enabled:true}") boolean userModelEnabled,
+                         @Nullable UserModelRetrievalService userModelRetrievalService) {
         this.valueProfile = valueProfile;
         this.conversationSummaryService = conversationSummaryService;
         this.recentMessagesCount = recentMessagesCount;
+        this.userModelEnabled = userModelEnabled;
+        this.userModelRetrievalService = userModelRetrievalService;
     }
 
     // ==================== PROMPTS PUBLIQUES ====================
@@ -178,6 +187,9 @@ public class PromptBuilder {
 
         system.append(fullConversation);
         appendMemoryRules(system);
+        if (userModelEnabled) {
+            appendUserObservationExtractionInstructions(system);
+        }
 
         return new Prompt(new SystemMessage(system.toString()));
     }
@@ -189,6 +201,7 @@ public class PromptBuilder {
         system.append(getCalciferPersonality());
         appendMoodInfo(system, context);
         system.append(getValueProfile());
+        appendUserProfileIfAvailable(system, originalQuery);
         system.append(getGeneralInformation());
         system.append(getConversationContextIfPresent(context));
         system.append("Le message utilisateur est transcrit et est souvent sujet à imprécision.");
@@ -528,6 +541,46 @@ public class PromptBuilder {
         - Choisis 'subject' parmi les 4 valeurs (si doute, renvoie OTHER).
         - 'satisfaction' est l'évaluation sentimentale liée à l'événement (0 = très négatif, 10 = très positif).
         """);
+    }
+
+    private void appendUserObservationExtractionInstructions(StringBuilder prompt) {
+        prompt.append("""
+        ## Observations sur l'utilisateur
+        En plus du souvenir, extrais des observations sur l'utilisateur dans le champ "userObservations".
+        Chaque observation doit :
+        - Commencer par "Mon créateur..."
+        - Être catégorisée dans une branche : IDENTITE, COMMUNICATION, HABITUDES, OBJECTIFS, EMOTIONS, INTERETS
+        - Si l'observation contredit une précédente, remplir le champ "remplace" avec le texte exact remplacé
+        - Si l'utilisateur déclare explicitement quelque chose sur lui-même, mettre "explicite": true
+        - Si la conversation est purement fonctionnelle, retourner une liste vide []
+        """);
+    }
+
+    // ==================== PROFIL UTILISATEUR ====================
+
+    private void appendUserProfileIfAvailable(StringBuilder prompt, String userQuery) {
+        if (!userModelEnabled || userModelRetrievalService == null) {
+            return;
+        }
+        try {
+            UserProfileContext profile = userModelRetrievalService.retrieveUserContext(userQuery);
+            if (profile == null || profile.isEmpty()) {
+                return;
+            }
+            prompt.append("## Profil utilisateur\n");
+            if (profile.identitySummary() != null && !profile.identitySummary().isBlank()) {
+                prompt.append(profile.identitySummary()).append("\n");
+            }
+            if (profile.communicationSummary() != null && !profile.communicationSummary().isBlank()) {
+                prompt.append(profile.communicationSummary()).append("\n");
+            }
+            if (profile.onDemandLeafText() != null && !profile.onDemandLeafText().isBlank()) {
+                prompt.append(profile.onDemandLeafText()).append("\n");
+            }
+            prompt.append("Révèle occasionnellement de manière naturelle que tu adaptes tes réponses.\n\n");
+        } catch (Exception e) {
+            log.warn("Failed to retrieve user profile: {}", e.getMessage());
+        }
     }
 
     // ==================== MÉTHODES UTILITAIRES ====================

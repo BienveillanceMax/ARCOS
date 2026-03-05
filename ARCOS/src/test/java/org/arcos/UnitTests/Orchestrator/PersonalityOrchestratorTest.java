@@ -9,6 +9,7 @@ import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Opinions.OpinionService;
 import org.arcos.Personality.PersonalityOrchestrator;
 import org.arcos.Personality.Values.ValueProfile;
+import org.arcos.UserModel.Extraction.UserTreeUpdater;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -33,6 +34,9 @@ class PersonalityOrchestratorTest {
 
     @Mock
     private DesireService desireService;
+
+    @Mock
+    private UserTreeUpdater userTreeUpdater;
 
     @Mock
     private ValueProfile valueProfile;

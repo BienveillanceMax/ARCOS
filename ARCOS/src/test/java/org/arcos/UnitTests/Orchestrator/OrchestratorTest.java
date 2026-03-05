@@ -121,7 +121,8 @@ class OrchestratorTest {
                 executionHistoryService,
                 wakeWordProducer,
                 audioProperties,
-                conversationSummaryService
+                conversationSummaryService,
+                null
         );
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);
     }

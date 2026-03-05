@@ -3,6 +3,7 @@ package org.arcos.LLM.Client;
 import org.arcos.Exceptions.DesireCreationException;
 import org.arcos.LLM.Client.ResponseObject.DesireResponse;
 import org.arcos.LLM.Client.ResponseObject.MemoryResponse;
+import org.arcos.UserModel.Models.MemoryAndObservationsResponse;
 import org.arcos.LLM.Client.ResponseObject.OpinionResponse;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
@@ -131,6 +132,18 @@ public class LLMClient
             return null;
         }
         return MemoryEntry.fromMemoryResponse(response);
+    }
+
+    @RateLimiter(name = "mistral_free")
+    public MemoryAndObservationsResponse generateMemoryAndObservationsResponse(Prompt prompt) {
+        MemoryAndObservationsResponse response = chatClient.prompt(prompt)
+                .call()
+                .entity(new BeanOutputConverter<>(MemoryAndObservationsResponse.class, this.objectMapper));
+        if (response == null || response.getContent() == null || response.getContent().isBlank()) {
+            log.warn("LLM returned null or empty memory+observations response");
+            return null;
+        }
+        return response;
     }
 
     @RateLimiter(name = "mistral_free")
