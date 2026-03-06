@@ -29,6 +29,25 @@ services:
       - "9876:9876"
     restart: unless-stopped
 
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 5G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
   arcos-app:
     build:
       context: .
@@ -40,6 +59,7 @@ services:
     depends_on:
       - qdrant
       - faster-whisper
+      - ollama
 
     env_file: .env
 
@@ -83,3 +103,4 @@ services:
 
 volumes:
   qdrant_storage:
+  ollama_data:

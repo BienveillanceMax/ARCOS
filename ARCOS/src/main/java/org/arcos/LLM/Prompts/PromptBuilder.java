@@ -564,20 +564,34 @@ public class PromptBuilder {
         }
         try {
             UserProfileContext profile = userModelRetrievalService.retrieveUserContext(userQuery);
-            if (profile == null || profile.isEmpty()) {
+            if (profile == null || (profile.isEmpty() && !profile.hasProactiveHint() && !profile.hasGreetingContext())) {
                 return;
             }
-            prompt.append("## Profil utilisateur\n");
-            if (profile.identitySummary() != null && !profile.identitySummary().isBlank()) {
-                prompt.append(profile.identitySummary()).append("\n");
+            if (!profile.isEmpty()) {
+                prompt.append("## Profil utilisateur\n");
+                if (profile.identitySummary() != null && !profile.identitySummary().isBlank()) {
+                    prompt.append(profile.identitySummary()).append("\n");
+                }
+                if (profile.communicationSummary() != null && !profile.communicationSummary().isBlank()) {
+                    prompt.append(profile.communicationSummary()).append("\n");
+                }
+                if (profile.onDemandLeafText() != null && !profile.onDemandLeafText().isBlank()) {
+                    prompt.append(profile.onDemandLeafText()).append("\n");
+                }
+                if (profile.engagementDecayDetected()) {
+                    prompt.append("L'utilisateur semble moins engagé récemment. Sois plus concis et proactif.\n");
+                }
+                prompt.append("Révèle occasionnellement de manière naturelle que tu adaptes tes réponses.\n\n");
             }
-            if (profile.communicationSummary() != null && !profile.communicationSummary().isBlank()) {
-                prompt.append(profile.communicationSummary()).append("\n");
+            if (profile.hasGreetingContext()) {
+                prompt.append("## Contexte de salutation\n");
+                prompt.append(profile.greetingContext()).append("\n");
+                prompt.append("Personnalise ta salutation en tenant compte de ce contexte.\n\n");
             }
-            if (profile.onDemandLeafText() != null && !profile.onDemandLeafText().isBlank()) {
-                prompt.append(profile.onDemandLeafText()).append("\n");
+            if (profile.hasProactiveHint()) {
+                prompt.append("## Découverte de l'utilisateur\n");
+                prompt.append(profile.proactiveGapHint()).append("\n\n");
             }
-            prompt.append("Révèle occasionnellement de manière naturelle que tu adaptes tes réponses.\n\n");
         } catch (Exception e) {
             log.warn("Failed to retrieve user profile: {}", e.getMessage());
         }

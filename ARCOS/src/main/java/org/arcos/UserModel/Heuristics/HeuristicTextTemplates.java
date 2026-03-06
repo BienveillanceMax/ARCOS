@@ -4,10 +4,19 @@ import org.arcos.UserModel.Models.ObservationLeaf;
 import org.arcos.UserModel.Models.ObservationSource;
 import org.arcos.UserModel.Models.SignificantChange;
 
+import org.springframework.stereotype.Component;
+
 import java.util.*;
 
-public class HeuristicTextTemplates {
+@Component
+public class HeuristicTextTemplates implements HeuristicLeafProvider {
 
+    @Override
+    public boolean isAvailable() {
+        return true;
+    }
+
+    @Override
     public List<ObservationLeaf> generateLeaves(List<SignificantChange> changes, int conversationCount) {
         if (conversationCount < 5) {
             return Collections.emptyList();

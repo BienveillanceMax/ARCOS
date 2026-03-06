@@ -1,6 +1,7 @@
 package org.arcos.UserModel;
 
 import lombok.extern.slf4j.Slf4j;
+import org.arcos.UserModel.Engagement.EngagementRecord;
 import org.arcos.UserModel.Models.ObservationLeaf;
 import org.arcos.UserModel.Models.ProfileStability;
 import org.arcos.UserModel.Models.TreeBranch;
@@ -22,6 +23,8 @@ public class UserObservationTree {
     private ProfileStability profileStability;
     private final Map<TreeBranch, String> summaries;
     private Map<String, Double> heuristicBaselines;
+    private final List<EngagementRecord> engagementHistory;
+    private final Map<TreeBranch, Integer> lastGapQuestionPerBranch;
 
     public UserObservationTree(UserModelProperties properties) {
         this.maxActiveObservations = properties.getMaxActiveObservations();
@@ -33,6 +36,8 @@ public class UserObservationTree {
         this.profileStability = ProfileStability.LOW;
         this.summaries = new EnumMap<>(TreeBranch.class);
         this.heuristicBaselines = new HashMap<>();
+        this.engagementHistory = new ArrayList<>();
+        this.lastGapQuestionPerBranch = new EnumMap<>(TreeBranch.class);
     }
 
     public void addLeaf(ObservationLeaf leaf) {
@@ -173,6 +178,70 @@ public class UserObservationTree {
         lock.writeLock().lock();
         try {
             this.heuristicBaselines = new HashMap<>(baselines);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    // ==================== ENGAGEMENT ====================
+
+    public List<EngagementRecord> getEngagementHistory() {
+        lock.readLock().lock();
+        try {
+            return engagementHistory;
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public void addEngagementRecord(EngagementRecord record) {
+        lock.writeLock().lock();
+        try {
+            engagementHistory.add(record);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    public void setEngagementHistory(List<EngagementRecord> history) {
+        lock.writeLock().lock();
+        try {
+            engagementHistory.clear();
+            if (history != null) {
+                engagementHistory.addAll(history);
+            }
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    // ==================== GAP-FILLING ====================
+
+    public Map<TreeBranch, Integer> getLastGapQuestionPerBranch() {
+        lock.readLock().lock();
+        try {
+            return new EnumMap<>(lastGapQuestionPerBranch);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
+
+    public void recordGapQuestion(TreeBranch branch, int conversationCount) {
+        lock.writeLock().lock();
+        try {
+            lastGapQuestionPerBranch.put(branch, conversationCount);
+        } finally {
+            lock.writeLock().unlock();
+        }
+    }
+
+    public void setLastGapQuestionPerBranch(Map<TreeBranch, Integer> state) {
+        lock.writeLock().lock();
+        try {
+            lastGapQuestionPerBranch.clear();
+            if (state != null) {
+                lastGapQuestionPerBranch.putAll(state);
+            }
         } finally {
             lock.writeLock().unlock();
         }

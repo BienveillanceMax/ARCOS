@@ -1,10 +1,11 @@
 package org.arcos.UserModel.Lifecycle;
 
 import lombok.extern.slf4j.Slf4j;
+import org.arcos.UserModel.Engagement.EngagementTracker;
 import org.arcos.UserModel.Extraction.UserTreeUpdater;
 import org.arcos.UserModel.Heuristics.EmaBaselineManager;
 import org.arcos.UserModel.Heuristics.HeuristicSignalExtractor;
-import org.arcos.UserModel.Heuristics.HeuristicTextTemplates;
+import org.arcos.UserModel.Heuristics.HeuristicLeafProvider;
 import org.arcos.UserModel.Models.ObservationCandidate;
 import org.arcos.UserModel.Models.ObservationLeaf;
 import org.arcos.UserModel.Models.SignificantChange;
@@ -24,19 +25,24 @@ public class UserModelPipelineOrchestrator {
     private final UserObservationTree tree;
     private final HeuristicSignalExtractor signalExtractor;
     private final EmaBaselineManager emaManager;
-    private final HeuristicTextTemplates textTemplates;
+    private final HeuristicLeafProvider textTemplates;
     private final UserTreeUpdater treeUpdater;
     private final UserTreePersistenceService persistenceService;
     private final UserModelProperties properties;
+    private final EngagementTracker engagementTracker;
 
     public UserModelPipelineOrchestrator(UserObservationTree tree,
                                          UserTreeUpdater treeUpdater,
                                          UserTreePersistenceService persistenceService,
-                                         UserModelProperties properties) {
+                                         UserModelProperties properties,
+                                         HeuristicLeafProvider heuristicLeafProvider,
+                                         EngagementTracker engagementTracker) {
         this.tree = tree;
         this.treeUpdater = treeUpdater;
         this.persistenceService = persistenceService;
         this.properties = properties;
+        this.textTemplates = heuristicLeafProvider;
+        this.engagementTracker = engagementTracker;
 
         this.signalExtractor = new HeuristicSignalExtractor(properties.getDisfluenceWords());
         this.emaManager = new EmaBaselineManager(
@@ -45,7 +51,6 @@ public class UserModelPipelineOrchestrator {
                 properties.getSignificanceThreshold(),
                 properties.getSignificanceConsecutiveSessions()
         );
-        this.textTemplates = new HeuristicTextTemplates();
     }
 
     public void processConversationAsync(List<String> userMessages, boolean hadInitiative) {
@@ -84,6 +89,9 @@ public class UserModelPipelineOrchestrator {
                 log.warn("Failed to process heuristic observation: {}", e.getMessage());
             }
         }
+
+        // Engagement tracking
+        engagementTracker.recordConversation(userMessages.size());
 
         // Update state
         tree.incrementConversationCount();

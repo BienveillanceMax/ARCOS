@@ -12,7 +12,7 @@ import java.util.List;
 
 @Slf4j
 @Component
-public class BranchSummaryBuilder {
+public class BranchSummaryBuilder implements BranchSummaryProvider {
 
     private final UserObservationTree tree;
     private final UserModelProperties properties;
@@ -66,6 +66,11 @@ public class BranchSummaryBuilder {
             case COMMUNICATION -> properties.getCommunicationBudgetTokens();
             default -> properties.getTotalBudgetTokens();
         };
+    }
+
+    @Override
+    public boolean isAvailable() {
+        return true;
     }
 
     public static int estimateTokens(String text) {

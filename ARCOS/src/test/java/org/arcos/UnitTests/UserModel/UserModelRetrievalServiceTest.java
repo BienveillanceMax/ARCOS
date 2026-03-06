@@ -1,6 +1,10 @@
 package org.arcos.UnitTests.UserModel;
 
 import org.arcos.UserModel.Embedding.LocalEmbeddingService;
+import org.arcos.UserModel.Engagement.EngagementTracker;
+import org.arcos.UserModel.GapFilling.GapDetector;
+import org.arcos.UserModel.GapFilling.ProactiveGapFiller;
+import org.arcos.UserModel.Greeting.PersonalizedGreetingService;
 import org.arcos.UserModel.Models.ObservationLeaf;
 import org.arcos.UserModel.Models.ObservationSource;
 import org.arcos.UserModel.Models.TreeBranch;
@@ -34,7 +38,12 @@ class UserModelRetrievalServiceTest {
         properties.setTotalBudgetTokens(80);
         properties.setRetrievalMinSrank(0.3);
         tree = new UserObservationTree(properties);
-        retrievalService = new UserModelRetrievalService(tree, embeddingService, properties);
+        GapDetector gapDetector = new GapDetector(tree);
+        ProactiveGapFiller gapFiller = new ProactiveGapFiller(gapDetector, tree, properties);
+        EngagementTracker engagementTracker = new EngagementTracker(tree, properties);
+        PersonalizedGreetingService greetingService = new PersonalizedGreetingService(tree);
+        retrievalService = new UserModelRetrievalService(tree, embeddingService, properties,
+                gapFiller, engagementTracker, greetingService);
     }
 
     @Test

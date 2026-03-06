@@ -6,7 +6,7 @@ import org.arcos.UserModel.Models.ObservationCandidate;
 import org.arcos.UserModel.Models.ObservationLeaf;
 import org.arcos.UserModel.Models.ObservationSource;
 import org.arcos.UserModel.Persistence.UserTreePersistenceService;
-import org.arcos.UserModel.Retrieval.BranchSummaryBuilder;
+import org.arcos.UserModel.Retrieval.BranchSummaryProvider;
 import org.arcos.UserModel.UserObservationTree;
 import org.springframework.stereotype.Component;
 
@@ -22,14 +22,14 @@ public class UserTreeUpdater {
 
     private final UserObservationTree tree;
     private final LocalEmbeddingService embeddingService;
-    private final BranchSummaryBuilder summaryBuilder;
+    private final BranchSummaryProvider summaryBuilder;
     private final UserTreePersistenceService persistenceService;
 
     public enum UpdateResult { ADD, UPDATE, AMBIGUOUS }
 
     public UserTreeUpdater(UserObservationTree tree,
                            LocalEmbeddingService embeddingService,
-                           BranchSummaryBuilder summaryBuilder,
+                           BranchSummaryProvider summaryBuilder,
                            UserTreePersistenceService persistenceService) {
         this.tree = tree;
         this.embeddingService = embeddingService;

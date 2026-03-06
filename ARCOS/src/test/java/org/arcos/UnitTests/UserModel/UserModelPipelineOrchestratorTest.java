@@ -1,6 +1,8 @@
 package org.arcos.UnitTests.UserModel;
 
+import org.arcos.UserModel.Engagement.EngagementTracker;
 import org.arcos.UserModel.Extraction.UserTreeUpdater;
+import org.arcos.UserModel.Heuristics.HeuristicTextTemplates;
 import org.arcos.UserModel.Lifecycle.UserModelPipelineOrchestrator;
 import org.arcos.UserModel.Models.ObservationCandidate;
 import org.arcos.UserModel.Models.ProfileStability;
@@ -34,7 +36,7 @@ class UserModelPipelineOrchestratorTest {
         MockitoAnnotations.openMocks(this);
         properties = new UserModelProperties();
         tree = new UserObservationTree(properties);
-        pipeline = new UserModelPipelineOrchestrator(tree, treeUpdater, persistenceService, properties);
+        pipeline = new UserModelPipelineOrchestrator(tree, treeUpdater, persistenceService, properties, new HeuristicTextTemplates(), new EngagementTracker(tree, properties));
     }
 
     @Test

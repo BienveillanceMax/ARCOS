@@ -2,6 +2,9 @@ package org.arcos.UserModel.Retrieval;
 
 import lombok.extern.slf4j.Slf4j;
 import org.arcos.UserModel.Embedding.LocalEmbeddingService;
+import org.arcos.UserModel.Engagement.EngagementTracker;
+import org.arcos.UserModel.GapFilling.ProactiveGapFiller;
+import org.arcos.UserModel.Greeting.PersonalizedGreetingService;
 import org.arcos.UserModel.Models.ObservationLeaf;
 import org.arcos.UserModel.Models.TreeBranch;
 import org.arcos.UserModel.Models.UserProfileContext;
@@ -20,13 +23,22 @@ public class UserModelRetrievalService {
     private final UserObservationTree tree;
     private final LocalEmbeddingService embeddingService;
     private final UserModelProperties properties;
+    private final ProactiveGapFiller proactiveGapFiller;
+    private final EngagementTracker engagementTracker;
+    private final PersonalizedGreetingService greetingService;
 
     public UserModelRetrievalService(UserObservationTree tree,
                                      LocalEmbeddingService embeddingService,
-                                     UserModelProperties properties) {
+                                     UserModelProperties properties,
+                                     ProactiveGapFiller proactiveGapFiller,
+                                     EngagementTracker engagementTracker,
+                                     PersonalizedGreetingService greetingService) {
         this.tree = tree;
         this.embeddingService = embeddingService;
         this.properties = properties;
+        this.proactiveGapFiller = proactiveGapFiller;
+        this.engagementTracker = engagementTracker;
+        this.greetingService = greetingService;
     }
 
     public UserProfileContext retrieveUserContext(String userQuery) {
@@ -50,7 +62,12 @@ public class UserModelRetrievalService {
             onDemandText = truncateToFit(identitySummary, communicationSummary, onDemandText);
         }
 
-        return new UserProfileContext(identitySummary, communicationSummary, onDemandText, conversationCount);
+        String gapHint = proactiveGapFiller.getGapHint().orElse(null);
+        boolean engagementDecay = engagementTracker.isDecayDetected();
+        String greeting = greetingService.buildGreetingContext().orElse(null);
+
+        return new UserProfileContext(identitySummary, communicationSummary, onDemandText,
+                conversationCount, gapHint, engagementDecay, greeting);
     }
 
     private String retrieveOnDemandLeaf(String userQuery) {

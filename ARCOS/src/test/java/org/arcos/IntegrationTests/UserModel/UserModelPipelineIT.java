@@ -1,7 +1,11 @@
 package org.arcos.IntegrationTests.UserModel;
 
 import org.arcos.UserModel.Embedding.LocalEmbeddingService;
+import org.arcos.UserModel.Engagement.EngagementTracker;
 import org.arcos.UserModel.Extraction.UserTreeUpdater;
+import org.arcos.UserModel.GapFilling.GapDetector;
+import org.arcos.UserModel.GapFilling.ProactiveGapFiller;
+import org.arcos.UserModel.Greeting.PersonalizedGreetingService;
 import org.arcos.UserModel.Heuristics.EmaBaselineManager;
 import org.arcos.UserModel.Heuristics.HeuristicSignalExtractor;
 import org.arcos.UserModel.Heuristics.HeuristicTextTemplates;
@@ -54,8 +58,12 @@ class UserModelPipelineIT {
         persistenceService = new UserTreePersistenceService(tree, properties);
         summaryBuilder = new BranchSummaryBuilder(tree, properties);
         treeUpdater = new UserTreeUpdater(tree, embeddingService, summaryBuilder, persistenceService);
-        pipeline = new UserModelPipelineOrchestrator(tree, treeUpdater, persistenceService, properties);
-        retrievalService = new UserModelRetrievalService(tree, embeddingService, properties);
+        EngagementTracker engagementTracker = new EngagementTracker(tree, properties);
+        pipeline = new UserModelPipelineOrchestrator(tree, treeUpdater, persistenceService, properties, new HeuristicTextTemplates(), engagementTracker);
+        GapDetector gapDetector = new GapDetector(tree);
+        ProactiveGapFiller gapFiller = new ProactiveGapFiller(gapDetector, tree, properties);
+        PersonalizedGreetingService greetingService = new PersonalizedGreetingService(tree);
+        retrievalService = new UserModelRetrievalService(tree, embeddingService, properties, gapFiller, engagementTracker, greetingService);
 
         when(embeddingService.embed(anyString())).thenReturn(new float[]{0.1f, 0.2f, 0.3f});
         when(embeddingService.isReady()).thenReturn(true);
