@@ -2,5 +2,4 @@ ARCOS/.env
 .idea
 ARCOS/HELP.md
 ARCOS/target/
-ARCOS/src/main/resources/*
-src/main/resources/client_secrets.json
+ARCOS/src/main/resources/client_secrets.json

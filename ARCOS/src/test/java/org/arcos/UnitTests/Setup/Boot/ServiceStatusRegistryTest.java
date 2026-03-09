@@ -1,8 +1,8 @@
-package org.arcos.UnitTests.Boot;
+package org.arcos.UnitTests.Setup.Boot;
 
-import org.arcos.Boot.ServiceStatus;
-import org.arcos.Boot.ServiceStatusEntry;
-import org.arcos.Boot.ServiceStatusRegistry;
+import org.arcos.Setup.Boot.ServiceStatusEntry;
+import org.arcos.Setup.Boot.ServiceStatusRegistry;
+import org.arcos.Setup.Health.ServiceStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 

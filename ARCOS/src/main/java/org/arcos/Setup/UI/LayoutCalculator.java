@@ -1,5 +1,7 @@
 package org.arcos.Setup.UI;
 
+import com.googlecode.lanterna.TerminalSize;
+
 /**
  * Calculates screen layout zones from terminal dimensions.
  * Content is centered with a max width of ~72 for readability.
@@ -12,7 +14,7 @@ public final class LayoutCalculator {
     private LayoutCalculator() {}
 
     /**
-     * Screen layout zone boundaries (all 1-based row indices).
+     * Screen layout zone boundaries (all 0-based row/col indices for Lanterna).
      *
      * @param headerRow        first row (header bar)
      * @param stepIndexStart   first row of step index strip
@@ -24,6 +26,7 @@ public final class LayoutCalculator {
      * @param frameWidth       actual frame width
      * @param contentWidth     usable content width inside borders
      * @param leftMargin       left margin for centering
+     * @param termHeight       terminal height (for boot phases)
      */
     public record ScreenLayout(
             int headerRow,
@@ -35,15 +38,29 @@ public final class LayoutCalculator {
             int footerRow,
             int frameWidth,
             int contentWidth,
-            int leftMargin
+            int leftMargin,
+            int termHeight
     ) {
         public int panelContentHeight() {
             return panelContentEnd - panelContentStart + 1;
         }
+
+        /** Vertical center row for centered content (e.g. banner, spinner). */
+        public int verticalCenter() {
+            return termHeight / 2;
+        }
+    }
+
+    /**
+     * Calculates layout from Lanterna TerminalSize.
+     */
+    public static ScreenLayout calculate(TerminalSize size) {
+        return calculate(size.getColumns(), size.getRows());
     }
 
     /**
      * Calculates layout from terminal dimensions.
+     * Row indices are 0-based (Lanterna convention).
      *
      * @param termWidth  terminal width in columns
      * @param termHeight terminal height in rows
@@ -55,22 +72,12 @@ public final class LayoutCalculator {
         int contentWidth = frameWidth - 6; // 3 left margin + 3 right margin inside borders
         int leftMargin = Math.max(0, (termWidth - frameWidth) / 2);
 
-        // Layout zones (1-based row indices):
-        // Row 1: header bar
-        // Row 2: empty
-        // Row 3-5: step index (3 rows: 2×2 grid + centered FIAT)
-        // Row 6: empty
-        // Row 7: panel divider
-        // Row 8: empty
-        // Row 9 to (height-2): panel content
-        // Row (height-1): empty
-        // Row height: footer
-        int headerRow = 1;
-        int stepIndexStart = 3;
-        int stepIndexEnd = 5;
-        int panelDividerRow = 7;
-        int panelContentStart = 9;
-        int footerRow = termHeight;
+        int headerRow = 0;
+        int stepIndexStart = 2;
+        int stepIndexEnd = 4;
+        int panelDividerRow = 6;
+        int panelContentStart = 8;
+        int footerRow = termHeight - 1;
         int panelContentEnd = footerRow - 2;
 
         return new ScreenLayout(
@@ -79,7 +86,8 @@ public final class LayoutCalculator {
                 panelDividerRow,
                 panelContentStart, panelContentEnd,
                 footerRow,
-                frameWidth, contentWidth, leftMargin
+                frameWidth, contentWidth, leftMargin,
+                termHeight
         );
     }
 }

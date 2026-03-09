@@ -12,11 +12,11 @@ import java.util.function.Consumer;
  * Frames: ◒ ◐ ◓ ◑ at 100ms interval, in PRIMARY color.
  * Two modes:
  * - Legacy: writes to PrintWriter with \r-based line replacement
- * - Screen-integrated: writes via a position callback (for ScreenManager)
+ * - Screen-integrated: writes via a position callback (for LanternaScreenManager)
  */
 public class SpinnerWidget implements AutoCloseable {
 
-    private static final char[] FRAMES = {'◒', '◐', '◓', '◑'};
+    private static final char[] FRAMES = Animations.SPINNER_FRAMES;
     private static final int INTERVAL_MS = 100;
 
     private final ScheduledExecutorService scheduler;

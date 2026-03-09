@@ -12,6 +12,7 @@ import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.LongTermMemory.service.MemoryService;
@@ -49,6 +50,7 @@ public class Orchestrator
 {
     private final EventQueue eventQueue;
     private final LLMClient llmClient;
+    private final ChatOrchestrator chatOrchestrator;
     private final PromptBuilder promptBuilder;
     private final ConversationContext context;
     private final MemoryService memoryService;
@@ -84,12 +86,13 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable UserModelPipelineOrchestrator userModelPipeline) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable UserModelPipelineOrchestrator userModelPipeline) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = evenQueue;
         this.llmClient = llmClient;
+        this.chatOrchestrator = chatOrchestrator;
         this.promptBuilder = promptBuilder;
         this.context = context;
         this.memoryService = memoryService;
@@ -236,7 +239,7 @@ public class Orchestrator
     private void generateFluxAndSpeak(Prompt streamingPrompt, String userQuery, MoodVoiceMapper.VoiceParams voiceParams, Runnable onTtsDone) {
         StringBuilder sentenceBuffer = new StringBuilder();
         StringBuilder fullResponse = new StringBuilder();
-        llmClient.generateStreamingChatResponse(streamingPrompt)
+        chatOrchestrator.generateStreamingChatResponse(streamingPrompt)
                 .doOnNext(chunk -> {
                     // 1. On garde le texte brut (avec *) pour l'historique et le buffer
                     sentenceBuffer.append(chunk);

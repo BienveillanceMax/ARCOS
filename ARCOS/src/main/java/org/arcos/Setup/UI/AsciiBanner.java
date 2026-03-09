@@ -1,7 +1,4 @@
-package org.arcos.Boot.Banner;
-
-import org.arcos.Setup.UI.AnsiPalette;
-import org.arcos.Setup.UI.TerminalCapabilities;
+package org.arcos.Setup.UI;
 
 /**
  * ASCII banner for ARCOS with red identity gradient.

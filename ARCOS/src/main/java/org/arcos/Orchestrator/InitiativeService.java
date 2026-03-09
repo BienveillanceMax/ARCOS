@@ -1,6 +1,6 @@
 package org.arcos.Orchestrator;
 
-import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
@@ -24,16 +24,16 @@ public class InitiativeService {
     private final MemoryService memoryService;
     private final OpinionService opinionService;
     private final DesireService desireService;
-    private final LLMClient llmClient;
+    private final ChatOrchestrator chatOrchestrator;
     private final PromptBuilder promptBuilder;
     private final PersonalityOrchestrator personalityOrchestrator;
 
     @Autowired
-    public InitiativeService(MemoryService memoryService, OpinionService opinionService, DesireService desireService, LLMClient llmClient, PromptBuilder promptBuilder, PersonalityOrchestrator personalityOrchestrator) {
+    public InitiativeService(MemoryService memoryService, OpinionService opinionService, DesireService desireService, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, PersonalityOrchestrator personalityOrchestrator) {
         this.memoryService = memoryService;
         this.opinionService = opinionService;
         this.desireService = desireService;
-        this.llmClient = llmClient;
+        this.chatOrchestrator = chatOrchestrator;
         this.promptBuilder = promptBuilder;
         this.personalityOrchestrator = personalityOrchestrator;
     }
@@ -51,8 +51,8 @@ public class InitiativeService {
             log.info("Step 2: Executing initiative via LLM Agent...");
             Prompt prompt = promptBuilder.buildInitiativePrompt(desire, memories, opinions);
 
-            // The LLMClient is configured with tools, so it will autonomously execute actions
-            String result = llmClient.generateChatResponse(prompt); // This returns a String (content)
+            // ChatOrchestrator is configured with tools, so it will autonomously execute actions
+            String result = chatOrchestrator.generateChatResponse(prompt);
 
             log.info("Initiative execution result: {}", result);
 

@@ -1,4 +1,6 @@
-package org.arcos.Boot;
+package org.arcos.Setup.Boot;
+
+import org.arcos.Setup.Health.ServiceStatus;
 
 /**
  * Entrée de statut pour un service dans le rapport de boot.

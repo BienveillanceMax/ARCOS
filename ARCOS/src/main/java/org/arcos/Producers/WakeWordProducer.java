@@ -162,13 +162,16 @@ public class WakeWordProducer implements Runnable {
         AudioFormat sourceFormat = new AudioFormat(audioProperties.getSampleRate(), 16, 1, true, false);
         DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, sourceFormat);
 
+        log.info("Audio config: deviceIndex={}, sampleRate={}, silenceThreshold={}",
+                this.audioDeviceIndex, audioProperties.getSampleRate(), audioProperties.getSilenceThreshold());
+
         this.micDataLine = getAudioDevice(this.audioDeviceIndex, dataLineInfo);
 
         if (this.micDataLine != null) {
             try {
                 this.micDataLine.open(sourceFormat);
                 this.micDataLine.start();
-                log.info("Successfully initialized audio device.");
+                log.info("Audio device opened: format={}", this.micDataLine.getFormat());
             } catch (LineUnavailableException e) {
                 log.error("Audio device is unavailable. Wake word detection will be disabled.", e);
                 this.micDataLine = null;
@@ -180,23 +183,31 @@ public class WakeWordProducer implements Runnable {
         if (deviceIndex >= 0) {
             try {
                 Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
+                log.info("Total mixer count: {}. Requested index: {}", mixerInfos.length, deviceIndex);
                 if (deviceIndex < mixerInfos.length) {
                     Mixer.Info mixerInfo = mixerInfos[deviceIndex];
+                    log.info("Mixer[{}]: name='{}', vendor='{}', description='{}'",
+                            deviceIndex, mixerInfo.getName(), mixerInfo.getVendor(), mixerInfo.getDescription());
                     Mixer mixer = AudioSystem.getMixer(mixerInfo);
                     if (mixer.isLineSupported(dataLineInfo)) {
+                        log.info("Using configured audio device: {} (index {})", mixerInfo.getName(), deviceIndex);
                         return (TargetDataLine) mixer.getLine(dataLineInfo);
                     } else {
-                        log.warn("Audio device at index {} does not support format. Using default.", deviceIndex);
+                        log.warn("Audio device '{}' at index {} does not support format. Using default.",
+                                mixerInfo.getName(), deviceIndex);
                     }
                 } else {
-                    log.warn("Audio device index {} is out of bounds. Using default.", deviceIndex);
+                    log.warn("Audio device index {} is out of bounds (only {} mixers). Using default.",
+                            deviceIndex, mixerInfos.length);
                 }
             } catch (Exception e) {
                 log.warn("Could not get audio device at index {}. Using default.", deviceIndex, e);
             }
         }
         try {
-            return (TargetDataLine) AudioSystem.getLine(dataLineInfo);
+            TargetDataLine line = (TargetDataLine) AudioSystem.getLine(dataLineInfo);
+            log.info("Using default audio device (auto-selected)");
+            return line;
         } catch (LineUnavailableException | IllegalArgumentException e) {
             log.warn("Could not get default audio capture device. Wake word detection will be disabled.");
             return null;
@@ -217,8 +228,10 @@ public class WakeWordProducer implements Runnable {
         short[] porcupineBuffer = new short[porcupineFrameLength];
         short[] resampledBuffer = new short[porcupineFrameLength];
 
-        log.info("Starting wake word detection loop...");
+        log.info("Starting wake word detection loop (frameLength={}, micFrameSize={} bytes, micRate={}, porcupineRate={})",
+                porcupineFrameLength, micFrameSize, micSampleRate, PORCUPINE_SAMPLE_RATE);
 
+        long lastRmsLogTime = 0;
         while (!Thread.currentThread().isInterrupted()) {
             try {
                 // --- Mode conversation : bypass Porcupine ---
@@ -256,6 +269,19 @@ public class WakeWordProducer implements Runnable {
                             .order(ByteOrder.LITTLE_ENDIAN)
                             .asShortBuffer()
                             .get(micSamples);
+
+                    // Log RMS every 5 seconds to verify mic is capturing audio
+                    long now = System.currentTimeMillis();
+                    if (now - lastRmsLogTime > 5000) {
+                        long sum = 0;
+                        for (int i = 0; i < samplesRead; i++) {
+                            sum += (long) micSamples[i] * micSamples[i];
+                        }
+                        double rms = Math.sqrt((double) sum / samplesRead);
+                        log.info("Audio RMS level: {} (threshold: {}, samples: {})",
+                                (int) rms, audioProperties.getSilenceThreshold(), samplesRead);
+                        lastRmsLogTime = now;
+                    }
 
                     // Simple downsampling from mic rate to Porcupine rate
                     downsample(micSamples, samplesRead, resampledBuffer, porcupineFrameLength);

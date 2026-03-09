@@ -1,6 +1,6 @@
-package org.arcos.UnitTests.Boot;
+package org.arcos.UnitTests.Setup.Boot;
 
-import org.arcos.Boot.Greeting.PersonalityGreeting;
+import org.arcos.Setup.Boot.PersonalityGreeting;
 import org.arcos.Configuration.PersonalityProperties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

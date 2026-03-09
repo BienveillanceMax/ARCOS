@@ -12,13 +12,13 @@ class LayoutCalculatorTest {
         // Given — standard 80x24 terminal
         ScreenLayout layout = LayoutCalculator.calculate(80, 24);
 
-        // Then
-        assertEquals(1, layout.headerRow());
-        assertEquals(3, layout.stepIndexStart());
-        assertEquals(5, layout.stepIndexEnd());
-        assertEquals(7, layout.panelDividerRow());
-        assertEquals(9, layout.panelContentStart());
-        assertEquals(24, layout.footerRow());
+        // Then — 0-based row indices (Lanterna convention)
+        assertEquals(0, layout.headerRow());
+        assertEquals(2, layout.stepIndexStart());
+        assertEquals(4, layout.stepIndexEnd());
+        assertEquals(6, layout.panelDividerRow());
+        assertEquals(8, layout.panelContentStart());
+        assertEquals(23, layout.footerRow());
         assertTrue(layout.panelContentEnd() < layout.footerRow());
         assertTrue(layout.contentWidth() > 0);
         assertTrue(layout.frameWidth() >= 60);

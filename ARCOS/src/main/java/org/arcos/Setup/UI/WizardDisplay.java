@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Display abstraction for the wizard TUI.
- * Two implementations: ScreenManager (full-screen) and FallbackRenderer (scrolling).
+ * Two implementations: LanternaScreenManager (full-screen) and FallbackRenderer (scrolling).
  * Steps interact only through this interface — never with raw Terminal/PrintWriter.
  */
 public interface WizardDisplay {

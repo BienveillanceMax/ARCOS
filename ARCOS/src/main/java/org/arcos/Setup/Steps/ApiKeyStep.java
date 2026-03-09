@@ -155,10 +155,10 @@ public class ApiKeyStep implements WizardStep {
     }
 
     private String buildPrompt(String existingValue, boolean color) {
-        String suffix = (existingValue != null && !existingValue.isBlank())
-                ? " [current: " + ApiKeyValidator.maskKey(existingValue) + "]"
-                : "";
-        return suffix + " : ";
+        if (existingValue != null && !existingValue.isBlank()) {
+            return "Key [" + ApiKeyValidator.maskKey(existingValue) + "]: ";
+        }
+        return "Key: ";
     }
 
     private String okText(String msg, boolean color) {

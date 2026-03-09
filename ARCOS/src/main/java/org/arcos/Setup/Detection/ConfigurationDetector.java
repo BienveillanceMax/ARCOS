@@ -2,6 +2,7 @@ package org.arcos.Setup.Detection;
 
 import org.arcos.Setup.ConfigurationModel;
 import org.arcos.Setup.Persistence.EnvFileParser;
+import org.arcos.Setup.Persistence.LocalYamlParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,13 +22,19 @@ public class ConfigurationDetector {
     private static final Logger log = LoggerFactory.getLogger(ConfigurationDetector.class);
 
     private final File envFile;
+    private final File localYamlFile;
 
     public ConfigurationDetector() {
-        this(new File(".env"));
+        this(new File(".env"), new File("application-local.yaml"));
     }
 
     public ConfigurationDetector(File envFile) {
+        this(envFile, new File("application-local.yaml"));
+    }
+
+    public ConfigurationDetector(File envFile, File localYamlFile) {
         this.envFile = envFile;
+        this.localYamlFile = localYamlFile;
     }
 
     /**
@@ -67,30 +74,42 @@ public class ConfigurationDetector {
      */
     public ConfigurationModel loadExistingConfiguration() {
         // 1. Tenter de charger depuis .env
+        ConfigurationModel model;
         if (envFile.exists()) {
             try {
-                ConfigurationModel model = EnvFileParser.loadIntoModel(envFile);
+                model = EnvFileParser.loadIntoModel(envFile);
                 log.debug("Configuration existante chargée depuis {}", envFile.getAbsolutePath());
-                return model;
             } catch (IOException e) {
                 log.warn("Impossible de lire le fichier .env : {}", e.getMessage());
+                model = new ConfigurationModel();
+            }
+        } else {
+            // Fallback : variables d'environnement
+            model = new ConfigurationModel();
+            String mistralKey = System.getenv("MISTRALAI_API_KEY");
+            if (mistralKey != null && !mistralKey.isBlank()) {
+                model.setMistralApiKey(mistralKey);
+            }
+            String braveKey = System.getenv("BRAVE_SEARCH_API_KEY");
+            if (braveKey != null && !braveKey.isBlank()) {
+                model.setBraveSearchApiKey(braveKey);
+            }
+            String porcupineKey = System.getenv("PORCUPINE_ACCESS_KEY");
+            if (porcupineKey != null && !porcupineKey.isBlank()) {
+                model.setPorcupineAccessKey(porcupineKey);
             }
         }
 
-        // 2. Fallback : variables d'environnement
-        ConfigurationModel model = new ConfigurationModel();
-        String mistralKey = System.getenv("MISTRALAI_API_KEY");
-        if (mistralKey != null && !mistralKey.isBlank()) {
-            model.setMistralApiKey(mistralKey);
+        // 2. Enrich from application-local.yaml (personality, audio)
+        if (localYamlFile.exists()) {
+            try {
+                LocalYamlParser.enrichModel(localYamlFile, model);
+                log.debug("Configuration enrichie depuis {}", localYamlFile.getAbsolutePath());
+            } catch (IOException e) {
+                log.warn("Impossible de lire {} : {}", localYamlFile.getName(), e.getMessage());
+            }
         }
-        String braveKey = System.getenv("BRAVE_SEARCH_API_KEY");
-        if (braveKey != null && !braveKey.isBlank()) {
-            model.setBraveSearchApiKey(braveKey);
-        }
-        String porcupineKey = System.getenv("PORCUPINE_ACCESS_KEY");
-        if (porcupineKey != null && !porcupineKey.isBlank()) {
-            model.setPorcupineAccessKey(porcupineKey);
-        }
+
         return model;
     }
 

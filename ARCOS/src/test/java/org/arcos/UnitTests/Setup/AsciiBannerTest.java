@@ -1,6 +1,6 @@
-package org.arcos.UnitTests.Boot;
+package org.arcos.UnitTests.Setup;
 
-import org.arcos.Boot.Banner.AsciiBanner;
+import org.arcos.Setup.UI.AsciiBanner;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;

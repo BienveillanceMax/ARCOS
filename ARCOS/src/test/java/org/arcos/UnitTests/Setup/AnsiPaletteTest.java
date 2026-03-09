@@ -21,19 +21,6 @@ class AnsiPaletteTest {
     }
 
     @Test
-    void deprecatedAliases_matchNewConstants() {
-        assertSame(AnsiPalette.PRIMARY, AnsiPalette.ORANGE_BRIGHT);
-        assertSame(AnsiPalette.BRIGHT, AnsiPalette.AMBER);
-        assertSame(AnsiPalette.DEEP, AnsiPalette.ORANGE_DARK);
-        assertSame(AnsiPalette.OK, AnsiPalette.GREEN);
-        assertSame(AnsiPalette.BRIGHT, AnsiPalette.RED);
-        assertSame(AnsiPalette.WARN, AnsiPalette.YELLOW);
-        assertSame(AnsiPalette.INFO, AnsiPalette.CYAN);
-        assertSame(AnsiPalette.MUTED, AnsiPalette.GRAY_LIGHT);
-        assertSame(AnsiPalette.TEXT, AnsiPalette.WHITE);
-    }
-
-    @Test
     void constants_containCorrectAnsiCodes() {
         assertTrue(AnsiPalette.BRIGHT.contains("196"), "BRIGHT should use color 196");
         assertTrue(AnsiPalette.PRIMARY.contains("160"), "PRIMARY should use color 160");

@@ -1,6 +1,6 @@
 package org.arcos.Orchestrator;
 
-import org.arcos.LLM.Client.LLMClient;
+import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
@@ -31,7 +31,7 @@ class InitiativeServiceTest {
     @Mock MemoryService memoryService;
     @Mock OpinionService opinionService;
     @Mock DesireService desireService;
-    @Mock LLMClient llmClient;
+    @Mock ChatOrchestrator chatOrchestrator;
     @Mock PromptBuilder promptBuilder;
     @Mock PersonalityOrchestrator personalityOrchestrator;
 
@@ -48,7 +48,7 @@ class InitiativeServiceTest {
         when(memoryService.searchMemories(anyString(), anyInt())).thenReturn(Collections.emptyList());
         when(opinionService.searchOpinions(anyString())).thenReturn(Collections.emptyList());
         when(promptBuilder.buildInitiativePrompt(any(DesireEntry.class), anyList(), anyList())).thenReturn(mock(Prompt.class));
-        when(llmClient.generateChatResponse(any(Prompt.class))).thenReturn("I have read the documentation.");
+        when(chatOrchestrator.generateChatResponse(any(Prompt.class))).thenReturn("I have read the documentation.");
 
         // When
         initiativeService.processInitiative(desire);
@@ -56,7 +56,7 @@ class InitiativeServiceTest {
         // Then
         assertEquals(DesireEntry.Status.SATISFIED, desire.getStatus());
         verify(desireService).storeDesire(desire);
-        verify(llmClient).generateChatResponse(any(Prompt.class));
+        verify(chatOrchestrator).generateChatResponse(any(Prompt.class));
 
         // Verify BDI loop closure
         verify(memoryService).storeMemory(any(MemoryEntry.class));

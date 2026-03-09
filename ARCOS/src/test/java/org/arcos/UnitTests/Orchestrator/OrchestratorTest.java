@@ -8,6 +8,7 @@ import org.arcos.EventBus.Events.EventType;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
 import org.arcos.Producers.WakeWordProducer;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
@@ -53,6 +54,9 @@ class OrchestratorTest {
 
     @Mock
     private LLMClient llmClient;
+
+    @Mock
+    private ChatOrchestrator chatOrchestrator;
 
     @Mock
     private PromptBuilder promptBuilder;
@@ -109,6 +113,7 @@ class OrchestratorTest {
                 personalityOrchestrator,
                 eventQueue,
                 llmClient,
+                chatOrchestrator,
                 promptBuilder,
                 conversationContext,
                 memoryService,
@@ -141,7 +146,7 @@ class OrchestratorTest {
         MoodUpdate moodUpdate = new MoodUpdate();
 
         when(promptBuilder.buildConversationnalPrompt(any(ConversationContext.class), any(String.class))).thenReturn(new Prompt(""));
-        when(llmClient.generateStreamingChatResponse(any(Prompt.class))).thenReturn(responseStream);
+        when(chatOrchestrator.generateStreamingChatResponse(any(Prompt.class))).thenReturn(responseStream);
 
         // For the async part
         when(promptBuilder.buildMoodUpdatePrompt(any(), any(), any())).thenReturn(new Prompt(""));
@@ -159,7 +164,7 @@ class OrchestratorTest {
         // Then
         // Verify streaming part — each chunk has a sentence boundary so each produces a speakAsync call
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
-        verify(llmClient).generateStreamingChatResponse(any(Prompt.class));
+        verify(chatOrchestrator).generateStreamingChatResponse(any(Prompt.class));
         verify(piperEmbeddedTTSModule, times(2)).speakAsync(any(String.class), anyFloat(), anyFloat(), anyFloat());
 
         // Verify completion part (synchronous because of Flux.just)

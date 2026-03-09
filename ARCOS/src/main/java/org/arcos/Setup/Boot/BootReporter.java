@@ -1,24 +1,25 @@
-package org.arcos.Boot.Report;
+package org.arcos.Setup.Boot;
 
-import org.arcos.Boot.Greeting.PersonalityGreeting;
-import org.arcos.Boot.ServiceStatus;
-import org.arcos.Boot.ServiceStatusEntry;
-import org.arcos.Boot.ServiceStatusRegistry;
+import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Configuration.PersonalityProperties;
-import org.arcos.Configuration.QdrantProperties;
+import org.arcos.Setup.Health.PiperHealthChecker;
+import org.arcos.Setup.Health.ServiceStatus;
 import org.arcos.Tools.SearchTool.BraveSearchService;
-import org.arcos.Setup.UI.TerminalCapabilities;
+import org.arcos.Setup.UI.BootPhaseRenderer;
+import org.arcos.Setup.UI.ScreenHolder;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
-import java.io.File;
+import java.io.IOException;
 
 /**
  * Déclenche l'affichage du rapport de boot après démarrage complet de Spring.
- * Collecte les statuts des services et délègue le rendu à BootReportRenderer.
+ * Collecte les statuts des services et délègue le rendu à BootPhaseRenderer.
  */
 @Component
 @Slf4j
@@ -33,15 +34,7 @@ public class BootReporter {
     private final PersonalityGreeting greeting;
     private final PersonalityProperties personalityProperties;
     private final BraveSearchService braveSearchService;
-
-    @Value("${MISTRALAI_API_KEY:}")
-    private String mistralApiKey;
-
-    @Value("${PORCUPINE_ACCESS_KEY:}")
-    private String porcupineKey;
-
-    @Value("${BRAVE_SEARCH_API_KEY:}")
-    private String braveKey;
+    private final ApplicationContext applicationContext;
 
     @Value("${qdrant.host:localhost}")
     private String qdrantHost;
@@ -58,18 +51,19 @@ public class BootReporter {
     public BootReporter(ServiceStatusRegistry registry,
                         PersonalityGreeting greeting,
                         PersonalityProperties personalityProperties,
-                        BraveSearchService braveSearchService) {
+                        BraveSearchService braveSearchService,
+                        ApplicationContext applicationContext) {
         this.registry = registry;
         this.greeting = greeting;
         this.personalityProperties = personalityProperties;
         this.braveSearchService = braveSearchService;
+        this.applicationContext = applicationContext;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void onApplicationReady() {
         collectServiceStatuses();
         renderReport();
-        printGreeting();
     }
 
     private void collectServiceStatuses() {
@@ -78,13 +72,13 @@ public class BootReporter {
                 personalityProperties.getProfile(), CATEGORY_PERSONALITY);
 
         // ── SYSTÈMES CŒUR ─────────────────────────────────────────────────────
-        // LLM
-        if (mistralApiKey != null && !mistralApiKey.isBlank()) {
+        // LLM — if Spring started and created a ChatModel bean, the LLM is online
+        if (hasBeanOfType(ChatModel.class)) {
             registry.register("LLM", ServiceStatus.ONLINE,
                     "Mistral (" + mistralModel + ")", CATEGORY_CORE);
         } else {
             registry.register("LLM", ServiceStatus.OFFLINE,
-                    "MISTRALAI_API_KEY absent", CATEGORY_CORE);
+                    "No ChatModel bean", CATEGORY_CORE);
         }
 
         // Qdrant — si Spring a démarré, Qdrant est forcément connecté
@@ -97,8 +91,10 @@ public class BootReporter {
                 piperStatus.getDetail(), CATEGORY_CORE);
 
         // ── INTERACTION ───────────────────────────────────────────────────────
-        // Wake word
-        if (porcupineKey != null && !porcupineKey.isBlank()) {
+        // Wake word — check via bean presence (WakeWordProducer uses Porcupine)
+        boolean porcupineAvailable = applicationContext.getEnvironment()
+                .getProperty("PORCUPINE_ACCESS_KEY", "").length() > 0;
+        if (porcupineAvailable) {
             registry.register("MOT DE RÉVEIL", ServiceStatus.ONLINE,
                     "Porcupine actif", CATEGORY_INTERACTION);
         } else {
@@ -121,49 +117,40 @@ public class BootReporter {
         }
     }
 
-    private ServiceStatusEntry checkPiperStatus() {
-        String piperDir = System.getProperty("user.home") + "/.piper-tts";
-        File piperDirFile = new File(piperDir);
-        if (!piperDirFile.exists()) {
-            return new ServiceStatusEntry("TTS", ServiceStatus.OFFLINE,
-                    "Piper introuvable dans ~/.piper-tts", CATEGORY_CORE);
+    private boolean hasBeanOfType(Class<?> type) {
+        try {
+            return !applicationContext.getBeansOfType(type).isEmpty();
+        } catch (Exception e) {
+            return false;
         }
-        File piperExe = findPiperExecutable(piperDirFile);
-        if (piperExe == null) {
-            return new ServiceStatusEntry("TTS", ServiceStatus.OFFLINE,
-                    "Exécutable piper absent", CATEGORY_CORE);
-        }
-        return new ServiceStatusEntry("TTS", ServiceStatus.ONLINE,
-                "Piper TTS prêt", CATEGORY_CORE);
     }
 
-    private File findPiperExecutable(File dir) {
-        if (!dir.exists()) return null;
-        File[] files = dir.listFiles();
-        if (files == null) return null;
-        for (File f : files) {
-            if (f.isFile() && f.getName().equals("piper") && f.canExecute()) return f;
-            if (f.isDirectory()) {
-                File found = findPiperExecutable(f);
-                if (found != null) return found;
-            }
-        }
-        return null;
+    private ServiceStatusEntry checkPiperStatus() {
+        var result = new PiperHealthChecker().check(null);
+        ServiceStatus status = result.isOnline() ? ServiceStatus.ONLINE : ServiceStatus.OFFLINE;
+        String detail = result.isOnline() ? "Piper TTS prêt" : result.message();
+        return new ServiceStatusEntry("TTS", status, detail, CATEGORY_CORE);
     }
 
     private void renderReport() {
-        boolean colorOn = TerminalCapabilities.isColorSupported();
-        BootReportRenderer renderer = new BootReportRenderer();
-        renderer.render(registry.getAll(), colorOn);
-    }
+        String greetingMessage = greeting.generateMessage(registry.hasIssues());
+        Screen screen = ScreenHolder.get();
+        if (screen != null) {
+            BootPhaseRenderer phaseRenderer = new BootPhaseRenderer(screen);
+            phaseRenderer.render(registry.getAll(), greetingMessage);
 
-    private void printGreeting() {
-        try {
-            Thread.sleep(500);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            // Stop screen after greeting keypress
+            try {
+                screen.stopScreen();
+            } catch (IOException ignored) {}
+            ScreenHolder.clear();
+        } else {
+            // Fallback: simple summary + greeting to stdout
+            long online = registry.getAll().stream().filter(ServiceStatusEntry::isOnline).count();
+            int total = registry.getAll().size();
+            System.out.println(online + "/" + total + " systems online");
+            System.out.println(greetingMessage);
+            System.out.flush();
         }
-        System.out.println(greeting.generateMessage(registry.hasIssues()));
-        System.out.flush();
     }
 }

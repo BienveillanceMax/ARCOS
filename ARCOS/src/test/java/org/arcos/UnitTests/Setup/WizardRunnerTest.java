@@ -8,36 +8,32 @@ import static org.junit.jupiter.api.Assertions.*;
 class WizardRunnerTest {
 
     @Test
-    void runIfNeeded_doesNotThrow_withNoArgs() {
+    void runIfNeededFallback_doesNotThrow_withNoArgs() {
         // Given — pas d'args
         // When/Then — ne doit pas lancer d'exception même si config manquante
         // En CI (sans TTY), WizardRunner détecte l'absence de terminal et retourne false
-        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(new String[]{}));
+        assertDoesNotThrow(() -> WizardRunner.runIfNeededFallback(new String[]{}));
     }
 
     @Test
-    void runIfNeeded_doesNotThrow_withSetupFlag() {
+    void runIfNeededFallback_doesNotThrow_withArgs() {
         // Given
-        String[] args = {"--setup"};
+        String[] args = {"--some-arg"};
 
         // When/Then
-        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(args));
+        assertDoesNotThrow(() -> WizardRunner.runIfNeededFallback(args));
     }
 
     @Test
-    void runIfNeeded_doesNotThrow_withReconfigureFlag() {
-        // Given
-        String[] args = {"--reconfigure"};
-
-        // When/Then
-        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(args));
-    }
-
-    @Test
-    void runIfNeeded_returnsFalse_whenNoTtyAvailable() {
+    void runIfNeededFallback_returnsFalse_whenNoTtyAvailable() {
         // En environnement CI sans TTY, le wizard ne peut pas s'exécuter interactivement.
-        // runIfNeeded() retourne false dans tous les cas sans TTY (config manquante ou --setup).
-        // Ce test vérifie uniquement l'absence d'exception et que la méthode ne bloque pas.
-        assertDoesNotThrow(() -> WizardRunner.runIfNeeded(new String[]{}));
+        // runIfNeededFallback() retourne false dans tous les cas sans TTY.
+        assertDoesNotThrow(() -> WizardRunner.runIfNeededFallback(new String[]{}));
+    }
+
+    @Test
+    void runWizard_requiresNonNullScreen() {
+        // runWizard(Screen) expects a non-null screen — verify the contract exists
+        assertThrows(NullPointerException.class, () -> WizardRunner.runWizard(null));
     }
 }

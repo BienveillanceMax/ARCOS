@@ -34,12 +34,10 @@ public class FasterWhisperHealthChecker implements ServiceHealthCheck {
 
             HttpResponse<Void> response = client.send(request, HttpResponse.BodyHandlers.discarding());
             long elapsed = System.currentTimeMillis() - start;
-            int status = response.statusCode();
 
-            if (status >= 200 && status < 300) {
-                return HealthResult.online(host + ":" + port, elapsed);
-            }
-            return HealthResult.offline("HTTP " + status);
+            // Any HTTP response means the service is running (the Flask app
+            // may not expose /health — a 404 still proves it's alive)
+            return HealthResult.online(host + ":" + port, elapsed);
 
         } catch (Exception e) {
             // Fallback : simple connexion TCP

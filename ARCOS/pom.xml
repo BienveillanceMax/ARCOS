@@ -222,6 +222,13 @@
             <version>2.4.1</version>
         </dependency>
 
+        <!-- Lanterna — double-buffered terminal UI (Screen layer) -->
+        <dependency>
+            <groupId>com.googlecode.lanterna</groupId>
+            <artifactId>lanterna</artifactId>
+            <version>3.1.2</version>
+        </dependency>
+
     </dependencies>
 
     <build>

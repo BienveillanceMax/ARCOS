@@ -1,5 +1,6 @@
 package org.arcos.Setup;
 
+import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Setup.Detection.ConfigurationDetector;
 import org.arcos.Setup.Steps.ApiKeyStep;
 import org.arcos.Setup.Steps.AudioDeviceStep;
@@ -7,7 +8,7 @@ import org.arcos.Setup.Steps.PersonalityStep;
 import org.arcos.Setup.Steps.RecapStep;
 import org.arcos.Setup.Steps.ServiceCheckStep;
 import org.arcos.Setup.UI.FallbackRenderer;
-import org.arcos.Setup.UI.ScreenManager;
+import org.arcos.Setup.UI.LanternaScreenManager;
 import org.arcos.Setup.UI.TerminalCapabilities;
 import org.arcos.Setup.UI.WizardDisplay;
 import org.jline.terminal.Terminal;
@@ -22,11 +23,9 @@ import java.util.List;
  * Orchestrates the ARCOS configuration wizard.
  * Runs BEFORE SpringApplication.run() — no Spring dependencies.
  *
- * Detects rendering mode:
- * - Full-screen (ScreenManager) when alternate screen supported and terminal large enough
- * - Fallback (FallbackRenderer) for TERM=dumb, pipe, or small terminals
- *
- * Usage: WizardRunner.runIfNeeded(args) in ArcosApplication.main()
+ * Two entry points:
+ * - runWizard(Screen): full-screen Lanterna path (called from unified boot flow)
+ * - runIfNeededFallback(args): TERM=dumb fallback path (scrolling output)
  */
 public class WizardRunner {
 
@@ -35,130 +34,112 @@ public class WizardRunner {
     private WizardRunner() {}
 
     /**
-     * Launches the wizard if configuration is incomplete or --setup flag is passed.
+     * Runs the wizard in the existing Lanterna screen (full-screen path).
+     * The screen is already started and showing the welcome screen.
+     * The screen is NOT closed here — it persists for the boot report.
+     *
+     * @param screen the active Lanterna screen
+     * @return true if the wizard completed successfully
+     */
+    public static boolean runWizard(Screen screen) {
+        ConfigurationDetector detector = new ConfigurationDetector();
+        ConfigurationModel existingConfig = detector.loadExistingConfiguration();
+        WizardContext context = new WizardContext(existingConfig);
+
+        LanternaScreenManager display = new LanternaScreenManager(screen);
+        return executeWizardSteps(display, context);
+    }
+
+    /**
+     * Fallback-only path for TERM=dumb or piped environments.
+     * Checks if config is missing and runs the fallback wizard if needed.
      *
      * @param args command line arguments
      * @return true if the wizard ran and saved configuration successfully
      */
-    public static boolean runIfNeeded(String[] args) {
-        boolean forceSetup = containsArg(args, "--setup") || containsArg(args, "--reconfigure");
+    public static boolean runIfNeededFallback(String[] args) {
         ConfigurationDetector detector = new ConfigurationDetector();
         boolean configMissing = !detector.isConfigurationComplete();
 
-        if (!forceSetup && !configMissing) {
+        if (!configMissing) {
             log.debug("Configuration complete — wizard not needed.");
             return false;
         }
 
         if (System.console() == null) {
-            if (configMissing) {
-                log.error("ARCOS configuration incomplete and no interactive terminal available.");
-                log.error("Create a .env file with MISTRALAI_API_KEY=your_key then restart ARCOS.");
-            } else {
-                log.debug("Wizard --setup requested but no TTY available — ignored.");
-            }
+            log.error("ARCOS configuration incomplete and no interactive terminal available.");
+            log.error("Create a .env file with MISTRALAI_API_KEY=your_key then restart ARCOS.");
             return false;
         }
 
-        if (configMissing) {
-            log.info("ARCOS configuration incomplete — launching configuration wizard.");
-        } else {
-            log.info("Relaunching configuration wizard (--setup).");
-        }
+        log.info("ARCOS configuration incomplete — launching configuration wizard (fallback mode).");
 
         ConfigurationModel existingConfig = detector.loadExistingConfiguration();
         WizardContext context = new WizardContext(existingConfig);
 
-        try {
-            return runWizard(context);
-        } catch (Exception e) {
-            log.error("Unexpected error in wizard: {}", e.getMessage(), e);
-            System.err.println("Error in configuration wizard. " +
-                    "Configure manually via .env (see .env.example).");
-            return false;
-        }
-    }
-
-    /**
-     * Runs the interactive wizard with JLine3.
-     */
-    static boolean runWizard(WizardContext context) {
         try (Terminal terminal = TerminalBuilder.builder()
                 .system(true)
                 .jansi(true)
                 .build()) {
 
-            // Select rendering mode
-            boolean fullScreen = TerminalCapabilities.isFullScreenSupported()
-                    && TerminalCapabilities.isMinimumWidthMet(terminal)
-                    && TerminalCapabilities.isMinimumHeightMet(terminal);
-
-            WizardDisplay display = fullScreen
-                    ? new ScreenManager(terminal)
-                    : new FallbackRenderer(terminal);
-
+            FallbackRenderer display = new FallbackRenderer(terminal);
             try {
-                List<StepDefinition> stepDefs = List.of(
-                        StepDefinition.NEXUS, StepDefinition.VOX,
-                        StepDefinition.ANIMA, StepDefinition.CORPUS,
-                        StepDefinition.FIAT);
-
-                display.initializeSteps(stepDefs);
-                display.drawFrame();
-
-                List<WizardStep> steps = List.of(
-                        new ApiKeyStep(),
-                        new AudioDeviceStep(),
-                        new PersonalityStep(),
-                        new ServiceCheckStep(),
-                        new RecapStep()
-                );
-
-                for (int i = 0; i < steps.size(); i++) {
-                    WizardStep step = steps.get(i);
-                    display.activateStep(i);
-
-                    WizardStep.StepResult result = step.execute(display, context);
-
-                    if (result.success()) {
-                        display.completeStep(i);
-                    } else {
-                        if (step.isRequired() && !result.skipped()) {
-                            log.warn("Step '{}' failed: {}", step.getName(), result.message());
-
-                            // Check if user wants to restart (RecapStep returns failure for cancel)
-                            if ("FIAT".equals(step.getName()) && result.message().contains("cancelled")) {
-                                display.close();
-                                // Restart wizard
-                                return runWizard(context);
-                            }
-
-                            display.showError("Wizard interrupted: " + result.message());
-                            display.printLine("Configure manually via .env (see .env.example).");
-                            display.waitForKey();
-                            return false;
-                        }
-                    }
-                }
-
-                return true;
+                return executeWizardSteps(display, context);
             } finally {
                 display.close();
             }
 
         } catch (IOException e) {
-            log.error("Cannot initialize JLine3 terminal: {}", e.getMessage());
+            log.error("Cannot initialize terminal: {}", e.getMessage());
             System.err.println("Interactive terminal not available. " +
                     "Configure manually via .env (see .env.example).");
             return false;
         }
     }
 
-    private static boolean containsArg(String[] args, String target) {
-        if (args == null) return false;
-        for (String arg : args) {
-            if (target.equals(arg)) return true;
+    /**
+     * Common wizard step execution logic, shared by both Lanterna and fallback paths.
+     */
+    private static boolean executeWizardSteps(WizardDisplay display, WizardContext context) {
+        List<StepDefinition> stepDefs = List.of(
+                StepDefinition.NEXUS, StepDefinition.VOX,
+                StepDefinition.ANIMA, StepDefinition.CORPUS,
+                StepDefinition.FIAT);
+
+        display.initializeSteps(stepDefs);
+        display.drawFrame();
+
+        List<WizardStep> steps = List.of(
+                new ApiKeyStep(),
+                new AudioDeviceStep(),
+                new PersonalityStep(),
+                new ServiceCheckStep(),
+                new RecapStep()
+        );
+
+        for (int i = 0; i < steps.size(); i++) {
+            WizardStep step = steps.get(i);
+            display.activateStep(i);
+
+            WizardStep.StepResult result = step.execute(display, context);
+
+            if (result.success()) {
+                display.completeStep(i);
+            } else {
+                if (step.isRequired() && !result.skipped()) {
+                    if ("FIAT".equals(step.getName()) && result.message().contains("cancelled")) {
+                        return executeWizardSteps(display, context);
+                    }
+
+                    log.warn("Step '{}' failed: {}", step.getName(), result.message());
+                    display.showError("Wizard interrupted: " + result.message());
+                    display.printLine("Configure manually via .env (see .env.example).");
+                    display.waitForKey();
+                    return false;
+                }
+            }
         }
-        return false;
+
+        return true;
     }
 }

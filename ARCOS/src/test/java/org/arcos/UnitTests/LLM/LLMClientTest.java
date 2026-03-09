@@ -8,14 +8,8 @@ import org.arcos.LLM.Client.ResponseObject.OpinionResponse;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
-import org.arcos.Tools.Actions.CalendarActions;
-import org.arcos.Tools.Actions.MemoryActions;
-import org.arcos.Tools.Actions.PlannedActionActions;
 import org.arcos.Tools.Actions.PythonActions;
 import org.arcos.Tools.Actions.SearchActions;
-import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
-import org.arcos.Tools.Actions.WeatherActions;
-import org.arcos.Tools.Actions.WebPageActions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
@@ -24,7 +18,6 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.converter.BeanOutputConverter;
-import org.springframework.ai.vectorstore.VectorStore;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -41,38 +34,16 @@ class LLMClientTest {
     private ChatClient.Builder chatClientBuilder;
 
     @Mock
-    private CalendarActions calendarActions;
-
-    @Mock
     private PythonActions pythonActions;
 
     @Mock
     private SearchActions searchActions;
 
-    @Mock
-    private PlannedActionActions plannedActionActions;
-
-    @Mock
-    private MemoryActions memoryActions;
-
-    @Mock
-    private WebPageActions webPageActions;
-
-    @Mock
-    private WeatherActions weatherActions;
-
-    @Mock
-    private MemoryRepository memoryRepository;
-
-    @Mock
-    private VectorStore vectorStore;
-
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(chatClientBuilder.build()).thenReturn(chatClient);
-        when(memoryRepository.getVectorStore()).thenReturn(vectorStore);
-        llmClient = new LLMClient(chatClientBuilder, calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions, memoryRepository, 3);
+        llmClient = new LLMClient(chatClientBuilder, pythonActions, searchActions);
     }
 
     // ===== generateMemoryResponse =====
@@ -112,7 +83,7 @@ class LLMClientTest {
 
     @Test
     void generateOpinionResponse_WhenResponseIsNull_ShouldReturnNull() {
-        when(chatClient.prompt(any(Prompt.class)).tools(calendarActions, pythonActions, searchActions)
+        when(chatClient.prompt(any(Prompt.class)).tools(pythonActions, searchActions)
                 .call().entity(any(BeanOutputConverter.class))).thenReturn(null);
 
         OpinionEntry result = llmClient.generateOpinionResponse(new Prompt("test"));
@@ -124,7 +95,7 @@ class LLMClientTest {
     void generateOpinionResponse_WhenSummaryIsNull_ShouldReturnNull() {
         OpinionResponse response = new OpinionResponse();
         response.setSummary(null);
-        when(chatClient.prompt(any(Prompt.class)).tools(calendarActions, pythonActions, searchActions)
+        when(chatClient.prompt(any(Prompt.class)).tools(pythonActions, searchActions)
                 .call().entity(any(BeanOutputConverter.class))).thenReturn(response);
 
         OpinionEntry result = llmClient.generateOpinionResponse(new Prompt("test"));
@@ -136,7 +107,7 @@ class LLMClientTest {
     void generateOpinionResponse_WhenSummaryIsBlank_ShouldReturnNull() {
         OpinionResponse response = new OpinionResponse();
         response.setSummary("  ");
-        when(chatClient.prompt(any(Prompt.class)).tools(calendarActions, pythonActions, searchActions)
+        when(chatClient.prompt(any(Prompt.class)).tools(pythonActions, searchActions)
                 .call().entity(any(BeanOutputConverter.class))).thenReturn(response);
 
         OpinionEntry result = llmClient.generateOpinionResponse(new Prompt("test"));

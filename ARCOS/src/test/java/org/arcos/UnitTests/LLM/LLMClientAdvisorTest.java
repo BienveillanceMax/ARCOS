@@ -1,6 +1,6 @@
 package org.arcos.UnitTests.LLM;
 
-import org.arcos.Exceptions.DesireCreationException;
+import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Client.ResponseObject.MemoryResponse;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
@@ -29,12 +29,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 /**
- * Tests unitaires vérifiant l'intégration du QuestionAnswerAdvisor dans LLMClient.
- * Couvre la construction, l'isolation des appels internes et la dégradation gracieuse.
+ * Tests unitaires vérifiant l'intégration du QuestionAnswerAdvisor dans ChatOrchestrator
+ * et l'isolation des appels internes de LLMClient.
  */
 class LLMClientAdvisorTest {
 
     private LLMClient llmClient;
+    private ChatOrchestrator chatOrchestrator;
 
     @Mock(answer = Answers.RETURNS_DEEP_STUBS)
     private ChatClient chatClient;
@@ -76,11 +77,11 @@ class LLMClientAdvisorTest {
         when(memoryRepository.getVectorStore()).thenReturn(vectorStore);
     }
 
-    // ===== T1 : Vérification de la construction de l'advisor =====
+    // ===== T1 : Vérification de la construction de l'advisor dans ChatOrchestrator =====
 
     @Test
     void constructor_ShouldCallGetVectorStore_WhenBuildingAdvisor() {
-        llmClient = new LLMClient(chatClientBuilder, calendarActions, pythonActions, searchActions,
+        chatOrchestrator = new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions, searchActions,
                 plannedActionActions, memoryActions, webPageActions, weatherActions, memoryRepository, 3);
 
         // getVectorStore() doit être appelé exactement une fois pour construire le QuestionAnswerAdvisor
@@ -91,7 +92,7 @@ class LLMClientAdvisorTest {
 
     @Test
     void constructor_ShouldCompleteWithoutException_ForAnyPositiveTopK() {
-        assertDoesNotThrow(() -> new LLMClient(chatClientBuilder, calendarActions, pythonActions,
+        assertDoesNotThrow(() -> new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions,
                 searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions,
                 memoryRepository, 5));
     }
@@ -106,10 +107,10 @@ class LLMClientAdvisorTest {
                 .call()
                 .content()).thenReturn("réponse de test");
 
-        llmClient = new LLMClient(chatClientBuilder, calendarActions, pythonActions, searchActions,
+        chatOrchestrator = new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions, searchActions,
                 plannedActionActions, memoryActions, webPageActions, weatherActions, memoryRepository, 3);
 
-        String result = llmClient.generateChatResponse(new Prompt("bonjour"));
+        String result = chatOrchestrator.generateChatResponse(new Prompt("bonjour"));
 
         assertEquals("réponse de test", result);
     }
@@ -120,15 +121,11 @@ class LLMClientAdvisorTest {
     void generateMemoryResponse_ShouldReturnNull_WhenResponseIsNull() {
         when(chatClient.prompt(any(Prompt.class)).call().entity(any(BeanOutputConverter.class))).thenReturn(null);
 
-        llmClient = new LLMClient(chatClientBuilder, calendarActions, pythonActions, searchActions,
-                plannedActionActions, memoryActions, webPageActions, weatherActions, memoryRepository, 3);
+        llmClient = new LLMClient(chatClientBuilder, pythonActions, searchActions);
 
         MemoryEntry result = llmClient.generateMemoryResponse(new Prompt("test mémoire"));
 
-        // L'advisor ne doit pas être invoqué sur les appels internes — getVectorStore() ne doit
-        // avoir été appelé qu'une seule fois lors de la construction, pas ici.
         assertNull(result);
-        verify(memoryRepository, times(1)).getVectorStore();
     }
 
     // ===== T5 : Dégradation gracieuse si VectorStore retourne un mock vide =====
@@ -138,7 +135,7 @@ class LLMClientAdvisorTest {
         // VectorStore valide mais sans données (collection vide)
         when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(java.util.Collections.emptyList());
 
-        assertDoesNotThrow(() -> new LLMClient(chatClientBuilder, calendarActions, pythonActions,
+        assertDoesNotThrow(() -> new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions,
                 searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions,
                 memoryRepository, 3));
     }

@@ -1,5 +1,6 @@
-package org.arcos.Boot;
+package org.arcos.Setup.Boot;
 
+import org.arcos.Setup.Health.ServiceStatus;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;

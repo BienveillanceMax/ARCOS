@@ -1,4 +1,4 @@
-package org.arcos.Boot.Greeting;
+package org.arcos.Setup.Boot;
 
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Setup.UI.AnsiPalette;
@@ -67,6 +67,6 @@ public class PersonalityGreeting {
         if (!TerminalCapabilities.isColorSupported()) {
             return "\n" + message + "\n";
         }
-        return "\n" + AnsiPalette.ORANGE_BRIGHT + AnsiPalette.BOLD + message + AnsiPalette.RESET + "\n";
+        return "\n" + AnsiPalette.PRIMARY + AnsiPalette.BOLD + message + AnsiPalette.RESET + "\n";
     }
 }

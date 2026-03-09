@@ -33,23 +33,4 @@ public final class AnsiPalette {
     public static final String WARN = "\033[38;5;178m"; // #D7AF00 — degraded, partial
     public static final String INFO = "\033[38;5;67m";  // #5F87AF — secondary readouts
 
-    // ── Deprecated aliases (keep BootReportRenderer / AsciiBanner compiling) ─
-    /** @deprecated Use {@link #PRIMARY} */
-    @Deprecated public static final String ORANGE_BRIGHT = PRIMARY;
-    /** @deprecated Use {@link #BRIGHT} */
-    @Deprecated public static final String AMBER = BRIGHT;
-    /** @deprecated Use {@link #DEEP} */
-    @Deprecated public static final String ORANGE_DARK = DEEP;
-    /** @deprecated Use {@link #OK} */
-    @Deprecated public static final String GREEN = OK;
-    /** @deprecated Use {@link #BRIGHT} */
-    @Deprecated public static final String RED = BRIGHT;
-    /** @deprecated Use {@link #WARN} */
-    @Deprecated public static final String YELLOW = WARN;
-    /** @deprecated Use {@link #INFO} */
-    @Deprecated public static final String CYAN = INFO;
-    /** @deprecated Use {@link #MUTED} */
-    @Deprecated public static final String GRAY_LIGHT = MUTED;
-    /** @deprecated Use {@link #TEXT} */
-    @Deprecated public static final String WHITE = TEXT;
 }

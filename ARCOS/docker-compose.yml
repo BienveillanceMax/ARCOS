@@ -56,12 +56,17 @@ services:
         GROUP_ID: ${GID:-1000}
     container_name: arcos_app
     restart: unless-stopped
-    depends_on:
-      - qdrant
-      - faster-whisper
-      - ollama
+    #depends_on:
+      #- qdrant
+      #- faster-whisper
+      #- ollama
 
-    env_file: .env
+    tty: true
+    stdin_open: true
+
+    env_file:
+      - path: .env
+        required: false
 
     network_mode: "host"
     privileged: true
