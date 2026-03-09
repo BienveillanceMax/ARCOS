@@ -1,18 +1,15 @@
 package org.arcos.UnitTests.PlannedAction;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.arcos.Configuration.PlannedActionProperties;
-import org.arcos.EventBus.EventQueue;
 import org.arcos.LLM.Client.PlannedActionLLMClient;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.PlannedAction.Models.ActionStatus;
-import org.arcos.PlannedAction.Models.ActionType;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.Models.ReWOOPlan;
+import org.arcos.PlannedAction.PlannedActionRepository;
 import org.arcos.PlannedAction.PlannedActionService;
+import org.arcos.Producers.PlannedActionProducer;
 import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +26,10 @@ import static org.mockito.Mockito.*;
 class PlannedActionServiceTest {
 
     @Mock
-    private EventQueue eventQueue;
+    private PlannedActionRepository repository;
+
+    @Mock
+    private PlannedActionProducer producer;
 
     @Mock
     private PlannedActionLLMClient llmClient;
@@ -42,11 +42,12 @@ class PlannedActionServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        service = new PlannedActionService(eventQueue, llmClient, promptBuilder, new PlannedActionProperties());
+        when(repository.findAll()).thenReturn(List.of());
+        service = new PlannedActionService(repository, producer, llmClient, promptBuilder, new PlannedActionProperties());
     }
 
     @Test
-    void createAction_ShouldStoreAction() {
+    void createAction_ShouldSaveAndLog() {
         // Given
         PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
 
@@ -54,90 +55,81 @@ class PlannedActionServiceTest {
         service.createAction(entry);
 
         // Then
-        List<PlannedActionEntry> activeActions = service.listActiveActions();
-        assertEquals(1, activeActions.size());
-        assertEquals("Appeler le dentiste", activeActions.get(0).getLabel());
+        verify(repository).save(entry);
     }
 
     @Test
-    void cancelAction_ShouldDisableMatchingAction() {
+    void cancelAction_ShouldDisableAndSave() {
         // Given
         PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        service.createAction(entry);
+        when(repository.findActiveByLabelContaining("dentiste")).thenReturn(entry);
 
         // When
         boolean cancelled = service.cancelAction("dentiste");
 
         // Then
         assertTrue(cancelled);
-        assertTrue(service.listActiveActions().isEmpty());
+        assertEquals(ActionStatus.DISABLED, entry.getStatus());
+        verify(repository).save(entry);
     }
 
     @Test
     void cancelAction_NoMatch_ShouldReturnFalse() {
         // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        service.createAction(entry);
+        when(repository.findActiveByLabelContaining("inexistant")).thenReturn(null);
 
         // When
         boolean cancelled = service.cancelAction("inexistant");
 
         // Then
         assertFalse(cancelled);
-        assertEquals(1, service.listActiveActions().size());
+        verify(repository, never()).save(any());
     }
 
     @Test
-    void markCompleted_ShouldSetStatusCompleted() {
+    void listActiveActions_ShouldDelegateToRepository() {
         // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        service.createAction(entry);
-
-        // When
-        service.markCompleted(entry);
-
-        // Then
-        assertTrue(service.listActiveActions().isEmpty());
-        assertEquals(ActionStatus.COMPLETED, entry.getStatus());
-    }
-
-    @Test
-    void deleteAction_ShouldRemoveAction() {
-        // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        service.createAction(entry);
-
-        // When
-        service.deleteAction(entry.getId());
-
-        // Then
-        assertTrue(service.listActiveActions().isEmpty());
-    }
-
-    @Test
-    void listActiveActions_ShouldOnlyReturnActive() {
-        // Given
-        PlannedActionEntry active = ObjectCreationUtils.createSimpleReminderEntry();
-        PlannedActionEntry completed = ObjectCreationUtils.createSimpleReminderEntry();
-        completed.setLabel("Completed action");
-        completed.setStatus(ActionStatus.COMPLETED);
-
-        service.createAction(active);
-        service.createAction(completed);
+        List<PlannedActionEntry> expected = List.of(ObjectCreationUtils.createSimpleReminderEntry());
+        when(repository.findAllActive()).thenReturn(expected);
 
         // When
         List<PlannedActionEntry> result = service.listActiveActions();
 
         // Then
-        assertEquals(1, result.size());
-        assertEquals("Appeler le dentiste", result.get(0).getLabel());
+        assertEquals(expected, result);
+        verify(repository).findAllActive();
     }
 
     @Test
-    void generateExecutionPlan_Success_ShouldSetPlanOnEntry() {
+    void markCompleted_ShouldSetStatusAndSave() {
         // Given
         PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        service.createAction(entry);
+
+        // When
+        service.markCompleted(entry);
+
+        // Then
+        assertEquals(ActionStatus.COMPLETED, entry.getStatus());
+        verify(repository).save(entry);
+    }
+
+    @Test
+    void deleteAction_ShouldDelegateToRepository() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
+        when(repository.delete(entry.getId())).thenReturn(entry);
+
+        // When
+        service.deleteAction(entry.getId());
+
+        // Then
+        verify(repository).delete(entry.getId());
+    }
+
+    @Test
+    void generateExecutionPlan_Success_ShouldSetPlanAndSave() {
+        // Given
+        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
 
         PlannedActionPlanResponse response = new PlannedActionPlanResponse();
         ReWOOPlan plan = new ReWOOPlan(List.of());
@@ -154,13 +146,13 @@ class PlannedActionServiceTest {
         assertNotNull(result);
         assertEquals(plan, entry.getExecutionPlan());
         assertEquals("template", entry.getSynthesisPromptTemplate());
+        verify(repository).save(entry);
     }
 
     @Test
     void generateExecutionPlan_AllRetriesFail_ShouldReturnNull() {
         // Given
         PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        service.createAction(entry);
 
         when(promptBuilder.buildReWOOPlanPrompt(entry)).thenReturn(new Prompt("plan prompt"));
         when(llmClient.generatePlannedActionPlanResponse(any(Prompt.class)))
@@ -173,63 +165,6 @@ class PlannedActionServiceTest {
         assertNull(result);
         assertNull(entry.getExecutionPlan());
         verify(llmClient, times(3)).generatePlannedActionPlanResponse(any(Prompt.class));
-    }
-
-    @Test
-    void onActionTriggered_ShouldPushEventToQueue() {
-        // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
-        when(eventQueue.offer(any())).thenReturn(true);
-
-        // When
-        service.onActionTriggered(entry);
-
-        // Then
-        verify(eventQueue).offer(any());
-        assertNotNull(entry.getLastExecutedAt());
-        assertEquals(1, entry.getExecutionCount());
-    }
-
-    @Test
-    void createAction_Deadline_ShouldStoreAction() {
-        // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineEntry();
-
-        // When
-        service.createAction(entry);
-
-        // Then
-        List<PlannedActionEntry> activeActions = service.listActiveActions();
-        assertEquals(1, activeActions.size());
-        assertTrue(activeActions.get(0).isDeadline());
-        assertEquals("Rendre le rapport", activeActions.get(0).getLabel());
-    }
-
-    @Test
-    void cancelAction_Deadline_ShouldDisable() {
-        // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineWithRemindersEntry();
-        service.createAction(entry);
-
-        // When
-        boolean cancelled = service.cancelAction("rapport");
-
-        // Then
-        assertTrue(cancelled);
-        assertTrue(service.listActiveActions().isEmpty());
-    }
-
-    @Test
-    void onReminderTriggered_ShouldPushEventWithReminderFlag() {
-        // Given
-        PlannedActionEntry entry = ObjectCreationUtils.createDeadlineWithRemindersEntry();
-        when(eventQueue.offer(any())).thenReturn(true);
-
-        // When
-        service.onReminderTriggered(entry);
-
-        // Then
-        verify(eventQueue).offer(any());
-        assertTrue(entry.isReminderTrigger());
+        verify(repository).save(entry);
     }
 }
