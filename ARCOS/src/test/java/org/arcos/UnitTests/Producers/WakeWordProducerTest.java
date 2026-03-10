@@ -29,24 +29,16 @@ class WakeWordProducerTest {
     }
 
     @Test
-    void constructor_WhenPorcupineResourcesAbsent_ShouldNotThrowAndDisablePorcupine() {
-        // Given / When : les ressources Porcupine ne sont pas disponibles en environnement de test
-        WakeWordProducer producer = buildProducerViaDegradedPath();
-
-        // Then : le constructeur ne doit pas propager d'exception et porcupineEnabled doit être false
-        boolean enabled = (boolean) ReflectionTestUtils.getField(producer, "porcupineEnabled");
-        assertThat(enabled).isFalse();
-    }
-
-    @Test
-    void startAfterStartup_WhenPorcupineDisabled_ShouldNotStartThread() {
+    void startAfterStartup_WhenPorcupineResourcesAbsent_ShouldDisableAndNotStartThread() {
         // Given
         WakeWordProducer producer = buildProducerViaDegradedPath();
 
-        // When : startAfterStartup ne doit pas lever d'exception et ne doit pas démarrer le thread
+        // When
         assertThatCode(producer::startAfterStartup).doesNotThrowAnyException();
 
-        // Then : aucun thread wakeword ne doit être démarré
+        // Then : porcupineEnabled doit être false et aucun thread démarré
+        boolean enabled = (boolean) ReflectionTestUtils.getField(producer, "porcupineEnabled");
+        assertThat(enabled).isFalse();
         Thread wakeWordThread = (Thread) ReflectionTestUtils.getField(producer, "wakeWordThread");
         assertThat(wakeWordThread).isNull();
     }
@@ -83,14 +75,11 @@ class WakeWordProducerTest {
     }
 
     /**
-     * Crée un WakeWordProducer en passant par le chemin dégradé :
-     * le constructeur intercepte l'absence des ressources Porcupine et
-     * positionne porcupineEnabled = false sans propager d'exception.
+     * Crée un WakeWordProducer sans déclencher l'init Porcupine.
+     * Le constructeur ne fait que stocker les dépendances ;
+     * l'init native est différée à startAfterStartup().
      */
     private WakeWordProducer buildProducerViaDegradedPath() {
-        // Le constructeur catchera l'IllegalArgumentException levée par extractResource()
-        // car les fichiers .ppn / .pv ne sont pas dans le classpath de test.
-        // On s'assure uniquement que l'instanciation se termine sans crash.
         WakeWordProducer[] holder = new WakeWordProducer[1];
         assertThatCode(() -> {
             holder[0] = new WakeWordProducer(eventQueue, "http://localhost:9000", centralFeedBackHandler, defaultAudioProperties());

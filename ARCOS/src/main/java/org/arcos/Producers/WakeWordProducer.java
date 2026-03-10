@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PreDestroy;
@@ -43,8 +44,10 @@ public class WakeWordProducer implements Runnable {
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final AudioProperties audioProperties;
+    private final String fasterWhisperUrl;
     private volatile Thread wakeWordThread;
     private boolean porcupineEnabled = false;
+    private boolean porcupineInitialized = false;
 
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
@@ -53,7 +56,9 @@ public class WakeWordProducer implements Runnable {
     private volatile long conversationWindowExpiry = 0L;
 
     @EventListener(ApplicationReadyEvent.class)
+    @Order(2)
     public void startAfterStartup() {
+        initializePorcupineAndAudio();
         if (!porcupineEnabled) {
             log.info("WakeWordProducer désactivé — thread non démarré.");
             return;
@@ -85,11 +90,20 @@ public class WakeWordProducer implements Runnable {
     @Autowired
     public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl,
                             CentralFeedBackHandler centralFeedBackHandler, AudioProperties audioProperties) {
-        log.info("Initialisation WakeWordProducer");
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = eventQueue;
         this.audioProperties = audioProperties;
+        this.fasterWhisperUrl = fasterWhisperUrl;
+    }
 
+    /**
+     * Deferred init: runs on ApplicationReadyEvent (after BootReporter closes the Lanterna screen)
+     * so that Porcupine's native [INFO] messages don't corrupt the TUI.
+     */
+    private void initializePorcupineAndAudio() {
+        if (porcupineInitialized) return;
+        porcupineInitialized = true;
+        log.info("Initialisation WakeWordProducer");
         try {
             String keywordName = "Mon-ami_fr_linux_v3_0_0.ppn";
             String porcupineModelName = "porcupine_params_fr.pv";
