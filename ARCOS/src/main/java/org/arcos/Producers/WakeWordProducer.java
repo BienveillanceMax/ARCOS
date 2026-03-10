@@ -52,6 +52,7 @@ public class WakeWordProducer implements Runnable {
 
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
+    private int silenceThreshold;
 
     private volatile boolean inConversationWindowMode = false;
     private volatile long conversationWindowExpiry = 0L;
@@ -125,6 +126,8 @@ public class WakeWordProducer implements Runnable {
             initializePorcupine(keywordPaths, porcupineModelPath);
             initializeMicrophone();
             if (this.micSource != null && this.micSource.isAvailable()) {
+                this.silenceThreshold = micSource.recommendedSilenceThreshold();
+                log.info("Silence threshold: {} (from {})", silenceThreshold, micSource.describe());
                 this.speechToText = new SpeechToText(fasterWhisperUrl);
             }
             this.porcupineEnabled = true;
@@ -136,14 +139,12 @@ public class WakeWordProducer implements Runnable {
     }
 
     /**
-     * Tries PipeWire first (handles device routing natively), falls back to Java Sound API.
+     * Tries PipeWire first (handles device routing and resampling natively), falls back to Java Sound API.
      */
     private void initializeMicrophone() {
-        int sampleRate = audioProperties.getSampleRate();
-
-        // Try PipeWire first
+        // Try PipeWire first — captures at 16kHz natively (no downsampling needed)
         if (PipeWireMicrophoneSource.isPipeWireAvailable()) {
-            PipeWireMicrophoneSource pwSource = new PipeWireMicrophoneSource(sampleRate);
+            PipeWireMicrophoneSource pwSource = new PipeWireMicrophoneSource();
             if (pwSource.isAvailable()) {
                 this.micSource = pwSource;
                 log.info("Audio source: {}", micSource.describe());
@@ -152,9 +153,10 @@ public class WakeWordProducer implements Runnable {
             pwSource.close();
         }
 
-        // Fallback to Java Sound API
+        // Fallback to Java Sound API (Raspberry Pi, systems without PipeWire)
         log.info("PipeWire not available, falling back to Java Sound API");
-        JavaSoundMicrophoneSource jsSource = new JavaSoundMicrophoneSource(sampleRate, audioProperties.getInputDeviceIndex());
+        JavaSoundMicrophoneSource jsSource = new JavaSoundMicrophoneSource(
+                audioProperties.getSampleRate(), audioProperties.getInputDeviceIndex());
         if (jsSource.isAvailable()) {
             this.micSource = jsSource;
             log.info("Audio source: {}", micSource.describe());
@@ -206,15 +208,18 @@ public class WakeWordProducer implements Runnable {
             log.warn("WakeWordProducer.run() appelé mais Porcupine non initialisé.");
             return;
         }
-        final int micSampleRate = audioProperties.getSampleRate();
+        final int micSampleRate = micSource.getSampleRate();
+        final boolean needsDownsampling = micSampleRate != PORCUPINE_SAMPLE_RATE;
         final int porcupineFrameLength = porcupine.getFrameLength();
-        final int micFrameSize = (int) Math.ceil(porcupineFrameLength * micSampleRate / (double) PORCUPINE_SAMPLE_RATE) * BYTES_PER_SAMPLE;
+        final int micFrameSize = needsDownsampling
+                ? (int) Math.ceil(porcupineFrameLength * micSampleRate / (double) PORCUPINE_SAMPLE_RATE) * BYTES_PER_SAMPLE
+                : porcupineFrameLength * BYTES_PER_SAMPLE;
 
         byte[] micBuffer = new byte[micFrameSize];
         short[] resampledBuffer = new short[porcupineFrameLength];
 
-        log.info("Starting wake word detection loop (frameLength={}, micFrameSize={} bytes, micRate={}, porcupineRate={})",
-                porcupineFrameLength, micFrameSize, micSampleRate, PORCUPINE_SAMPLE_RATE);
+        log.info("Starting wake word detection loop (frameLength={}, micFrameSize={} bytes, micRate={}, porcupineRate={}, downsampling={})",
+                porcupineFrameLength, micFrameSize, micSampleRate, PORCUPINE_SAMPLE_RATE, needsDownsampling);
 
         long lastRmsLogTime = 0;
         while (!Thread.currentThread().isInterrupted()) {
@@ -245,7 +250,6 @@ public class WakeWordProducer implements Runnable {
                 int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
-                    // Convert bytes to shorts and downsample to 16kHz
                     int samplesRead = bytesRead / BYTES_PER_SAMPLE;
                     short[] micSamples = new short[samplesRead];
 
@@ -263,12 +267,16 @@ public class WakeWordProducer implements Runnable {
                         }
                         double rms = Math.sqrt((double) sum / samplesRead);
                         log.info("Audio RMS level: {} (threshold: {}, samples: {}, source: {})",
-                                (int) rms, audioProperties.getSilenceThreshold(), samplesRead, micSource.describe());
+                                (int) rms, silenceThreshold, samplesRead, micSource.describe());
                         lastRmsLogTime = now;
                     }
 
-                    // Simple downsampling from mic rate to Porcupine rate
-                    downsample(micSamples, samplesRead, resampledBuffer, porcupineFrameLength);
+                    // Downsample to 16kHz if needed (PipeWire already outputs at 16kHz)
+                    if (needsDownsampling) {
+                        downsample(micSamples, samplesRead, resampledBuffer, porcupineFrameLength);
+                    } else {
+                        System.arraycopy(micSamples, 0, resampledBuffer, 0, Math.min(samplesRead, porcupineFrameLength));
+                    }
 
                     // Check for wake word
                     int result = porcupine.process(resampledBuffer);
@@ -320,9 +328,13 @@ public class WakeWordProducer implements Runnable {
 
         speechToText.reset();
 
-        final int micSampleRate = audioProperties.getSampleRate();
-        final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20; // 50ms frames
-        final int micFrameSize = (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE);
+        final int micSampleRate = micSource.getSampleRate();
+        final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
+        // Whisper frame: 50ms at 16kHz = 1600 bytes
+        final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20;
+        final int micFrameSize = needsResample
+                ? (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE)
+                : whisperFrameSize;
 
         byte[] micBuffer = new byte[micFrameSize];
         byte[] whisperBuffer = new byte[whisperFrameSize];
@@ -336,23 +348,24 @@ public class WakeWordProducer implements Runnable {
                 int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
-                    // Convert to 16-bit samples
-                    int samplesRead = bytesRead / BYTES_PER_SAMPLE;
-                    short[] micSamples = new short[samplesRead];
-                    ByteBuffer.wrap(micBuffer, 0, bytesRead)
-                            .order(ByteOrder.LITTLE_ENDIAN)
-                            .asShortBuffer()
-                            .get(micSamples);
+                    if (needsResample) {
+                        int samplesRead = bytesRead / BYTES_PER_SAMPLE;
+                        short[] micSamples = new short[samplesRead];
+                        ByteBuffer.wrap(micBuffer, 0, bytesRead)
+                                .order(ByteOrder.LITTLE_ENDIAN)
+                                .asShortBuffer()
+                                .get(micSamples);
 
-                    // Downsample to 16kHz
-                    int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
-                    short[] downsampled = new short[whisperSamples];
-                    downsample(micSamples, samplesRead, downsampled, whisperSamples);
+                        int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
+                        short[] downsampled = new short[whisperSamples];
+                        downsample(micSamples, samplesRead, downsampled, whisperSamples);
 
-                    // Convert back to bytes
-                    ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
-                    for (short s : downsampled) {
-                        bb.putShort(s);
+                        ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
+                        for (short s : downsampled) {
+                            bb.putShort(s);
+                        }
+                    } else {
+                        System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, whisperFrameSize));
                     }
 
                     // Check for silence
@@ -415,7 +428,7 @@ public class WakeWordProducer implements Runnable {
         }
 
         double rms = Math.sqrt((double) sum / sampleCount);
-        return rms < audioProperties.getSilenceThreshold();
+        return rms < silenceThreshold;
     }
 
     /**
@@ -450,9 +463,12 @@ public class WakeWordProducer implements Runnable {
 
         speechToText.reset();
 
-        final int micSampleRate = audioProperties.getSampleRate();
+        final int micSampleRate = micSource.getSampleRate();
+        final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
         final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20;
-        final int micFrameSize = (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE);
+        final int micFrameSize = needsResample
+                ? (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE)
+                : whisperFrameSize;
 
         byte[] micBuffer = new byte[micFrameSize];
         byte[] whisperBuffer = new byte[whisperFrameSize];
@@ -466,20 +482,24 @@ public class WakeWordProducer implements Runnable {
                 int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
-                    int samplesRead = bytesRead / BYTES_PER_SAMPLE;
-                    short[] micSamples = new short[samplesRead];
-                    ByteBuffer.wrap(micBuffer, 0, bytesRead)
-                            .order(ByteOrder.LITTLE_ENDIAN)
-                            .asShortBuffer()
-                            .get(micSamples);
+                    if (needsResample) {
+                        int samplesRead = bytesRead / BYTES_PER_SAMPLE;
+                        short[] micSamples = new short[samplesRead];
+                        ByteBuffer.wrap(micBuffer, 0, bytesRead)
+                                .order(ByteOrder.LITTLE_ENDIAN)
+                                .asShortBuffer()
+                                .get(micSamples);
 
-                    int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
-                    short[] downsampled = new short[whisperSamples];
-                    downsample(micSamples, samplesRead, downsampled, whisperSamples);
+                        int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
+                        short[] downsampled = new short[whisperSamples];
+                        downsample(micSamples, samplesRead, downsampled, whisperSamples);
 
-                    ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
-                    for (short s : downsampled) {
-                        bb.putShort(s);
+                        ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
+                        for (short s : downsampled) {
+                            bb.putShort(s);
+                        }
+                    } else {
+                        System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, whisperFrameSize));
                     }
 
                     boolean isSilent = isSilence(whisperBuffer);

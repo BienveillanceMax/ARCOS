@@ -27,7 +27,10 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 
 @Slf4j
-@SpringBootApplication
+@SpringBootApplication(exclude = {
+    org.springframework.ai.model.transformers.autoconfigure.TransformersEmbeddingModelAutoConfiguration.class,
+    org.springframework.ai.model.ollama.autoconfigure.OllamaEmbeddingAutoConfiguration.class
+})
 @EnableScheduling
 public class ArcosApplication {
 

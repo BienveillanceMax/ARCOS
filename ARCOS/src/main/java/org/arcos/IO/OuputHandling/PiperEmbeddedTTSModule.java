@@ -24,6 +24,7 @@ public class PiperEmbeddedTTSModule {
     private File modelFile;
     private File configFile;
     private boolean enabled = false;
+    private String audioPlayerCommand;
 
     public PiperEmbeddedTTSModule() {
         this.generationExecutor = Executors.newSingleThreadExecutor();
@@ -60,6 +61,31 @@ public class PiperEmbeddedTTSModule {
 
         // Verify installation
         verifyInstallation();
+
+        // Resolve audio player once (avoids spawning `which` on every playAudio call)
+        resolveAudioPlayer();
+    }
+
+    private void resolveAudioPlayer() {
+        String os = getOperatingSystem();
+        switch (os) {
+            case "linux":
+                for (String cmd : new String[]{"paplay", "pw-play", "aplay"}) {
+                    if (isCommandAvailable(cmd)) {
+                        this.audioPlayerCommand = cmd;
+                        log.info("Audio player résolu : {}", cmd);
+                        return;
+                    }
+                }
+                log.warn("No audio player found. Install pulseaudio-utils, pipewire or alsa-utils");
+                break;
+            case "macos":
+                this.audioPlayerCommand = "afplay";
+                break;
+            case "windows":
+                this.audioPlayerCommand = "powershell";
+                break;
+        }
     }
 
     private boolean isPiperInstalled() {
@@ -528,30 +554,18 @@ public class PiperEmbeddedTTSModule {
     }
 
     private void playAudio(File audioFile) throws Exception {
-        String os = getOperatingSystem();
+        if (audioPlayerCommand == null) {
+            throw new RuntimeException("No audio player found. Install pulseaudio-utils, pipewire or alsa-utils");
+        }
+
+        log.debug("Lecture audio avec {} : {}", audioPlayerCommand, audioFile.getAbsolutePath());
+
         ProcessBuilder pb;
-
-        log.debug("Lecture audio sur {} : {}", os, audioFile.getAbsolutePath());
-
-        switch (os) {
-            case "linux":
-                // Try paplay first (PulseAudio), fallback to aplay
-                if (isCommandAvailable("paplay")) {
-                    pb = new ProcessBuilder("paplay", audioFile.getAbsolutePath());
-                }
-                else {
-                    throw new RuntimeException("No audio player found. Install pulseaudio-utils or alsa-utils");
-                }
-                break;
-            case "macos":
-                pb = new ProcessBuilder("afplay", audioFile.getAbsolutePath());
-                break;
-            case "windows":
-                pb = new ProcessBuilder("powershell", "-c",
-                        "(New-Object Media.SoundPlayer '" + audioFile.getAbsolutePath() + "').PlaySync()");
-                break;
-            default:
-                throw new UnsupportedOperationException("Audio playback not supported on: " + os);
+        if ("powershell".equals(audioPlayerCommand)) {
+            pb = new ProcessBuilder("powershell", "-c",
+                    "(New-Object Media.SoundPlayer '" + audioFile.getAbsolutePath() + "').PlaySync()");
+        } else {
+            pb = new ProcessBuilder(audioPlayerCommand, audioFile.getAbsolutePath());
         }
 
         pb.redirectErrorStream(true);

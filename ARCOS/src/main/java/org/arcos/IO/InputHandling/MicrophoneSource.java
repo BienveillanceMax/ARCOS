@@ -21,4 +21,10 @@ public interface MicrophoneSource {
 
     /** Human-readable description for logging. */
     String describe();
+
+    /** Actual sample rate of the audio stream in Hz. */
+    int getSampleRate();
+
+    /** Recommended RMS silence threshold for this source. */
+    int recommendedSilenceThreshold();
 }

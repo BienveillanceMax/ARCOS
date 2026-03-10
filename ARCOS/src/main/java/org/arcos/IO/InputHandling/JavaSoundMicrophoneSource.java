@@ -13,8 +13,10 @@ public class JavaSoundMicrophoneSource implements MicrophoneSource {
 
     private TargetDataLine line;
     private final String deviceDescription;
+    private final int sampleRate;
 
     public JavaSoundMicrophoneSource(int sampleRate, int deviceIndex) {
+        this.sampleRate = sampleRate;
         AudioFormat format = new AudioFormat(sampleRate, 16, 1, true, false);
         DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, format);
 
@@ -88,5 +90,15 @@ public class JavaSoundMicrophoneSource implements MicrophoneSource {
     @Override
     public String describe() {
         return deviceDescription;
+    }
+
+    @Override
+    public int getSampleRate() {
+        return sampleRate;
+    }
+
+    @Override
+    public int recommendedSilenceThreshold() {
+        return 1000;
     }
 }
