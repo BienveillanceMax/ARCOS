@@ -13,8 +13,11 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "arcos.audio")
 public class AudioProperties {
 
-    /** Index du device audio d'entrée (microphone). -1 = auto. */
+    /** Index du device audio d'entrée (microphone). -1 = auto. Déprécié, préférer inputDeviceName. */
     private int inputDeviceIndex = -1;
+
+    /** Nom du device audio d'entrée. Résolu au démarrage vers l'index courant. Vide = utiliser inputDeviceIndex. */
+    private String inputDeviceName = "";
 
     /** Fréquence d'échantillonnage du microphone en Hz. */
     private int sampleRate = 44100;
@@ -37,12 +40,23 @@ public class AudioProperties {
     /** Durée de silence avant fermeture anticipée de la fenêtre de conversation en ms. */
     private int conversationSilenceMs = 1500;
 
+    /** Commande ALSA exécutée avant l'ouverture du micro (ex: "amixer -c 0 cset numid=185 45,45"). Vide = rien. */
+    private String alsaInitCommand = "";
+
     public int getInputDeviceIndex() {
         return inputDeviceIndex;
     }
 
     public void setInputDeviceIndex(int inputDeviceIndex) {
         this.inputDeviceIndex = inputDeviceIndex;
+    }
+
+    public String getInputDeviceName() {
+        return inputDeviceName;
+    }
+
+    public void setInputDeviceName(String inputDeviceName) {
+        this.inputDeviceName = inputDeviceName;
     }
 
     public int getSampleRate() {
@@ -99,5 +113,13 @@ public class AudioProperties {
 
     public void setConversationSilenceMs(int conversationSilenceMs) {
         this.conversationSilenceMs = conversationSilenceMs;
+    }
+
+    public String getAlsaInitCommand() {
+        return alsaInitCommand;
+    }
+
+    public void setAlsaInitCommand(String alsaInitCommand) {
+        this.alsaInitCommand = alsaInitCommand;
     }
 }

@@ -91,7 +91,10 @@ public class ConfigurationWriter {
         sb.append("arcos:\n");
 
         // Audio
-        if (model.getAudioDeviceIndex() >= 0) {
+        if (model.getAudioDeviceName() != null && !model.getAudioDeviceName().isBlank()) {
+            sb.append("  audio:\n");
+            sb.append("    input-device-name: \"").append(model.getAudioDeviceName()).append("\"\n");
+        } else if (model.getAudioDeviceIndex() >= 0) {
             sb.append("  audio:\n");
             sb.append("    input-device-index: ").append(model.getAudioDeviceIndex()).append("\n");
         }

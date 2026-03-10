@@ -16,6 +16,7 @@ public class ConfigurationModel {
 
     // ── Audio ─────────────────────────────────────────────────────────────────
     private int audioDeviceIndex = -1;    // -1 = non configuré / auto
+    private String audioDeviceName = "";  // Nom stable du device (résolu au runtime)
 
     // ── Personnalité ──────────────────────────────────────────────────────────
     private String personalityProfile = "DEFAULT";
@@ -40,6 +41,9 @@ public class ConfigurationModel {
 
     public int getAudioDeviceIndex() { return audioDeviceIndex; }
     public void setAudioDeviceIndex(int audioDeviceIndex) { this.audioDeviceIndex = audioDeviceIndex; }
+
+    public String getAudioDeviceName() { return audioDeviceName; }
+    public void setAudioDeviceName(String audioDeviceName) { this.audioDeviceName = audioDeviceName; }
 
     public String getPersonalityProfile() { return personalityProfile; }
     public void setPersonalityProfile(String personalityProfile) { this.personalityProfile = personalityProfile; }

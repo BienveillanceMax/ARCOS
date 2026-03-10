@@ -7,6 +7,7 @@ import org.arcos.Setup.Validation.AudioDeviceEnumerator;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -54,21 +55,56 @@ public class AudioDeviceStep implements WizardStep {
         if (devices.size() == 1) {
             AudioDeviceEnumerator.AudioDevice device = devices.get(0);
             context.getModel().setAudioDeviceIndex(device.index());
+            context.getModel().setAudioDeviceName(device.name());
             String msg = "Auto-selected: " + device.name() + " (index " + device.index() + ")";
             display.printLine(okText(msg, color));
             return StepResult.success(msg);
         }
 
-        // Multiple devices — show menu
-        display.printLine("Select microphone:");
+        // Multiple devices — probe each for signal.
+        // ALSA without PulseAudio only allows one subdevice open per card at a time.
+        // First pass probes all; second pass retries failures (card lock released by then).
+        display.printLine("Probing microphones...");
+
+        int bestIndex = -1;
+        int bestRms = -1;
+
+        AudioDeviceEnumerator.ProbeResult[] results = new AudioDeviceEnumerator.ProbeResult[devices.size()];
+        List<Integer> retryIndices = new ArrayList<>();
+
+        for (int d = 0; d < devices.size(); d++) {
+            results[d] = AudioDeviceEnumerator.probeRmsLevel(devices.get(d).index(), 44100, 300);
+            if (results[d].rms() < 0) {
+                retryIndices.add(d);
+            }
+        }
+
+        if (!retryIndices.isEmpty()) {
+            try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            for (int d : retryIndices) {
+                results[d] = AudioDeviceEnumerator.probeRmsLevel(devices.get(d).index(), 44100, 300);
+            }
+        }
+
         display.printLine("");
-        for (AudioDeviceEnumerator.AudioDevice device : devices) {
-            display.printLine("[" + device.index() + "]  " + device.name());
+        for (int d = 0; d < devices.size(); d++) {
+            AudioDeviceEnumerator.AudioDevice device = devices.get(d);
+            String indicator = signalIndicator(results[d], color);
+            display.printLine("[" + device.index() + "]  " + device.name() + "  " + indicator);
+            if (results[d].rms() > bestRms) {
+                bestRms = results[d].rms();
+                bestIndex = device.index();
+            }
         }
         display.printLine("");
 
+        String recommendation = "";
+        if (bestRms > 0 && bestIndex >= 0) {
+            recommendation = " [recommended: " + bestIndex + "]";
+        }
+
         int currentIndex = context.getModel().getAudioDeviceIndex();
-        String defaultHint = currentIndex >= 0 ? " [current: " + currentIndex + "]" : "";
+        String defaultHint = currentIndex >= 0 ? " [current: " + currentIndex + "]" : recommendation;
 
         while (true) {
             String input = display.readLine("\u25b8 (index or 's' to skip)" + defaultHint + " ");
@@ -89,8 +125,9 @@ public class AudioDeviceStep implements WizardStep {
                 AudioDeviceEnumerator.AudioDevice chosen = AudioDeviceEnumerator.getDeviceAt(idx);
                 if (chosen != null) {
                     context.getModel().setAudioDeviceIndex(idx);
+                    context.getModel().setAudioDeviceName(chosen.name());
                     display.printLine(okText("Selected: " + chosen.name() + " (index " + idx + ")", color));
-                    return StepResult.success("Microphone configured: index " + idx);
+                    return StepResult.success("Microphone configured: " + chosen.name());
                 } else {
                     display.showError("Index " + idx + " not found. Choose from the listed indices.");
                 }
@@ -108,5 +145,29 @@ public class AudioDeviceStep implements WizardStep {
     private String warnText(String msg, boolean color) {
         if (color) return AnsiPalette.WARN + "\u26a0" + AnsiPalette.RESET + " " + msg;
         return "[!!] " + msg;
+    }
+
+    private String signalIndicator(AudioDeviceEnumerator.ProbeResult probe, boolean color) {
+        int rms = probe.rms();
+        if (rms < 0) {
+            String detail = probe.error() != null ? " (" + probe.error() + ")" : "";
+            return color
+                    ? AnsiPalette.MUTED + "--- ERROR" + detail + AnsiPalette.RESET
+                    : "--- ERROR" + detail;
+        }
+        if (rms == 0) {
+            return color
+                    ? AnsiPalette.MUTED + "--- SILENT" + AnsiPalette.RESET
+                    : "--- SILENT";
+        }
+        // Scale: 1-20 = low, 20+ = live
+        if (rms < 20) {
+            return color
+                    ? AnsiPalette.WARN + "\u2581\u2582  LOW (rms:" + rms + ")" + AnsiPalette.RESET
+                    : "..  LOW (rms:" + rms + ")";
+        }
+        return color
+                ? AnsiPalette.OK + "\u2581\u2582\u2583 LIVE (rms:" + rms + ")" + AnsiPalette.RESET
+                : "... LIVE (rms:" + rms + ")";
     }
 }

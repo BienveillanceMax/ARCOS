@@ -6,6 +6,9 @@ import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.EventBus.Events.WakeWordEvent;
+import org.arcos.IO.InputHandling.JavaSoundMicrophoneSource;
+import org.arcos.IO.InputHandling.MicrophoneSource;
+import org.arcos.IO.InputHandling.PipeWireMicrophoneSource;
 import org.arcos.IO.InputHandling.SpeechToText;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -21,7 +24,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import jakarta.annotation.PreDestroy;
-import javax.sound.sampled.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,9 +40,8 @@ public class WakeWordProducer implements Runnable {
 
     private Porcupine porcupine;
     private String[] keywords;
-    private int audioDeviceIndex;
     private SpeechToText speechToText;
-    private TargetDataLine micDataLine;
+    private MicrophoneSource micSource;
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final AudioProperties audioProperties;
@@ -63,7 +64,7 @@ public class WakeWordProducer implements Runnable {
             log.info("WakeWordProducer désactivé — thread non démarré.");
             return;
         }
-        if (this.micDataLine != null) {
+        if (this.micSource != null && this.micSource.isAvailable()) {
             wakeWordThread = new Thread(this, "wakeword-producer");
             wakeWordThread.setDaemon(true);
             wakeWordThread.start();
@@ -78,9 +79,8 @@ public class WakeWordProducer implements Runnable {
         if (wakeWordThread != null) {
             wakeWordThread.interrupt();
         }
-        if (micDataLine != null) {
-            micDataLine.stop();
-            micDataLine.close();
+        if (micSource != null) {
+            micSource.close();
         }
         if (porcupine != null) {
             porcupine.delete();
@@ -122,10 +122,9 @@ public class WakeWordProducer implements Runnable {
                 throw new IllegalArgumentException(String.format("Fichier keyword '%s' inexistant", keywordPaths[0]));
             }
             this.keywords = keywordPaths;
-            this.audioDeviceIndex = audioProperties.getInputDeviceIndex();
             initializePorcupine(keywordPaths, porcupineModelPath);
-            initializeAudio();
-            if (this.micDataLine != null) {
+            initializeMicrophone();
+            if (this.micSource != null && this.micSource.isAvailable()) {
                 this.speechToText = new SpeechToText(fasterWhisperUrl);
             }
             this.porcupineEnabled = true;
@@ -133,6 +132,35 @@ public class WakeWordProducer implements Runnable {
         } catch (Exception e) {
             log.warn("Wake word désactivé : {}. ARCOS démarrera sans détection du mot de réveil.", e.getMessage());
             this.porcupineEnabled = false;
+        }
+    }
+
+    /**
+     * Tries PipeWire first (handles device routing natively), falls back to Java Sound API.
+     */
+    private void initializeMicrophone() {
+        int sampleRate = audioProperties.getSampleRate();
+
+        // Try PipeWire first
+        if (PipeWireMicrophoneSource.isPipeWireAvailable()) {
+            PipeWireMicrophoneSource pwSource = new PipeWireMicrophoneSource(sampleRate);
+            if (pwSource.isAvailable()) {
+                this.micSource = pwSource;
+                log.info("Audio source: {}", micSource.describe());
+                return;
+            }
+            pwSource.close();
+        }
+
+        // Fallback to Java Sound API
+        log.info("PipeWire not available, falling back to Java Sound API");
+        JavaSoundMicrophoneSource jsSource = new JavaSoundMicrophoneSource(sampleRate, audioProperties.getInputDeviceIndex());
+        if (jsSource.isAvailable()) {
+            this.micSource = jsSource;
+            log.info("Audio source: {}", micSource.describe());
+        } else {
+            log.warn("No audio source available");
+            this.micSource = null;
         }
     }
 
@@ -172,62 +200,6 @@ public class WakeWordProducer implements Runnable {
         }
     }
 
-    private void initializeAudio() {
-        AudioFormat sourceFormat = new AudioFormat(audioProperties.getSampleRate(), 16, 1, true, false);
-        DataLine.Info dataLineInfo = new DataLine.Info(TargetDataLine.class, sourceFormat);
-
-        log.info("Audio config: deviceIndex={}, sampleRate={}, silenceThreshold={}",
-                this.audioDeviceIndex, audioProperties.getSampleRate(), audioProperties.getSilenceThreshold());
-
-        this.micDataLine = getAudioDevice(this.audioDeviceIndex, dataLineInfo);
-
-        if (this.micDataLine != null) {
-            try {
-                this.micDataLine.open(sourceFormat);
-                this.micDataLine.start();
-                log.info("Audio device opened: format={}", this.micDataLine.getFormat());
-            } catch (LineUnavailableException e) {
-                log.error("Audio device is unavailable. Wake word detection will be disabled.", e);
-                this.micDataLine = null;
-            }
-        }
-    }
-
-    private static TargetDataLine getAudioDevice(int deviceIndex, DataLine.Info dataLineInfo) {
-        if (deviceIndex >= 0) {
-            try {
-                Mixer.Info[] mixerInfos = AudioSystem.getMixerInfo();
-                log.info("Total mixer count: {}. Requested index: {}", mixerInfos.length, deviceIndex);
-                if (deviceIndex < mixerInfos.length) {
-                    Mixer.Info mixerInfo = mixerInfos[deviceIndex];
-                    log.info("Mixer[{}]: name='{}', vendor='{}', description='{}'",
-                            deviceIndex, mixerInfo.getName(), mixerInfo.getVendor(), mixerInfo.getDescription());
-                    Mixer mixer = AudioSystem.getMixer(mixerInfo);
-                    if (mixer.isLineSupported(dataLineInfo)) {
-                        log.info("Using configured audio device: {} (index {})", mixerInfo.getName(), deviceIndex);
-                        return (TargetDataLine) mixer.getLine(dataLineInfo);
-                    } else {
-                        log.warn("Audio device '{}' at index {} does not support format. Using default.",
-                                mixerInfo.getName(), deviceIndex);
-                    }
-                } else {
-                    log.warn("Audio device index {} is out of bounds (only {} mixers). Using default.",
-                            deviceIndex, mixerInfos.length);
-                }
-            } catch (Exception e) {
-                log.warn("Could not get audio device at index {}. Using default.", deviceIndex, e);
-            }
-        }
-        try {
-            TargetDataLine line = (TargetDataLine) AudioSystem.getLine(dataLineInfo);
-            log.info("Using default audio device (auto-selected)");
-            return line;
-        } catch (LineUnavailableException | IllegalArgumentException e) {
-            log.warn("Could not get default audio capture device. Wake word detection will be disabled.");
-            return null;
-        }
-    }
-
     @Override
     public void run() {
         if (!porcupineEnabled || porcupine == null) {
@@ -239,7 +211,6 @@ public class WakeWordProducer implements Runnable {
         final int micFrameSize = (int) Math.ceil(porcupineFrameLength * micSampleRate / (double) PORCUPINE_SAMPLE_RATE) * BYTES_PER_SAMPLE;
 
         byte[] micBuffer = new byte[micFrameSize];
-        short[] porcupineBuffer = new short[porcupineFrameLength];
         short[] resampledBuffer = new short[porcupineFrameLength];
 
         log.info("Starting wake word detection loop (frameLength={}, micFrameSize={} bytes, micRate={}, porcupineRate={})",
@@ -271,8 +242,7 @@ public class WakeWordProducer implements Runnable {
                 }
 
                 // --- Mode veille standard : boucle Porcupine ---
-                // Read audio from microphone
-                int bytesRead = micDataLine.read(micBuffer, 0, micFrameSize);
+                int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
                     // Convert bytes to shorts and downsample to 16kHz
@@ -292,8 +262,8 @@ public class WakeWordProducer implements Runnable {
                             sum += (long) micSamples[i] * micSamples[i];
                         }
                         double rms = Math.sqrt((double) sum / samplesRead);
-                        log.info("Audio RMS level: {} (threshold: {}, samples: {})",
-                                (int) rms, audioProperties.getSilenceThreshold(), samplesRead);
+                        log.info("Audio RMS level: {} (threshold: {}, samples: {}, source: {})",
+                                (int) rms, audioProperties.getSilenceThreshold(), samplesRead, micSource.describe());
                         lastRmsLogTime = now;
                     }
 
@@ -320,6 +290,9 @@ public class WakeWordProducer implements Runnable {
                             log.info(">>> No speech detected or transcription failed");
                         }
                     }
+                } else if (bytesRead < 0) {
+                    log.error("Audio source returned -1 (stream ended). Stopping wake word detection.");
+                    break;
                 }
             } catch (PorcupineException e) {
                 log.error("Error processing audio with Porcupine", e);
@@ -348,7 +321,6 @@ public class WakeWordProducer implements Runnable {
         speechToText.reset();
 
         final int micSampleRate = audioProperties.getSampleRate();
-        // Read audio at 16kHz for Whisper (downsample on the fly)
         final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20; // 50ms frames
         final int micFrameSize = (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE);
 
@@ -361,7 +333,7 @@ public class WakeWordProducer implements Runnable {
 
         try {
             while (true) {
-                int bytesRead = micDataLine.read(micBuffer, 0, micFrameSize);
+                int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
                     // Convert to 16-bit samples
@@ -491,7 +463,7 @@ public class WakeWordProducer implements Runnable {
 
         try {
             while (true) {
-                int bytesRead = micDataLine.read(micBuffer, 0, micFrameSize);
+                int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
 
                 if (bytesRead > 0) {
                     int samplesRead = bytesRead / BYTES_PER_SAMPLE;
@@ -549,17 +521,6 @@ public class WakeWordProducer implements Runnable {
         } catch (Exception e) {
             log.error("[CONVERSATION] Erreur lors de l'enregistrement", e);
             return "";
-        }
-    }
-
-    public static void showAudioDevices() {
-        Mixer.Info[] allMixerInfo = AudioSystem.getMixerInfo();
-        Line.Info captureLine = new Line.Info(TargetDataLine.class);
-        for (int i = 0; i < allMixerInfo.length; i++) {
-            Mixer mixer = AudioSystem.getMixer(allMixerInfo[i]);
-            if (mixer.isLineSupported(captureLine)) {
-                log.info("Device {}: {}", i, allMixerInfo[i].getName());
-            }
         }
     }
 }

@@ -20,12 +20,16 @@ public class LocalLlmService {
 
     private final OllamaChatModel ollamaChatModel;
     private final UserModelProperties properties;
+    private final LocalLlmHealthIndicator healthIndicator;
     private final ExecutorService executor;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
 
-    public LocalLlmService(OllamaChatModel ollamaChatModel, UserModelProperties properties) {
+    public LocalLlmService(OllamaChatModel ollamaChatModel,
+                           UserModelProperties properties,
+                           LocalLlmHealthIndicator healthIndicator) {
         this.ollamaChatModel = ollamaChatModel;
         this.properties = properties;
+        this.healthIndicator = healthIndicator;
 
         ThreadFactory daemonFactory = r -> {
             Thread t = new Thread(r, "arcos-local-llm");
@@ -74,7 +78,7 @@ public class LocalLlmService {
     }
 
     public boolean isAvailable() {
-        return !isProcessing.get();
+        return healthIndicator.isOllamaUp() && !isProcessing.get();
     }
 
     @PreDestroy

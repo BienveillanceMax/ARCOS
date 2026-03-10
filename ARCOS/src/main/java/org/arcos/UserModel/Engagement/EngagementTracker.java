@@ -13,8 +13,6 @@ import java.util.List;
 @Component
 public class EngagementTracker {
 
-    private static final int MAX_HISTORY_SIZE = 50;
-
     private final UserObservationTree tree;
     private final UserModelProperties properties;
 
@@ -26,8 +24,7 @@ public class EngagementTracker {
     public void recordConversation(int messageCount) {
         EngagementRecord record = new EngagementRecord(Instant.now(), messageCount);
         tree.addEngagementRecord(record);
-        trimHistory();
-        log.debug("Recorded engagement: {} messages, history size={}", messageCount, tree.getEngagementHistory().size());
+        log.debug("Recorded engagement: {} messages", messageCount);
     }
 
     public boolean isDecayDetected() {
@@ -95,12 +92,5 @@ public class EngagementTracker {
             count++;
         }
         return count > 0 ? totalHours / count : 0;
-    }
-
-    private void trimHistory() {
-        List<EngagementRecord> history = tree.getEngagementHistory();
-        while (history.size() > MAX_HISTORY_SIZE) {
-            history.remove(0);
-        }
     }
 }

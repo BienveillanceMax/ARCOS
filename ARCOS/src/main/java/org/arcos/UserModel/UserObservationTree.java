@@ -185,10 +185,12 @@ public class UserObservationTree {
 
     // ==================== ENGAGEMENT ====================
 
+    private static final int MAX_ENGAGEMENT_HISTORY = 50;
+
     public List<EngagementRecord> getEngagementHistory() {
         lock.readLock().lock();
         try {
-            return engagementHistory;
+            return new ArrayList<>(engagementHistory);
         } finally {
             lock.readLock().unlock();
         }
@@ -198,6 +200,9 @@ public class UserObservationTree {
         lock.writeLock().lock();
         try {
             engagementHistory.add(record);
+            while (engagementHistory.size() > MAX_ENGAGEMENT_HISTORY) {
+                engagementHistory.remove(0);
+            }
         } finally {
             lock.writeLock().unlock();
         }

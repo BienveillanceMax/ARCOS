@@ -30,6 +30,9 @@ class LocalLlmServiceTest {
     @Mock
     private OllamaChatModel ollamaChatModel;
 
+    @Mock
+    private LocalLlmHealthIndicator healthIndicator;
+
     private UserModelProperties properties;
     private LocalLlmService service;
     private AutoCloseable mocks;
@@ -40,7 +43,8 @@ class LocalLlmServiceTest {
         properties = new UserModelProperties();
         properties.getConsolidation().setTimeoutMs(5000);
         properties.getConsolidation().setModel("qwen3.5:4b");
-        service = new LocalLlmService(ollamaChatModel, properties);
+        when(healthIndicator.isOllamaUp()).thenReturn(true);
+        service = new LocalLlmService(ollamaChatModel, properties, healthIndicator);
     }
 
     @AfterEach
@@ -134,7 +138,7 @@ class LocalLlmServiceTest {
         // Given — make the call take longer than timeout
         properties.getConsolidation().setTimeoutMs(200);
         service.shutdown();
-        service = new LocalLlmService(ollamaChatModel, properties);
+        service = new LocalLlmService(ollamaChatModel, properties, healthIndicator);
 
         when(ollamaChatModel.call(any(Prompt.class))).thenAnswer(inv -> {
             Thread.sleep(5000);
@@ -152,9 +156,14 @@ class LocalLlmServiceTest {
 
     @Test
     void isProcessing_shouldReflectState() {
-        // Given
         assertFalse(service.isProcessing());
         assertTrue(service.isAvailable());
+    }
+
+    @Test
+    void isAvailable_shouldBeFalseWhenOllamaDown() {
+        when(healthIndicator.isOllamaUp()).thenReturn(false);
+        assertFalse(service.isAvailable());
     }
 
     @Test
