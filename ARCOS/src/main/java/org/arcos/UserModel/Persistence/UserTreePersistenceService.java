@@ -92,6 +92,14 @@ public class UserTreePersistenceService {
         pendingSave = scheduler.schedule(this::doSave, properties.getDebounceSaveMs(), TimeUnit.MILLISECONDS);
     }
 
+    public void cancelPendingSave() {
+        ScheduledFuture<?> existing = pendingSave;
+        if (existing != null) {
+            existing.cancel(false);
+            pendingSave = null;
+        }
+    }
+
     public void doSave() {
         Path targetPath = Paths.get(properties.getStoragePath());
         Path tmpPath = Paths.get(properties.getStoragePath() + ".tmp");

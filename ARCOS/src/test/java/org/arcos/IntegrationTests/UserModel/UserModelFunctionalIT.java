@@ -80,6 +80,8 @@ class UserModelFunctionalIT {
 
     @BeforeEach
     void resetTree() throws IOException {
+        persistenceService.cancelPendingSave();
+
         Map<TreeBranch, List<ObservationLeaf>> emptyBranches = new EnumMap<>(TreeBranch.class);
         for (TreeBranch branch : TreeBranch.values()) {
             emptyBranches.put(branch, new ArrayList<>());
