@@ -44,9 +44,9 @@ public class MoodIntegrationTest {
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "Hello");
         String promptContent = prompt.toString();
 
-        assertTrue(promptContent.contains("## Humeur Actuelle"),
+        assertTrue(promptContent.contains("Humeur:"),
                 "Le prompt conversationnel doit contenir la section humeur courante");
-        assertTrue(promptContent.contains("État Émotionnel"),
+        assertTrue(promptContent.contains(Mood.fromPadState(context.getPadState()).getLabel()),
                 "Le prompt conversationnel doit contenir l'état émotionnel");
         assertTrue(promptContent.contains("Calcifer"),
                 "Le prompt conversationnel doit contenir la personnalité Calcifer");

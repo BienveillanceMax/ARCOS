@@ -35,7 +35,7 @@ class PromptBuilderChannelBTest {
         Prompt prompt = promptBuilder.buildMemoryPrompt("USER: Je suis developpeur. ASSISTANT: Interessant!");
         String systemContent = getSystemContent(prompt);
 
-        assertTrue(systemContent.contains("## Observations sur l'utilisateur"),
+        assertTrue(systemContent.contains("## Observations utilisateur"),
                 "Doit contenir l'en-tete des observations utilisateur");
         assertTrue(systemContent.contains("userObservations"),
                 "Doit mentionner le champ userObservations");
@@ -72,7 +72,7 @@ class PromptBuilderChannelBTest {
         Prompt prompt = promptBuilder.buildMemoryPrompt("USER: Bonjour. ASSISTANT: Salut!");
         String systemContent = getSystemContent(prompt);
 
-        assertFalse(systemContent.contains("## Observations sur l'utilisateur"),
+        assertFalse(systemContent.contains("## Observations utilisateur"),
                 "Ne doit pas contenir les instructions d'observation quand desactive");
         assertFalse(systemContent.contains("userObservations"),
                 "Ne doit pas mentionner userObservations quand desactive");
@@ -98,9 +98,9 @@ class PromptBuilderChannelBTest {
         String disabledContent = getSystemContent(disabledPrompt);
 
         // Les deux doivent contenir les regles memoire standard
-        assertTrue(enabledContent.contains("RÈGLES / CONTRAINTES"),
+        assertTrue(enabledContent.contains("RÈGLES:"),
                 "Les regles memoire doivent etre presentes quand userModel active");
-        assertTrue(disabledContent.contains("RÈGLES / CONTRAINTES"),
+        assertTrue(disabledContent.contains("RÈGLES:"),
                 "Les regles memoire doivent etre presentes quand userModel desactive");
     }
 

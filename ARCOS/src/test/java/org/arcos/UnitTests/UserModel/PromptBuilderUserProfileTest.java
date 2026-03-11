@@ -50,7 +50,7 @@ class PromptBuilderUserProfileTest {
         assertTrue(systemContent.contains("## Profil utilisateur"));
         assertTrue(systemContent.contains("Pierre, développeur"));
         assertTrue(systemContent.contains("Concis et direct"));
-        assertTrue(systemContent.contains("adaptes tes réponses"));
+        assertTrue(systemContent.contains("Adapte occasionnellement"));
     }
 
     @Test

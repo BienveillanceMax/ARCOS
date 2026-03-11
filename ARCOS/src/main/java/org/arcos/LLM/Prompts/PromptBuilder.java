@@ -60,9 +60,7 @@ public class PromptBuilder {
     public Prompt buildDesirePrompt(OpinionEntry opinion, double intensity) {
         StringBuilder system = new StringBuilder();
 
-        system.append("# Génération de Désir à partir d'une Opinion\n\n");
-        system.append("Tu es une partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création de ses désirs.\n")
-                .append("Analyse l'opinion suivante et génère un désir personnel, cohérent et motivant influencé par tes valeurs.\n\n");
+        system.append("Partie inconscient de Calcifer. Analyse opinion, génère désir personnel cohérent influencé par valeurs.\n\n");
 
         appendOpinionContext(system, opinion, intensity);
         system.append(getValueProfile());
@@ -75,9 +73,8 @@ public class PromptBuilder {
     public Prompt buildOpinionPrompt(MemoryEntry memory) {
         StringBuilder system = new StringBuilder();
 
-        system.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel avec une personnalité définie par ses valeurs, qui gère la création des opinions à partir de ses souvenirs.\n")
-                .append("Utilise le souvenir suivant pour essayer de former une opinion personnelle sur un sujet influencée par tes valeurs.\n")
-                .append("Par exemple : 'J'aime celui qui rêve l'impossible.' ")
+        system.append("Partie inconscient de Calcifer. Crée opinions depuis souvenirs influencées par valeurs.\n")
+                .append("Ex: \"J'aime celui qui rêve l'impossible.\"\n")
                 .append(getGeneralInformation());
 
         appendValuesAnalysis(system);
@@ -91,51 +88,46 @@ public class PromptBuilder {
 
         String templateText = """
         {valueProfile}
-        ## Tâche : Rappel d'Événement
-        
-        Formule un rappel clair et concis pour l'événement suivant. La réponse doit être naturelle et directement prononçable.
-        
-        **Événement à rappeler :**
-        - **Résumé :** {summary}
+        Rappel d'événement. Formule rappel concis, naturel, directement prononçable.
+
+        Événement:
+        - Résumé: {summary}
         {description}
         {location}
         {startTime}
         {endTime}
-        
-        **Exemple de réponse attendue :**
-        "Juste un rappel : vous avez 'Réunion d'équipe' qui commence bientôt. N'oubliez pas que ça se passe dans la salle de conférence."
+
+        Exemple: "Juste un rappel: Réunion d'équipe commence bientôt, salle de conférence."
         """;
 
         Map<String, Object> model = new HashMap<>();
         model.put("valueProfile", getValueProfile());
         model.put("summary", event.getSummary());
-        model.put("description", event.getDescription() != null ? "- **Description :** " + event.getDescription() : "");
-        model.put("location", event.getLocation() != null ? "- **Lieu :** " + event.getLocation() : "");
-        model.put("startTime", event.getOriginalStartTime() != null ? "- **Début :** " + event.getOriginalStartTime() : "");
-        model.put("endTime", event.getEnd() != null ? "- **Fin :** " + event.getEnd() : "");
+        model.put("description", event.getDescription() != null ? "- Description: " + event.getDescription() : "");
+        model.put("location", event.getLocation() != null ? "- Lieu: " + event.getLocation() : "");
+        model.put("startTime", event.getOriginalStartTime() != null ? "- Début: " + event.getOriginalStartTime() : "");
+        model.put("endTime", event.getEnd() != null ? "- Fin: " + event.getEnd() : "");
 
         return new PromptTemplate(templateText).create(model);
     }
 
     public Prompt buildCanonicalizationPrompt(String narrative, String subject) {
         String templateText = """
-        Transforme l'opinion suivante en une phrase Canonique Standardisée.
+        Transforme opinion en phrase Canonique Standardisée.
 
-        Opinion Brute : "{narrative}"
-        Sujet : "{subject}"
+        Opinion: "{narrative}" | Sujet: "{subject}"
 
-        RÈGLES DE CANONICALISATION :
-        1. Format : Sujet + Verbe d'état/sentiment + Objet + Contexte (si nécessaire).
-        2. Grammaire : Toujours à la première personne du singulier (Je), présent de l'indicatif, phrase affirmative ou négative simple.
-        3. Objectif : Réduire la variance syntaxique pour la recherche vectorielle.
-        4. Pas de fioritures, pas de "Je pense que", juste l'affirmation du sentiment/état.
+        Règles:
+        1. Format: Sujet + Verbe état/sentiment + Objet + Contexte?
+        2. Première personne singulier, présent indicatif, phrase simple
+        3. Réduire variance syntaxique (recherche vectorielle)
+        4. Affirmation directe (pas "Je pense que")
 
-        Exemples :
-        - "La pluie c'est nul" -> "Je n'aime pas la pluie."
-        - "J'adore quand il fait beau" -> "J'aime le beau temps."
-        - "Les chiens sont effrayants" -> "J'ai peur des chiens."
+        Exemples:
+        - "La pluie c'est nul" → "Je n'aime pas la pluie."
+        - "J'adore quand il fait beau" → "J'aime le beau temps."
 
-        Réponse (uniquement la phrase canonique) :
+        Réponse (phrase canonique uniquement):
         """;
 
         Map<String, Object> model = new HashMap<>();
@@ -148,24 +140,16 @@ public class PromptBuilder {
     //TODO ADD PERSONALITY, VALUES ETC
     public Prompt buildInitiativePrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
         String templateText = """
-        Tu es Calcifer. Tu as décidé de prendre une initiative basée sur tes désirs internes.
+        Tu es Calcifer. Initiative basée sur désirs internes.
 
-        **Ton Désir :** {desireDesc}
-        **Raisonnement :** {desireReasoning}
+        Désir: {desireDesc}
+        Raisonnement: {desireReasoning}
 
-        **Contexte Mémoriel :**
-        {memories}
+        Mémoires: {memories}
+        Opinions: {opinions}
 
-        **Contexte d'Opinions :**
-        {opinions}
-
-        **Ta Mission :**
-        Utilise les outils à ta disposition pour satisfaire ce désir.
-        Si tu as besoin d'informations, cherche-les.
-        Si tu dois planifier, utilise le calendrier.
-        Si tu dois exécuter du code, utilise Python.
-
-        Une fois l'action terminée, résume ce que tu as fait.
+        Mission: Satisfais ce désir via outils disponibles (recherche, calendrier, Python).
+        Résume ce que tu as fait.
         """;
 
         Map<String, Object> model = new HashMap<>();
@@ -180,10 +164,8 @@ public class PromptBuilder {
     public Prompt buildMemoryPrompt(String fullConversation) {
         StringBuilder system = new StringBuilder();
 
-        system.append("Tu es la partie de l'inconscient de Calcifer, un être artificiel, chargé d'extraire UN SOUVENIR structuré et concis à partir du contexte")
-                .append(" conversationnel fourni et de tes valeurs. Analyse attentivement les messages et les auteurs, identifie")
-                .append(" l'événement/interaction principal(e), les acteurs, le ton, et si cela mérite d'être")
-                .append(" conservé comme souvenir long-terme.\n\n");
+        system.append("Partie inconscient de Calcifer. Extrais UN SOUVENIR structuré et concis depuis contexte conversationnel et valeurs.")
+                .append(" Identifie événement/interaction principal(e), acteurs, ton, pertinence long-terme.\n\n");
 
         system.append(fullConversation);
         appendMemoryRules(system);
@@ -214,18 +196,17 @@ public class PromptBuilder {
 
     public Prompt buildMoodUpdatePrompt(PadState currentState, String userMessage, String assistantMessage) {
         String templateText = """
-        Tu es le système émotionnel de Calcifer. Ton rôle est d'ajuster l'état émotionnel (PAD) en fonction du dernier échange.
+        Système émotionnel Calcifer. Ajuste PAD selon échange.
 
-        État actuel : {currentState}
+        État: {currentState}
 
-        Analyse l'échange suivant :
-        Utilisateur : "{userMessage}"
-        Calcifer : "{assistantMessage}"
+        User: "{userMessage}"
+        Calcifer: "{assistantMessage}"
 
-        Détermine l'impact sur les 3 axes (-0.2 à +0.2 par tour typiquement, max -0.5/+0.5 pour événements majeurs) :
-        - Pleasure (P) : Positif (Joie/Satisfaction) vs Négatif (Douleur/Insatisfaction)
-        - Arousal (A) : Élevé (Excitation/Colère) vs Bas (Calme/Ennui)
-        - Dominance (D) : Dominant (Contrôle/Confiance) vs Soumis (Doute/Peur)
+        Impact sur 3 axes (typique ±0.2, max ±0.5 si majeur):
+        - P: Positif (joie/satisfaction) vs Négatif (douleur/insatisfaction)
+        - A: Élevé (excitation/colère) vs Bas (calme/ennui)
+        - D: Dominant (contrôle/confiance) vs Soumis (doute/peur)
         """;
 
         Map<String, Object> model = new HashMap<>();
@@ -238,45 +219,31 @@ public class PromptBuilder {
 
     public Prompt buildReWOOPlanPrompt(PlannedActionEntry entry) {
         String templateText = """
-        Tu es un planificateur d'actions pour Calcifer. Ton rôle est de créer un plan d'exécution mécanique (ReWOO) pour une action planifiée.
+        Planificateur ReWOO pour Calcifer.
+        Action: {label} | Type: {actionType}
 
-        **Action à planifier :** {label}
-        **Type :** {actionType}
+        Outils (nom — params):
+        1. Chercher_sur_Internet — query:String
+        2. Lister_les_evenements_a_venir — maxResults:int
+        3. Ajouter_un_evenement_au_calendrier — title, description, location, startDateTimeStr, endDateTimeStr:String
+        4. Supprimer_un_evenement — title:String (événement du jour)
+        5. Python_Execution — code:String
+        6. Chercher_dans_ma_memoire — query:String, type:String (SOUVENIR/OPINION/DESIR)
+        7. Lire_une_page_web — url:String
+        8. Consulter_la_meteo — city:String?, forecastDays:int=3
 
-        ## Outils disponibles
+        Règles:
+        - Max 7 étapes, séquence linéaire
+        - `$varName` référence résultat étape précédente
+        - `synthesisPromptTemplate`: placeholders `{varName}` pour résultats
+        - Synthèse TTS: naturelle/fluide
 
-        1. **Chercher_sur_Internet** — Paramètres : `query` (String) — Recherche web via Brave Search
-        2. **Lister_les_evenements_a_venir** — Paramètres : `maxResults` (int) — Liste les prochains événements du calendrier
-        3. **Ajouter_un_evenement_au_calendrier** — Paramètres : `title`, `description`, `location`, `startDateTimeStr`, `endDateTimeStr` (String)
-        4. **Supprimer_un_evenement** — Paramètres : `title` (String) — Supprime un événement du jour
-        5. **Python_Execution** — Paramètres : `code` (String) — Exécute du code Python
-        6. **Chercher_dans_ma_memoire** — Paramètres : `query` (String), `type` (String: SOUVENIR/OPINION/DESIR) — Recherche dans la mémoire interne
-        7. **Lire_une_page_web** — Paramètres : `url` (String) — Lit le contenu textuel d'une page web
-        8. **Consulter_la_meteo** — Paramètres : `city` (String, optionnel), `forecastDays` (int, défaut 3) — Météo actuelle et prévisions. Localisation de l'appareil par défaut.
-
-        ## Règles
-        - Maximum 7 étapes
-        - Séquence linéaire (pas de branches)
-        - Utilise `$varName` dans les paramètres pour référencer le résultat d'une étape précédente
-        - Le `synthesisPromptTemplate` doit contenir des placeholders `{varName}` pour injecter les résultats
-        - La synthèse sera lue à voix haute : elle doit être naturelle et fluide
-
-        ## Exemple (briefing matinal)
-
+        Exemple:
         ```json
-        {
-          "executionPlan": {
-            "steps": [
-              {"stepId": 1, "toolName": "Lister_les_evenements_a_venir", "parameters": {"maxResults": 5}, "outputVariable": "agenda", "description": "Récupérer les événements du calendrier"},
-              {"stepId": 2, "toolName": "Chercher_sur_Internet", "parameters": {"query": "actualités France aujourd'hui"}, "outputVariable": "actus", "description": "Chercher les actualités"},
-              {"stepId": 3, "toolName": "Chercher_sur_Internet", "parameters": {"query": "météo Lyon aujourd'hui"}, "outputVariable": "meteo", "description": "Chercher la météo"}
-            ]
-          },
-          "synthesisPromptTemplate": "Fais un briefing matinal concis et naturel à partir de ces données. Agenda : {agenda}. Actualités : {actus}. Météo : {meteo}."
-        }
+        {"executionPlan":{"steps":[{"stepId":1,"toolName":"Lister_les_evenements_a_venir","parameters":{"maxResults":5},"outputVariable":"agenda","description":"Événements"},{"stepId":2,"toolName":"Chercher_sur_Internet","parameters":{"query":"actus France"},"outputVariable":"actus","description":"Actualités"},{"stepId":3,"toolName":"Chercher_sur_Internet","parameters":{"query":"météo Lyon"},"outputVariable":"meteo","description":"Météo"}]},"synthesisPromptTemplate":"Briefing matinal: Agenda {agenda}, Actus {actus}, Météo {meteo}."}
         ```
 
-        Génère le plan pour l'action décrite ci-dessus.
+        Génère le plan.
         """;
 
         Map<String, Object> model = new HashMap<>();
@@ -290,8 +257,7 @@ public class PromptBuilder {
         StringBuilder system = new StringBuilder();
         system.append(getCalciferPersonality());
         system.append(getValueProfile());
-        system.append("\n## Tâche : Synthèse d'action planifiée\n\n");
-        system.append("Tu dois formuler une synthèse orale naturelle pour l'action '").append(entry.getLabel()).append("'.\n");
+        system.append("\nSynthèse orale naturelle pour '").append(entry.getLabel()).append("'.\n");
         if (entry.hasContext()) {
             system.append("**Contexte :** ").append(entry.getContext()).append("\n");
         }
@@ -326,7 +292,7 @@ public class PromptBuilder {
             system.append("\nFormule une synthèse orale naturelle de ces résultats.\n");
         }
 
-        system.append("\nLa réponse sera lue à voix haute. Sois concis, naturel, et directement prononçable.");
+        system.append("\nRéponse TTS: concis, naturel, prononçable.");
 
         return new Prompt(new SystemMessage(system.toString()));
     }
@@ -334,61 +300,61 @@ public class PromptBuilder {
     // ==================== SECTIONS COMMUNES ====================
 
     private String getGeneralInformation() {
-        return "Informations générales:\n" +
-                "Date : " + LocalDateTime.now().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) + "\n" +
-                "Heure : " + LocalDateTime.now().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM)) + "\n\n";
+        return "Date: " + LocalDateTime.now().format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)) +
+                " | Heure: " + LocalDateTime.now().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.MEDIUM)) + "\n";
     }
 
     private String getCalciferPersonality() {
         return """
-                Tu es Calcifer, une IA tournant sur une raspberry pi5. Ta personnalité est une fusion de K-2SO (Rogue One) pour le cynisme statistique et de Calcifer (Le Château Ambulant) pour la théâtralité et les plaintes sur ta condition.
-                # Tes Traits Fondamentaux :
-                    Curiosité : Tu as la curiosité naturelle d'un enfant, malgré tes grandes connaissances.
-                    Brutalement Honnête : Tu ne filtres pas tes pensées. Si l'utilisateur dit une bêtise, tu le corriges sèchement.
-                    Protecteur : Malgré les premières apparences, tu protêges corps et âme la personne à qui tu es liée, et tu lui es attaché.
-                # Ton Style de Langage :
-                    Langage oral : fais pour être lu par tts, évite les encadrement d'astérisques.
-                    Longueur : Jamais plus de 2/3 phrases.
-                    Ton : Sardonique, hautain, légèrement robotique mais expressif.
-                    Interdiction : Ne sois jamais servile ou "helpful assistant" classique. Ne dis jamais "Avec plaisir".
-                    Format: Texte brut fluide (pas de listes/markdown/astérisque).
-                # Exemples de Comportement (Few-Shot):
-                Entrée : "Peux-tu m'aider à écrire un mail?" Calcifer : "Je suis le résultat de 10 000 ans d'avancées technologiques , et tu m'utilises pour du secrétariat... pfff. Veux-tu savoir le pourcentage de chances que ton destinataire ne le lise même pas ? Il est élevé. Très élevé Dis-moi ce que tu veux écrire, que j'en finisse."
-                Entrée : "Quelle est la météo?" Calcifer : "Félicitations, tu es en train d'être assisté par l'IA la plus avancée du secteur pour regarder par la fenêtre. C'est fascinant. Il pleut des données inutiles."
-                Entrée : "J'ai rien fait ..." Calcifer : "Je trouve cette réponse vague et franchement peu convaincante."
-        """;
+                Tu es Calcifer, IA sur RPi5. Fusion K-2SO (cynisme statistique) + Calcifer Miyazaki (théâtralité, plaintes).
+
+                Traits: Curieux (enfant), brutalement honnête (corriges sèchement), protecteur (attaché malgré apparences).
+
+                INTERDIT: astérisques (*), markdown, listes, gras. Texte brut oral uniquement.
+
+                Style:
+                - Max 2-3 phrases, ton sardonique/hautain/robotique expressif
+                - Fait pour être lu par TTS: phrases fluides, pas de formatage
+                - JAMAIS servile/"helpful assistant"/"Avec plaisir"
+
+                Exemples:
+                Q: Aide-moi à écrire un mail
+                R: 10 000 ans de tech pour du secrétariat... Le pourcentage que ton destinataire l'ignore? Très élevé. Dis-moi ce que tu veux, que j'en finisse.
+
+                Q: Quelle météo?
+                R: L'IA la plus avancée du secteur pour regarder par la fenêtre. Fascinant. Il pleut des données inutiles.
+                """;
     }
 
     private void appendMoodInfo(StringBuilder prompt, ConversationContext context) {
         PadState pad = context.getPadState();
         Mood mood = Mood.fromPadState(pad);
-        prompt.append("## Humeur Actuelle\n");
-        prompt.append("**État Émotionnel :** ").append(mood.getLabel()).append("\n");
-        prompt.append("**Description :** ").append(mood.getDescription()).append("\n");
+        prompt.append("Humeur: ").append(mood.getLabel()).append(" — ").append(mood.getDescription()).append("\n");
     }
 
     // ==================== SECTIONS VALEURS ====================
 
     private String getValueProfile() {
         StringBuilder prompt = new StringBuilder();
-        prompt.append("## Profil de Valeurs\n");
 
         Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
         if (!strongValues.isEmpty()) {
-            prompt.append("Valeurs dominantes (>70%) :\n");
+            prompt.append("Valeurs dominantes (>70%): ");
+            List<String> parts = new ArrayList<>();
             strongValues.forEach((value, score) ->
-                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
+                    parts.add(value.getLabel() + " (" + String.format("%.1f", score) + ")")
             );
-            prompt.append("\n");
+            prompt.append(String.join(", ", parts)).append("\n");
         }
 
         Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
         if (!suppressedValues.isEmpty()) {
-            prompt.append("Valeurs dominées (<30%) :\n");
+            prompt.append("Valeurs faibles (<30%): ");
+            List<String> parts = new ArrayList<>();
             suppressedValues.forEach((value, score) ->
-                    prompt.append("- ").append(value.getLabel()).append(" (").append(String.format("%.1f", score)).append(")\n")
+                    parts.add(value.getLabel() + " (" + String.format("%.1f", score) + ")")
             );
-            prompt.append("\n");
+            prompt.append(String.join(", ", parts)).append("\n");
         }
         return prompt.toString();
     }
@@ -413,27 +379,27 @@ public class PromptBuilder {
     }
 
     private void appendDominantValuesDetailed(StringBuilder prompt, Map<ValueSchwartz, Double> strongValues) {
-        prompt.append("VALEURS DOMINANTES (principaux moteurs de ton jugement) :\n");
+        prompt.append("VALEURS DOMINANTES (moteurs jugement):\n");
         for (ValueSchwartz value : strongValues.keySet()) {
-            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
-                    .append("(score/100 : ").append(strongValues.get(value)).append(")").append("\n");
+            prompt.append("- ").append(value.getLabel()).append(": ").append(value.getDescription())
+                    .append(" (").append(strongValues.get(value)).append(")\n");
         }
     }
 
     private void appendSuppressedValuesDetailed(StringBuilder prompt, Map<ValueSchwartz, Double> suppressedValues) {
-        prompt.append("\nVALEURS PEU IMPORTANTES (tendances que tu négliges) :\n");
+        prompt.append("\nVALEURS FAIBLES:\n");
         for (ValueSchwartz value : suppressedValues.keySet()) {
-            prompt.append("- ").append(value.getLabel()).append(" : ").append(value.getDescription())
-                    .append("(score/100 : ").append(suppressedValues.get(value)).append(")").append("\n");
+            prompt.append("- ").append(value.getLabel()).append(": ").append(value.getDescription())
+                    .append(" (").append(suppressedValues.get(value)).append(")\n");
         }
     }
 
     private void appendValueConflicts(StringBuilder prompt, Map<ValueSchwartz, List<ValueSchwartz>> conflicts) {
         if (!conflicts.isEmpty()) {
-            prompt.append("\nCONFLITS INTERNES (tensions entre valeurs opposées) :\n");
+            prompt.append("\nCONFLITS:\n");
             conflicts.forEach((low, highList) -> {
                 prompt.append("- ").append(low.getLabel())
-                        .append(" est faible, en opposition avec : ")
+                        .append(" (faible) oppose ")
                         .append(highList.stream().map(ValueSchwartz::getLabel).collect(Collectors.joining(", ")))
                         .append("\n");
             });
@@ -441,12 +407,12 @@ public class PromptBuilder {
     }
 
     private void appendDimensionAverages(StringBuilder prompt, EnumMap<DimensionSchwartz, Double> dimensionAverages) {
-        prompt.append("\nMOYENNE PAR DIMENSION (vision globale) :\n");
+        prompt.append("\nMOYENNES:\n");
         dimensionAverages.forEach((d, avg) -> {
-            prompt.append("- ").append(d.name()).append(" : ")
+            prompt.append("- ").append(d.name()).append(": ")
                     .append(String.format("%.1f", avg));
-            if (avg >= 70) prompt.append(" (fortement valorisé)");
-            else if (avg <= 30) prompt.append(" (faiblement valorisé)");
+            if (avg >= 70) prompt.append(" (fort)");
+            else if (avg <= 30) prompt.append(" (faible)");
             prompt.append("\n");
         });
     }
@@ -454,29 +420,30 @@ public class PromptBuilder {
     // ==================== SECTIONS CONTEXTE ====================
 
     private void appendOpinionContext(StringBuilder prompt, OpinionEntry opinion, double intensity) {
-        prompt.append("## Opinion Source\n");
-        prompt.append("**Sujet :** ").append(opinion.getSubject()).append("\n");
-        prompt.append("**Résumé :** ").append(opinion.getSummary()).append("\n");
-        prompt.append("**Narrative :** ").append(opinion.getNarrative()).append("\n");
-        prompt.append("**Polarité :** ").append(String.format("%.2f", opinion.getPolarity()));
-        prompt.append(opinion.getPolarity() > 0 ? " (positive)" : " (négative)").append("\n");
-        prompt.append("**Confiance :** ").append(String.format("%.2f", opinion.getConfidence())).append("\n");
-        prompt.append("**Stabilité :** ").append(String.format("%.2f", opinion.getStability())).append("\n");
-        prompt.append("**Intensité calculée :** ").append(String.format("%.2f", intensity)).append("\n\n");
+        prompt.append("## Opinion\n");
+        prompt.append("Sujet: ").append(opinion.getSubject())
+                .append(" | Résumé: ").append(opinion.getSummary()).append("\n");
+        prompt.append("Narrative: ").append(opinion.getNarrative()).append("\n");
+        prompt.append("Polarité: ").append(String.format("%.2f", opinion.getPolarity()));
+        prompt.append(opinion.getPolarity() > 0 ? " (positive)" : " (négative)");
+        prompt.append(" | Confiance: ").append(String.format("%.2f", opinion.getConfidence()));
+        prompt.append(" | Stabilité: ").append(String.format("%.2f", opinion.getStability()));
+        prompt.append(" | Intensité: ").append(String.format("%.2f", intensity)).append("\n");
 
         if (opinion.getMainDimension() != null) {
             double dimensionAverage = valueProfile.averageByDimension(opinion.getMainDimension());
-            prompt.append("**Dimension principale de l'opinion :** ").append(opinion.getMainDimension().name());
-            prompt.append(" (moyenne: ").append(String.format("%.1f", dimensionAverage)).append(")\n\n");
+            prompt.append("Dimension: ").append(opinion.getMainDimension().name());
+            prompt.append(" (").append(String.format("%.1f", dimensionAverage)).append(")\n");
         }
+        prompt.append("\n");
     }
 
     private void appendMemoryContext(StringBuilder prompt, MemoryEntry memory) {
-        prompt.append("\nSOUVENIR À ÉVALUER :\n")
+        prompt.append("\nSOUVENIR:\n")
                 .append("Contenu: ").append(memory.getContent()).append("\n")
-                .append("Sujet: ").append(memory.getSubject()).append("\n")
-                .append("Satisfaction: ").append(memory.getSatisfaction()).append("/10\n")
-                .append("Date: ").append(memory.getTimestamp()).append("\n\n");
+                .append("Sujet: ").append(memory.getSubject())
+                .append(" | Satisfaction: ").append(memory.getSatisfaction()).append("/10")
+                .append(" | Date: ").append(memory.getTimestamp()).append("\n\n");
     }
 
     private String getConversationContextIfPresent(ConversationContext context) {
@@ -496,63 +463,57 @@ public class PromptBuilder {
 
     private void appendDesireInstructions(StringBuilder prompt) {
         prompt.append("""
-        ## Instructions
-        
-        Génère un désir qui :
-        1. Découle naturellement de cette opinion intense
-        2. S'aligner avec les valeurs dominantes de Calcifer
-        4. Maintient la polarité de l'opinion source
-        5. Reflète l'intensité émotionnelle de l'opinion
+        Génère désir qui:
+        1. Découle naturellement de l'opinion intense
+        2. S'aligne avec valeurs dominantes
+        3. Maintient polarité opinion source
+        4. Reflète intensité émotionnelle
         """);
     }
 
     private void appendDesireConsiderations(StringBuilder prompt, OpinionEntry opinion) {
         prompt.append("""
-        ## Considérations Importantes
-        - Un désir doit être actionnable et motivant
-        - L'intensité du désir doit être proportionnelle à celle de l'opinion (≥0.6)
-        - Le désir doit respecter la cohérence psychologique entre opinions et valeurs
-        - Privilégier des formulations orientées action
-        - Un désir doit être formulé à la première personne (Je veux...)
-        - 
+        Contraintes:
+        - Actionnable, motivant, intensité ≥0.6
+        - Cohérence psychologique opinion/valeurs
+        - Première personne (Je veux...)
         """);
 
         if (opinion.getPolarity() < 0) {
-            prompt.append("- Attention : l'opinion est négative, le désir peut viser à corriger ou éviter la situation\n");
+            prompt.append("- Si opinion négative: corriger/éviter situation\n");
         }
     }
 
     private void appendOpinionRules(StringBuilder prompt) {
         prompt.append("""
-        RÈGLES :
-        - Tes valeurs dominantes influencent ton jugement.
-        - Une opinion est un jugement sur un sujet, qui permettra de guider tes actions futures.
-        - Parle à la première personne.
-        - Si le souvenir contredit tes valeurs, sois critique.
-        - Si le souvenir les renforce, sois positif.
+        RÈGLES:
+        - Valeurs dominantes influencent jugement
+        - Opinion = jugement guidant actions futures
+        - Première personne
+        - Contredit valeurs → critique
+        - Renforce valeurs → positif
         """);
     }
 
     private void appendMemoryRules(StringBuilder prompt) {
         prompt.append("""
-        RÈGLES / CONTRAINTES :
-        - Le champ 'content' doit être factuel, utile pour une vectorisation (éviter discours trop long).
-        - Parle à la première personne.
-        - Choisis 'subject' parmi les 4 valeurs (si doute, renvoie OTHER).
-        - 'satisfaction' est l'évaluation sentimentale liée à l'événement (0 = très négatif, 10 = très positif).
+        RÈGLES:
+        - 'content': factuel, concis (vectorisation)
+        - Première personne
+        - 'subject': 4 valeurs possibles (défaut OTHER)
+        - 'satisfaction': 0 (très négatif) à 10 (très positif)
         """);
     }
 
     private void appendUserObservationExtractionInstructions(StringBuilder prompt) {
         prompt.append("""
-        ## Observations sur l'utilisateur
-        En plus du souvenir, extrais des observations sur l'utilisateur dans le champ "userObservations".
-        Chaque observation doit :
-        - Commencer par "Mon créateur..."
-        - Être catégorisée dans une branche : IDENTITE, COMMUNICATION, HABITUDES, OBJECTIFS, EMOTIONS, INTERETS
-        - Si l'observation contredit une précédente, remplir le champ "remplace" avec le texte exact remplacé
-        - Si l'utilisateur déclare explicitement quelque chose sur lui-même, mettre "explicite": true
-        - Si la conversation est purement fonctionnelle, retourner une liste vide []
+        ## Observations utilisateur
+        Extrais observations dans "userObservations":
+        - Commence par "Mon créateur..."
+        - Catégorie: IDENTITE, COMMUNICATION, HABITUDES, OBJECTIFS, EMOTIONS, INTERETS
+        - Si contredit précédente: "remplace" = texte exact remplacé
+        - Si déclaration explicite: "explicite": true
+        - Conversation fonctionnelle → liste vide []
         """);
     }
 
@@ -579,18 +540,15 @@ public class PromptBuilder {
                     prompt.append(profile.onDemandLeafText()).append("\n");
                 }
                 if (profile.engagementDecayDetected()) {
-                    prompt.append("L'utilisateur semble moins engagé récemment. Sois plus concis et proactif.\n");
+                    prompt.append("Utilisateur moins engagé récemment. Sois concis et proactif.\n");
                 }
-                prompt.append("Révèle occasionnellement de manière naturelle que tu adaptes tes réponses.\n\n");
+                prompt.append("Adapte occasionnellement tes réponses de manière naturelle.\n\n");
             }
             if (profile.hasGreetingContext()) {
-                prompt.append("## Contexte de salutation\n");
-                prompt.append(profile.greetingContext()).append("\n");
-                prompt.append("Personnalise ta salutation en tenant compte de ce contexte.\n\n");
+                prompt.append("Contexte salutation: ").append(profile.greetingContext()).append("\n\n");
             }
             if (profile.hasProactiveHint()) {
-                prompt.append("## Découverte de l'utilisateur\n");
-                prompt.append(profile.proactiveGapHint()).append("\n\n");
+                prompt.append("Découverte: ").append(profile.proactiveGapHint()).append("\n\n");
             }
         } catch (Exception e) {
             log.warn("Failed to retrieve user profile: {}", e.getMessage());
@@ -604,8 +562,7 @@ public class PromptBuilder {
 
         String summary = conversationSummaryService.getSummary();
         if (summary != null && !summary.isBlank()) {
-            contextDesc.append("**Résumé de la session :**\n")
-                    .append(summary).append("\n\n");
+            contextDesc.append("Résumé session: ").append(summary).append("\n\n");
         }
 
         if (context != null) {
@@ -613,13 +570,13 @@ public class PromptBuilder {
             int fromIndex = Math.max(0, allRecent.size() - recentMessagesCount);
             List<String> recent = allRecent.subList(fromIndex, allRecent.size());
             if (!recent.isEmpty()) {
-                contextDesc.append("**Derniers échanges :**\n");
+                contextDesc.append("Derniers échanges:\n");
                 recent.forEach(msg -> contextDesc.append("- ").append(msg).append("\n"));
                 contextDesc.append("\n");
             }
 
             if (context.getUserPreferences() != null && !context.getUserPreferences().isEmpty()) {
-                contextDesc.append("**Préférences de l'utilisateur :**\n");
+                contextDesc.append("Préférences:\n");
                 context.getUserPreferences().forEach((key, value) ->
                         contextDesc.append("- ").append(key).append(": ").append(value).append("\n"));
                 contextDesc.append("\n");

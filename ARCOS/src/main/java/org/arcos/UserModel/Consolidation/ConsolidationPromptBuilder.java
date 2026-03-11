@@ -14,33 +14,20 @@ public class ConsolidationPromptBuilder {
 
     public String buildCrossBranchConflict(ObservationLeaf leafA, ObservationLeaf leafB, double similarity) {
         return ThinkingMode.THINK.getPrefix() + """
-                Tu es un systeme de consolidation de profil utilisateur.
-                Deux observations similaires (similarite: %.2f) existent dans des branches differentes et sont potentiellement en conflit.
+                Consolidation profil utilisateur.
+                Deux observations similaires (sim: %.2f) dans branches differentes, conflit potentiel.
 
-                Observation A:
-                - Branche: %s
-                - Texte: "%s"
-                - Nombre d'observations: %d
-                - Importance emotionnelle: %.2f
-                - Dernier renforcement: %s
+                A: %s | "%s" | obs:%d | importance:%.2f | renfort:%s
+                B: %s | "%s" | obs:%d | importance:%.2f | renfort:%s
 
-                Observation B:
-                - Branche: %s
-                - Texte: "%s"
-                - Nombre d'observations: %d
-                - Importance emotionnelle: %.2f
-                - Dernier renforcement: %s
-
-                Decide de l'action a effectuer parmi: MERGE, REBRANCH, REWRITE, ARCHIVE, KEEP_BOTH.
-                - MERGE: fusionner les deux, garder le gagnant (winner_id)
-                - REBRANCH: deplacer une observation vers la branche de l'autre (target_branch)
-                - REWRITE: reecrire le texte d'une observation (new_text)
-                - ARCHIVE: archiver l'observation la moins pertinente
-                - KEEP_BOTH: garder les deux (observations complementaires)
+                Actions:
+                - MERGE: fusionner (winner_id)
+                - REBRANCH: deplacer vers autre branche (target_branch)
+                - REWRITE: reecrire texte (new_text)
+                - ARCHIVE: archiver moins pertinente
+                - KEEP_BOTH: garder (complementaires)
 
                 %s
-
-                Reponds avec ce format JSON:
                 {"decision":"ACTION","winner_id":"uuid","merge_target_id":"uuid","new_text":"texte","target_branch":"BRANCHE","confidence":0.0,"reasoning":"explication"}
                 """.formatted(
                 similarity,
@@ -55,31 +42,25 @@ public class ConsolidationPromptBuilder {
     public String buildIntraBranchConsolidation(ObservationLeaf leaf, List<ObservationLeaf> similarLeaves) {
         StringBuilder similar = new StringBuilder();
         for (ObservationLeaf s : similarLeaves) {
-            similar.append("- ID: %s | Texte: \"%s\" | Observations: %d | Importance: %.2f\n".formatted(
+            similar.append("- %s | \"%s\" | obs:%d | importance:%.2f\n".formatted(
                     s.getId(), s.getText(), s.getObservationCount(), s.getEmotionalImportance()));
         }
 
         return ThinkingMode.THINK.getPrefix() + """
-                Tu es un systeme de consolidation de profil utilisateur.
-                Une observation dans la branche %s necessite une consolidation avec des observations similaires.
+                Consolidation profil utilisateur.
+                Observation branche %s a consolider avec similaires.
 
-                Observation cible:
-                - ID: %s
-                - Texte: "%s"
-                - Nombre d'observations: %d
-                - Importance emotionnelle: %.2f
+                Cible: %s | "%s" | obs:%d | importance:%.2f
 
-                Observations similaires dans la meme branche:
+                Similaires:
                 %s
-                Decide de l'action a effectuer parmi: MERGE, REWRITE, ARCHIVE, KEEP_BOTH.
-                - MERGE: fusionner avec le gagnant (winner_id), supprimer les autres
-                - REWRITE: reecrire le texte pour synthetiser (new_text)
-                - ARCHIVE: archiver les doublons
-                - KEEP_BOTH: garder toutes les observations
+                Actions:
+                - MERGE: fusionner avec gagnant (winner_id)
+                - REWRITE: reecrire pour synthetiser (new_text)
+                - ARCHIVE: archiver doublons
+                - KEEP_BOTH: garder toutes
 
                 %s
-
-                Reponds avec ce format JSON:
                 {"decision":"ACTION","winner_id":"uuid","new_text":"texte","confidence":0.0,"reasoning":"explication"}
                 """.formatted(
                 leaf.getBranch(),
@@ -91,14 +72,13 @@ public class ConsolidationPromptBuilder {
 
     public String buildSimpleMerge(ObservationLeaf leafA, ObservationLeaf leafB) {
         return ThinkingMode.NO_THINK.getPrefix() + """
-                Deux observations sont quasi-identiques. Laquelle garder?
+                Observations quasi-identiques. Laquelle garder?
 
-                A: ID=%s | "%s" | observations=%d
-                B: ID=%s | "%s" | observations=%d
+                A: %s | "%s" | obs=%d
+                B: %s | "%s" | obs=%d
 
                 %s
-
-                Reponds: {"winner_id":"uuid"}
+                {"winner_id":"uuid"}
                 """.formatted(
                 leafA.getId(), leafA.getText(), leafA.getObservationCount(),
                 leafB.getId(), leafB.getText(), leafB.getObservationCount(),
@@ -109,23 +89,21 @@ public class ConsolidationPromptBuilder {
     public String buildCrossSessionPattern(List<ObservationLeaf> cluster, TreeBranch branch) {
         StringBuilder clusterDesc = new StringBuilder();
         for (ObservationLeaf leaf : cluster) {
-            clusterDesc.append("- \"%s\" (observations: %d, importance: %.2f)\n".formatted(
+            clusterDesc.append("- \"%s\" (obs:%d, importance:%.2f)\n".formatted(
                     leaf.getText(), leaf.getObservationCount(), leaf.getEmotionalImportance()));
         }
 
         return ThinkingMode.THINK.getPrefix() + """
-                Tu es un systeme de detection de patterns dans un profil utilisateur.
-                Voici un groupe d'observations similaires dans la branche %s:
+                Detection patterns profil utilisateur.
+                Observations similaires (branche %s):
 
                 %s
-                Ces observations forment-elles un pattern significatif qui merite une observation resumee?
+                Pattern significatif meritant resume?
 
-                Si oui, reponds CREATE_SUMMARY avec le texte du resume.
-                Si non, reponds NO_PATTERN.
+                Oui → CREATE_SUMMARY avec texte
+                Non → NO_PATTERN
 
                 %s
-
-                Reponds avec ce format JSON:
                 {"decision":"CREATE_SUMMARY","new_text":"Mon createur...","confidence":0.0,"reasoning":"explication"}
                 ou
                 {"decision":"NO_PATTERN","confidence":0.0,"reasoning":"explication"}

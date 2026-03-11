@@ -61,12 +61,10 @@ public class ConversationSummaryService {
         String prev = (previousSummary == null || previousSummary.isBlank())
                 ? "(aucun)"
                 : previousSummary;
-        String text = "Résumé précédent : " + prev + "\n"
-                + "Dernier échange :\n"
-                + "UTILISATEUR : " + lastUserMessage + "\n"
-                + "CALCIFER : " + lastAssistantMessage + "\n\n"
-                + "En 1 à 2 phrases maximum, mets à jour le résumé pour inclure les nouveaux éléments importants. "
-                + "Réponds uniquement avec le résumé mis à jour, sans introduction.";
+        String text = "Résumé précédent: " + prev + "\n"
+                + "UTILISATEUR: " + lastUserMessage + "\n"
+                + "CALCIFER: " + lastAssistantMessage + "\n\n"
+                + "Mets à jour résumé (1-2 phrases). Nouveaux éléments importants uniquement. Résumé seul, sans introduction.";
         return new Prompt(new SystemMessage(text));
     }
 }

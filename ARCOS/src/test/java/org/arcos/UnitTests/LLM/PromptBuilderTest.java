@@ -48,11 +48,11 @@ class PromptBuilderTest {
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "test");
         String systemContent = getSystemContent(prompt);
 
-        assertTrue(systemContent.contains("**Résumé de la session :**"),
+        assertTrue(systemContent.contains("Résumé session:"),
                 "Doit contenir l'en-tête du résumé");
         assertTrue(systemContent.contains("L'utilisateur aime les films d'action"),
                 "Doit contenir le texte du résumé");
-        assertTrue(systemContent.contains("**Derniers échanges :**"),
+        assertTrue(systemContent.contains("Derniers échanges:"),
                 "Doit contenir les derniers échanges");
         // Avec recentMessagesCount=3 et 4 messages, les 3 derniers doivent apparaître
         assertTrue(systemContent.contains("ASSISTANT: Ah oui, les films d'action.") ||
@@ -78,9 +78,9 @@ class PromptBuilderTest {
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "test");
         String systemContent = getSystemContent(prompt);
 
-        assertFalse(systemContent.contains("**Résumé de la session :**"),
+        assertFalse(systemContent.contains("Résumé session:"),
                 "Ne doit pas contenir l'en-tête du résumé si résumé vide");
-        assertTrue(systemContent.contains("**Derniers échanges :**"),
+        assertTrue(systemContent.contains("Derniers échanges:"),
                 "Doit contenir les derniers échanges");
         assertTrue(systemContent.contains("Il fait 15°C"),
                 "Doit contenir le contenu du message récent");
@@ -98,11 +98,11 @@ class PromptBuilderTest {
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "test");
         String systemContent = getSystemContent(prompt);
 
-        assertTrue(systemContent.contains("**Résumé de la session :**"),
+        assertTrue(systemContent.contains("Résumé session:"),
                 "Doit contenir l'en-tête du résumé même si le contexte est vide");
         assertTrue(systemContent.contains("L'utilisateur est intéressé par les nouvelles technologies."),
                 "Doit contenir le texte du résumé");
-        assertFalse(systemContent.contains("**Derniers échanges :**"),
+        assertFalse(systemContent.contains("Derniers échanges:"),
                 "Ne doit pas contenir les derniers échanges si le contexte est vide");
     }
 

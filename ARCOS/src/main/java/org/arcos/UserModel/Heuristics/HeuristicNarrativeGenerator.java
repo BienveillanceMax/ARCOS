@@ -66,12 +66,11 @@ public class HeuristicNarrativeGenerator implements HeuristicLeafProvider {
         }
 
         return """
-                Tu es un systeme de modelisation utilisateur.
-                A partir des changements significatifs observes dans le comportement de l'utilisateur, genere des observations factuelles et descriptives.
-                Chaque observation doit commencer par "Mon createur" et decrire un trait ou comportement.
-                Reponds avec une observation par ligne, sans numerotation ni tiret.
+                Modelisation utilisateur. Genere observations factuelles depuis changements comportementaux.
+                Chaque observation commence par "Mon createur" et decrit un trait/comportement.
+                Une observation par ligne, sans numerotation.
 
-                Changements observes:
+                Changements:
                 %s
                 Observations:
                 """.formatted(changesDesc);

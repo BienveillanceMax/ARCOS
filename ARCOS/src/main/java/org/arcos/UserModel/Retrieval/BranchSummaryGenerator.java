@@ -75,9 +75,7 @@ public class BranchSummaryGenerator implements BranchSummaryProvider {
         }
 
         return """
-                Genere un resume concis de la branche "%s" du profil utilisateur.
-                Le resume doit etre ecrit a la premiere personne du point de vue de l'assistant ("Mon createur...").
-                Le resume ne doit pas depasser %d mots.
+                Resume branche "%s" du profil utilisateur. Premiere personne ("Mon createur..."). Max %d mots.
 
                 Observations:
                 %s
