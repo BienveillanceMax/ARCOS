@@ -68,9 +68,12 @@ Phase 5: Human validation    → user reviews ~200 sample pairs
 
 | Dataset | Source | Why |
 |---------|--------|-----|
-| OpenLLM-France/Claire-Dialogue-French | HuggingFace | Real FR dialogue transcripts (radio, interviews). Oral/familiar register. |
-| CATIE-AQ/everyday-conversations | HuggingFace | Everyday FR conversations. Natural self-disclosure. |
-| OpenSubtitles FR | OPUS/HuggingFace | Massive volume of short, emotional, colloquial FR utterances. |
+| wraps/everyday-conversations-llama3.1-2k-french | HuggingFace | FR user turns from everyday conversations (shopping, work, cooking, travel). |
+| cfierro/personality-qs-french | HuggingFace | FR self-descriptions and personality responses. Relevant for identity/personality branches. |
+| FrancophonIA/french-conversational-dataset | HuggingFace | Varied FR conversational turns with context. |
+
+Note: Originally planned datasets (Claire-Dialogue-French, CATIE-AQ, OpenSubtitles) are either
+gated, unavailable, or use deprecated HuggingFace script format. The above are accessible alternatives.
 
 ### Extraction Pipeline
 
