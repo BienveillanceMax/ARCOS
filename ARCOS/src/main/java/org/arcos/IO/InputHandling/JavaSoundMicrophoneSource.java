@@ -101,4 +101,12 @@ public class JavaSoundMicrophoneSource implements MicrophoneSource {
     public int recommendedSilenceThreshold() {
         return 1000;
     }
+
+    @Override
+    public void drain() {
+        if (line != null) {
+            line.flush();
+            log.debug("Flushed Java Sound capture buffer");
+        }
+    }
 }

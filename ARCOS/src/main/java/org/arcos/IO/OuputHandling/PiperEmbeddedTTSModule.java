@@ -461,16 +461,19 @@ public class PiperEmbeddedTTSModule {
     }
 
     /**
-     * Enfile un callback dans la queue de lecture — il se déclenchera après tous les audios en attente.
-     * Utile quand il n'y a pas de reliquat à lire mais qu'on veut signaler la fin du TTS.
+     * Enfile un callback qui se déclenchera après tous les audios en attente.
+     * Route through generationExecutor first to ensure all pending audio generations
+     * (and their subsequent playback submissions) complete before the callback runs.
      */
     public void afterPlayback(Runnable callback) {
         if (!enabled) {
             if (callback != null) callback.run();
             return;
         }
-        playbackExecutor.submit(() -> {
-            if (callback != null) callback.run();
+        generationExecutor.submit(() -> {
+            playbackExecutor.submit(() -> {
+                if (callback != null) callback.run();
+            });
         });
     }
 

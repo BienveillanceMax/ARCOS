@@ -54,6 +54,8 @@ public class WakeWordProducer implements Runnable {
     private static final int BYTES_PER_SAMPLE = 2;
     private int silenceThreshold;
 
+    private volatile boolean suspended = false;
+    private volatile boolean needsDrain = false;
     private volatile boolean inConversationWindowMode = false;
     private volatile long conversationWindowExpiry = 0L;
 
@@ -224,6 +226,19 @@ public class WakeWordProducer implements Runnable {
         long lastRmsLogTime = 0;
         while (!Thread.currentThread().isInterrupted()) {
             try {
+                // --- Suspended: skip mic processing while TTS is playing ---
+                if (suspended) {
+                    Thread.sleep(50);
+                    continue;
+                }
+
+                // --- Just exited suspension: drain stale mic data (TTS echo) ---
+                if (needsDrain) {
+                    log.debug("Draining mic buffer after TTS playback");
+                    micSource.drain();
+                    needsDrain = false;
+                }
+
                 // --- Mode conversation : bypass Porcupine ---
                 if (inConversationWindowMode) {
                     long remaining = conversationWindowExpiry - System.currentTimeMillis();
@@ -438,11 +453,25 @@ public class WakeWordProducer implements Runnable {
      *
      * @param durationMs Durée de la fenêtre en ms
      */
+    public void suspend() {
+        suspended = true;
+        needsDrain = true;
+        log.debug("WakeWordProducer suspended (TTS playing)");
+    }
+
+    public void resumeDetection() {
+        // Drain happens on the wakeword-producer thread when it exits suspension
+        suspended = false;
+        log.debug("WakeWordProducer resumed");
+    }
+
     public void openConversationWindow(int durationMs) {
         if (!porcupineEnabled) {
             log.debug("openConversationWindow ignorée : Porcupine non actif");
             return;
         }
+        // Drain happens on the wakeword-producer thread when it exits suspension
+        suspended = false;
         inConversationWindowMode = true;
         conversationWindowExpiry = System.currentTimeMillis() + durationMs;
         log.debug("Fenêtre conversation ouverte pour {}ms", durationMs);
@@ -523,8 +552,16 @@ public class WakeWordProducer implements Runnable {
                     }
 
                     long elapsed = System.currentTimeMillis() - recordingStartTime;
-                    if (elapsed >= maxDurationMs) {
-                        log.info("[CONVERSATION] Fenêtre de {}ms expirée", maxDurationMs);
+                    // Window timeout only applies while waiting for speech to start.
+                    // Once speech is detected, let silence detection handle the end,
+                    // with maxRecordingSeconds as a safety backstop.
+                    long timeout = hasDetectedSpeech
+                            ? (long) audioProperties.getMaxRecordingSeconds() * 1000
+                            : maxDurationMs;
+                    if (elapsed >= timeout) {
+                        log.info("[CONVERSATION] {} après {}ms",
+                                hasDetectedSpeech ? "Durée max d'enregistrement atteinte" : "Fenêtre expirée sans parole",
+                                elapsed);
                         break;
                     }
                 }

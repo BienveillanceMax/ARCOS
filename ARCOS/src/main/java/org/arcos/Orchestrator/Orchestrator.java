@@ -216,17 +216,19 @@ public class Orchestrator
         // Get Voice Parameters based on current Mood
         PadState currentPad = context.getPadState();
         MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
-        // Callback post-TTS pour ouvrir la fenêtre de conversation (mode multi-tours)
-        Runnable onTtsDone = null;
-        if (audioProperties.isMultiTurnEnabled() && !isExecutingAction) {
-            onTtsDone = () -> {
-                if (!isExecutingAction) {
-                    inConversationMode = true;
-                    wakeWordProducer.openConversationWindow(audioProperties.getPostResponseListeningWindowMs());
-                    log.debug("Fenêtre de conversation ouverte ({} ms)", audioProperties.getPostResponseListeningWindowMs());
-                }
-            };
-        }
+        // Suspend mic processing before TTS starts to prevent audio feedback
+        wakeWordProducer.suspend();
+
+        // Callback post-TTS : resume mic (conversation window or wake word detection)
+        Runnable onTtsDone = () -> {
+            if (audioProperties.isMultiTurnEnabled() && !isExecutingAction) {
+                inConversationMode = true;
+                wakeWordProducer.openConversationWindow(audioProperties.getPostResponseListeningWindowMs());
+                log.debug("Fenêtre de conversation ouverte ({} ms)", audioProperties.getPostResponseListeningWindowMs());
+            } else {
+                wakeWordProducer.resumeDetection();
+            }
+        };
 
         generateFluxAndSpeak(streamingPrompt, userQuery, voiceParams, onTtsDone);
 
@@ -267,15 +269,11 @@ public class Orchestrator
                     if (sentenceBuffer.length() > 0) {
                         String cleanRelic = cleanForTTS(sentenceBuffer.toString());
                         if (!cleanRelic.isEmpty()) {
-                            if (onTtsDone != null) {
-                                ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW, onTtsDone);
-                            } else {
-                                ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW);
-                            }
-                        } else if (onTtsDone != null) {
+                            ttsHandler.speakAsync(cleanRelic, voiceParams.lengthScale, voiceParams.noiseScale, voiceParams.noiseW, onTtsDone);
+                        } else {
                             ttsHandler.afterPlayback(onTtsDone);
                         }
-                    } else if (onTtsDone != null) {
+                    } else {
                         ttsHandler.afterPlayback(onTtsDone);
                     }
 
@@ -289,10 +287,14 @@ public class Orchestrator
                     updateMoodAsync(userQuery, finalResponse);
                     log.info("Complete response : " + fullResponse);
                     triggerPersonalityProcessing(lastInteracted);
-
-
                 })
-                .subscribe();
+                .subscribe(
+                        unused -> {},
+                        error -> {
+                            log.error("Error in streaming response", error);
+                            wakeWordProducer.resumeDetection();
+                        }
+                );
     }
 
     private int findSentenceEnd(StringBuilder sb) {

@@ -88,6 +88,29 @@ public class PipeWireMicrophoneSource implements MicrophoneSource {
     }
 
     /**
+     * Read and discard buffered audio for 500ms using blocking reads.
+     * InputStream.available() is unreliable on process pipes (returns 0 even with data),
+     * so we use blocking read() which always returns stale data first (FIFO pipe).
+     */
+    @Override
+    public void drain() {
+        if (audioStream == null) return;
+        try {
+            byte[] buf = new byte[3200]; // 100ms at 16kHz mono 16-bit
+            long deadline = System.currentTimeMillis() + 500;
+            int totalDrained = 0;
+            while (System.currentTimeMillis() < deadline) {
+                int read = audioStream.read(buf, 0, buf.length);
+                if (read > 0) totalDrained += read;
+                else break;
+            }
+            log.debug("Drained {} bytes from PipeWire buffer", totalDrained);
+        } catch (IOException e) {
+            log.warn("Error draining PipeWire buffer", e);
+        }
+    }
+
+    /**
      * Quick check: is pw-record available on this system?
      */
     public static boolean isPipeWireAvailable() {
