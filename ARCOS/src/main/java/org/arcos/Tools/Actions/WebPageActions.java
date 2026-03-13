@@ -1,6 +1,9 @@
 package org.arcos.Tools.Actions;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
+import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.Tools.WebPageTool.WebPageService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -16,13 +19,16 @@ import java.util.List;
 public class WebPageActions {
 
     private final WebPageService webPageService;
+    private final CentralFeedBackHandler centralFeedBackHandler;
     private final int maxContentLength;
     private final int timeoutSeconds;
 
     public WebPageActions(WebPageService webPageService,
+                          CentralFeedBackHandler centralFeedBackHandler,
                           @Value("${arcos.web-page.max-content-length:4000}") int maxContentLength,
                           @Value("${arcos.web-page.timeout-seconds:15}") int timeoutSeconds) {
         this.webPageService = webPageService;
+        this.centralFeedBackHandler = centralFeedBackHandler;
         this.maxContentLength = maxContentLength;
         this.timeoutSeconds = timeoutSeconds;
     }
@@ -41,6 +47,7 @@ public class WebPageActions {
 
         log.info("Lecture de la page web : {}", url);
 
+        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.LONGTASK_START));
         try {
             String content = webPageService.fetchAndExtract(url, maxContentLength, timeoutSeconds);
             return ActionResult.success(List.of(content), "Page lue avec succès")
@@ -62,6 +69,9 @@ public class WebPageActions {
             log.error("Lecture interrompue pour {} : {}", url, e.getMessage());
             return ActionResult.failure("Lecture interrompue : " + e.getMessage(), e)
                     .withExecutionTime(System.currentTimeMillis() - startTime);
+
+        } finally {
+            centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.LONGTASK_END));
         }
     }
 

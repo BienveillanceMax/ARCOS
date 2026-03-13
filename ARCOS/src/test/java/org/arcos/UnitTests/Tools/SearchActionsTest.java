@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.Tools;
 
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.SearchActions;
 import org.arcos.Tools.SearchTool.BraveSearchService;
@@ -24,11 +25,14 @@ class SearchActionsTest {
     @Mock
     private BraveSearchService searchService;
 
+    @Mock
+    private CentralFeedBackHandler centralFeedBackHandler;
+
     private SearchActions searchActions;
 
     @BeforeEach
     void setUp() {
-        searchActions = new SearchActions(searchService, 5);
+        searchActions = new SearchActions(searchService, centralFeedBackHandler, 5);
     }
 
     @Test

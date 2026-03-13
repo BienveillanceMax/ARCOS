@@ -16,14 +16,14 @@ public class AudioCueFeedbackHandler
         audioCueEngine.play("arcos_startup.wav");
     }
 
-    //When addressed after a long silence (>4 min) a sound should play to notify the user that the assistant is listening.
-    public void playWakeUpSoundHard() {
-        audioCueEngine.play("wakeup_hard.wav");
-    }
-
     //When addressed shortly, should only play a soft sound
     public void playWakeUpSoundSoft() {
         audioCueEngine.play("wakeup_soft.wav");
+    }
+
+    //When the LLM starts processing a user query, a sound signals "heard, processing"
+    public void playThinkingStartSound() {
+        audioCueEngine.play("thinking_start.wav");
     }
 
     //When starting a long task (ie deep research), a sound should play to inform the user of the begining of a long task.

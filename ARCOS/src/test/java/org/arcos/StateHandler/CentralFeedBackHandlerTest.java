@@ -29,10 +29,10 @@ public class CentralFeedBackHandlerTest {
     }
 
     @Test
-    public void testWakeUpLongEvent() {
-        FeedBackEvent event = new FeedBackEvent(UXEventType.WAKEUP_LONG);
+    public void testThinkingStartEvent() {
+        FeedBackEvent event = new FeedBackEvent(UXEventType.THINKING_START);
         centralFeedBackHandler.handleFeedBack(event);
-        verify(audioCueEngine, times(1)).play("wakeup_hard.wav");
+        verify(audioCueEngine, times(1)).play("thinking_start.wav");
     }
 
     @Test

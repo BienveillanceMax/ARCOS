@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.Tools;
 
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.WebPageActions;
 import org.arcos.Tools.WebPageTool.WebPageService;
@@ -20,11 +21,14 @@ class WebPageActionsTest {
     @Mock
     private WebPageService webPageService;
 
+    @Mock
+    private CentralFeedBackHandler centralFeedBackHandler;
+
     private WebPageActions webPageActions;
 
     @BeforeEach
     void setUp() {
-        webPageActions = new WebPageActions(webPageService, 4000, 15);
+        webPageActions = new WebPageActions(webPageService, centralFeedBackHandler, 4000, 15);
     }
 
     @Test

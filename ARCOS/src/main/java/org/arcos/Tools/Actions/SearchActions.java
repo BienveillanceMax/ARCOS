@@ -2,6 +2,9 @@ package org.arcos.Tools.Actions;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.arcos.Exceptions.SearchException;
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
+import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.Tools.SearchTool.BraveSearchService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
@@ -18,12 +21,15 @@ import java.util.Map;
 public class SearchActions
 {
     private final BraveSearchService searchService;
+    private final CentralFeedBackHandler centralFeedBackHandler;
     private final int braveResultCount;
 
     @Autowired
     public SearchActions(BraveSearchService searchService,
+                         CentralFeedBackHandler centralFeedBackHandler,
                          @Value("${arcos.search.brave-result-count:5}") int braveResultCount) {
         this.searchService = searchService;
+        this.centralFeedBackHandler = centralFeedBackHandler;
         this.braveResultCount = braveResultCount;
     }
 
@@ -43,6 +49,7 @@ public class SearchActions
         long startTime = System.currentTimeMillis();
         BraveSearchService.SearchResult result;
 
+        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.LONGTASK_START));
         try {
             BraveSearchService.SearchOptions options = BraveSearchService.SearchOptions.defaultOptions()
                     .withCount(braveResultCount);
@@ -50,6 +57,8 @@ public class SearchActions
         } catch (SearchException e) {
             log.error(e.getMessage());
             throw new RuntimeException("Erreur de recherche Brave : " + e.getMessage(), e);
+        } finally {
+            centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.LONGTASK_END));
         }
 
         List<String> processedResults = new ArrayList<>();

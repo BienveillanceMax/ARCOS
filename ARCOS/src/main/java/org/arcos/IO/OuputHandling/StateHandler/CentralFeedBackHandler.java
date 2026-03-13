@@ -23,11 +23,11 @@ public class CentralFeedBackHandler
             case ARCOS_START:
                 audioCueHandler.playArcosStart();
                 break;
-            case WAKEUP_LONG:
-                audioCueHandler.playWakeUpSoundHard();
-                break;
             case WAKEUP_SHORT:
                 audioCueHandler.playWakeUpSoundSoft();
+                break;
+            case THINKING_START:
+                audioCueHandler.playThinkingStartSound();
                 break;
             case LONGTASK_START:
                 audioCueHandler.playLongTaskStartedSound();

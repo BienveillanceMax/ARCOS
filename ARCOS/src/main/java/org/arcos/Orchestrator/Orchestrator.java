@@ -128,6 +128,7 @@ public class Orchestrator
                 centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_END));
             } catch (Exception e) {
                 log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
                 desire.setStatus(DesireEntry.Status.PENDING);
                 desire.setLastUpdated(java.time.LocalDateTime.now());
                 desireService.storeDesire(desire);
@@ -154,6 +155,7 @@ public class Orchestrator
                 }
             } catch (Exception e) {
                 log.error("Error executing planned action {}", action.getId(), e);
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
                 executionHistoryService.recordExecution(action, e.getMessage(), false);
             } finally {
                 isExecutingAction = false;
@@ -208,6 +210,7 @@ public class Orchestrator
 
     private void processAndSpeak(String userQuery, boolean isMultiTurn) {
         log.info("Processing query: {}", userQuery);
+        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.THINKING_START));
 
         // Create the prompt for streaming response
         Prompt streamingPrompt = promptBuilder.buildConversationnalPrompt(context, userQuery);
@@ -292,6 +295,7 @@ public class Orchestrator
                         unused -> {},
                         error -> {
                             log.error("Error in streaming response", error);
+                            centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
                             wakeWordProducer.resumeDetection();
                         }
                 );
