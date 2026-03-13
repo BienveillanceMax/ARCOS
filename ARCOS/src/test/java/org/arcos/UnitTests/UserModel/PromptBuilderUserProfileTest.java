@@ -41,7 +41,7 @@ class PromptBuilderUserProfileTest {
         when(retrievalService.retrieveUserContext(anyString()))
                 .thenReturn(new UserProfileContext("Pierre, développeur", "Concis et direct", null, 5));
 
-        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, retrievalService);
+        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, retrievalService, null);
         ConversationContext context = new ConversationContext();
 
         Prompt prompt = builder.buildConversationnalPrompt(context, "Salut");
@@ -58,7 +58,7 @@ class PromptBuilderUserProfileTest {
         when(retrievalService.retrieveUserContext(anyString()))
                 .thenReturn(new UserProfileContext(null, null, null, 2));
 
-        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, retrievalService);
+        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, retrievalService, null);
         ConversationContext context = new ConversationContext();
 
         Prompt prompt = builder.buildConversationnalPrompt(context, "Salut");
@@ -69,7 +69,7 @@ class PromptBuilderUserProfileTest {
 
     @Test
     void buildConversationnalPrompt_UserModelDisabled_ShouldNotInjectProfile() {
-        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, false, null);
+        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, false, null, null);
         ConversationContext context = new ConversationContext();
 
         Prompt prompt = builder.buildConversationnalPrompt(context, "Salut");
@@ -84,7 +84,7 @@ class PromptBuilderUserProfileTest {
         when(retrievalService.retrieveUserContext(anyString()))
                 .thenReturn(new UserProfileContext("Pierre", null, "Mon créateur s'intéresse à l'IA", 10));
 
-        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, retrievalService);
+        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, retrievalService, null);
         ConversationContext context = new ConversationContext();
 
         Prompt prompt = builder.buildConversationnalPrompt(context, "Parle-moi d'IA");
@@ -95,7 +95,7 @@ class PromptBuilderUserProfileTest {
 
     @Test
     void buildConversationnalPrompt_NullRetrievalService_ShouldNotFail() {
-        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null);
+        PromptBuilder builder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null);
         ConversationContext context = new ConversationContext();
 
         Prompt prompt = builder.buildConversationnalPrompt(context, "Salut");

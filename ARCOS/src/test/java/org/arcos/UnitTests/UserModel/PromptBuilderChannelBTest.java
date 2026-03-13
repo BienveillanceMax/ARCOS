@@ -30,7 +30,7 @@ class PromptBuilderChannelBTest {
         when(conversationSummaryService.getSummary()).thenReturn("");
 
         ValueProfile valueProfile = new ValueProfile();
-        PromptBuilder promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null);
+        PromptBuilder promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null);
 
         Prompt prompt = promptBuilder.buildMemoryPrompt("USER: Je suis developpeur. ASSISTANT: Interessant!");
         String systemContent = getSystemContent(prompt);
@@ -67,7 +67,7 @@ class PromptBuilderChannelBTest {
         when(conversationSummaryService.getSummary()).thenReturn("");
 
         ValueProfile valueProfile = new ValueProfile();
-        PromptBuilder promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, false, null);
+        PromptBuilder promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, false, null, null);
 
         Prompt prompt = promptBuilder.buildMemoryPrompt("USER: Bonjour. ASSISTANT: Salut!");
         String systemContent = getSystemContent(prompt);
@@ -88,12 +88,12 @@ class PromptBuilderChannelBTest {
         ValueProfile valueProfile = new ValueProfile();
 
         // Avec userModelEnabled=true
-        PromptBuilder enabledBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null);
+        PromptBuilder enabledBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null);
         Prompt enabledPrompt = enabledBuilder.buildMemoryPrompt("USER: test ASSISTANT: test");
         String enabledContent = getSystemContent(enabledPrompt);
 
         // Avec userModelEnabled=false
-        PromptBuilder disabledBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, false, null);
+        PromptBuilder disabledBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, false, null, null);
         Prompt disabledPrompt = disabledBuilder.buildMemoryPrompt("USER: test ASSISTANT: test");
         String disabledContent = getSystemContent(disabledPrompt);
 

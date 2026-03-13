@@ -3,6 +3,7 @@ package org.arcos.UnitTests.LLM;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.ConversationSummaryService;
+import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Values.ValueProfile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +11,15 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
@@ -23,6 +31,9 @@ class PromptBuilderTest {
     @Mock
     private ConversationSummaryService conversationSummaryService;
 
+    @Mock
+    private OpinionRepository opinionRepository;
+
     private PromptBuilder promptBuilder;
 
     @BeforeEach
@@ -30,7 +41,7 @@ class PromptBuilderTest {
         MockitoAnnotations.openMocks(this);
         // ValueProfile avec profil DEFAULT (scores à 50.0) — pas de valeurs dominantes/supprimées
         ValueProfile valueProfile = new ValueProfile();
-        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null);
+        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null);
     }
 
     // ===== T7 : résumé disponible + contexte non vide =====
@@ -104,6 +115,83 @@ class PromptBuilderTest {
                 "Doit contenir le texte du résumé");
         assertFalse(systemContent.contains("Derniers échanges:"),
                 "Ne doit pas contenir les derniers échanges si le contexte est vide");
+    }
+
+    // ===== Opinion injection tests =====
+
+    @Test
+    void buildConversationnalPrompt_shouldIncludeOpinions_whenRepoReturnsResults() {
+        when(conversationSummaryService.getSummary()).thenReturn("");
+
+        Document doc1 = new Document("J'aime la pluie d'automne.",
+                Map.of("canonicalText", "J'aime la pluie d'automne.", "polarity", 0.7));
+        Document doc2 = new Document("La politique manque de vision.",
+                Map.of("canonicalText", "La politique manque de vision.", "polarity", -0.4));
+
+        when(opinionRepository.search(any(SearchRequest.class)))
+                .thenReturn(List.of(doc1, doc2));
+
+        PromptBuilder builderWithOpinions = new PromptBuilder(
+                new ValueProfile(), conversationSummaryService, 3, true, null, opinionRepository);
+
+        Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "test météo");
+        String systemContent = getSystemContent(prompt);
+
+        assertTrue(systemContent.contains("J'aime la pluie d'automne."),
+                "Should contain first opinion");
+        assertTrue(systemContent.contains("La politique manque de vision."),
+                "Should contain second opinion");
+        assertTrue(systemContent.contains("N'invente pas d'opinions"),
+                "Should contain guard rail instruction");
+    }
+
+    @Test
+    void buildConversationnalPrompt_shouldIncludeSingleOpinion_withoutSeparator() {
+        when(conversationSummaryService.getSummary()).thenReturn("");
+
+        Document doc = new Document("Le café est essentiel.",
+                Map.of("canonicalText", "Le café est essentiel.", "polarity", 0.8));
+
+        when(opinionRepository.search(any(SearchRequest.class)))
+                .thenReturn(List.of(doc));
+
+        PromptBuilder builderWithOpinions = new PromptBuilder(
+                new ValueProfile(), conversationSummaryService, 3, true, null, opinionRepository);
+
+        Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "café");
+        String systemContent = getSystemContent(prompt);
+
+        assertTrue(systemContent.contains("Le café est essentiel."),
+                "Should contain the opinion");
+        assertFalse(systemContent.contains("polarité: 0.8) | "),
+                "Single opinion should not have separator after it");
+    }
+
+    @Test
+    void buildConversationnalPrompt_shouldSkipOpinions_whenRepoReturnsEmpty() {
+        when(conversationSummaryService.getSummary()).thenReturn("");
+        when(opinionRepository.search(any(SearchRequest.class)))
+                .thenReturn(Collections.emptyList());
+
+        PromptBuilder builderWithOpinions = new PromptBuilder(
+                new ValueProfile(), conversationSummaryService, 3, true, null, opinionRepository);
+
+        Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "bonjour");
+        String systemContent = getSystemContent(prompt);
+
+        assertFalse(systemContent.contains("Tes opinions"),
+                "Should not contain opinions block when none found");
+    }
+
+    @Test
+    void buildConversationnalPrompt_shouldNotCrash_whenOpinionRepoIsNull() {
+        when(conversationSummaryService.getSummary()).thenReturn("");
+
+        PromptBuilder builderNoOpinions = new PromptBuilder(
+                new ValueProfile(), conversationSummaryService, 3, true, null, null);
+
+        assertDoesNotThrow(() ->
+                builderNoOpinions.buildConversationnalPrompt(new ConversationContext(), "test"));
     }
 
     // ===== Utilitaire =====

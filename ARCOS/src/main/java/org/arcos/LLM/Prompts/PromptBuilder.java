@@ -5,6 +5,7 @@ import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Mood.Mood;
 import org.arcos.Personality.Mood.PadState;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
@@ -21,6 +22,8 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.document.Document;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.lang.Nullable;
@@ -41,18 +44,21 @@ public class PromptBuilder {
     private final int recentMessagesCount;
     private final boolean userModelEnabled;
     private final UserModelRetrievalService userModelRetrievalService;
+    private final OpinionRepository opinionRepository;
 
     @Autowired
     public PromptBuilder(ValueProfile valueProfile,
                          ConversationSummaryService conversationSummaryService,
                          @Value("${arcos.conversation.summary.recent-messages-count:3}") int recentMessagesCount,
                          @Value("${arcos.user-model.enabled:true}") boolean userModelEnabled,
-                         @Nullable UserModelRetrievalService userModelRetrievalService) {
+                         @Nullable UserModelRetrievalService userModelRetrievalService,
+                         @Nullable OpinionRepository opinionRepository) {
         this.valueProfile = valueProfile;
         this.conversationSummaryService = conversationSummaryService;
         this.recentMessagesCount = recentMessagesCount;
         this.userModelEnabled = userModelEnabled;
         this.userModelRetrievalService = userModelRetrievalService;
+        this.opinionRepository = opinionRepository;
     }
 
     // ==================== PROMPTS PUBLIQUES ====================
@@ -184,6 +190,7 @@ public class PromptBuilder {
         appendMoodInfo(system, context);
         system.append(getValueProfile());
         appendUserProfileIfAvailable(system, originalQuery);
+        appendRelevantOpinions(system, originalQuery);
         system.append(getGeneralInformation());
         system.append(getConversationContextIfPresent(context));
         system.append("Le message utilisateur est transcrit et est souvent sujet à imprécision.");
@@ -554,6 +561,31 @@ public class PromptBuilder {
             }
         } catch (Exception e) {
             log.warn("Failed to retrieve user profile: {}", e.getMessage());
+        }
+    }
+
+    // ==================== OPINIONS CONTEXTUELLES ====================
+
+    private void appendRelevantOpinions(StringBuilder prompt, String query) {
+        if (opinionRepository == null) { return; }
+        try {
+            SearchRequest searchRequest = SearchRequest.builder().query(query).topK(2).build();
+            List<Document> docs = opinionRepository.search(searchRequest);
+            if (docs.isEmpty()) { return; }
+            prompt.append("Tes opinions: ");
+            for (int i = 0; i < docs.size(); i++) {
+                Map<String, Object> meta = docs.get(i).getMetadata();
+                String text = meta.containsKey("canonicalText") && meta.get("canonicalText") != null
+                        ? meta.get("canonicalText").toString()
+                        : (meta.containsKey("summary") ? meta.get("summary").toString() : docs.get(i).getText());
+                Object polarityObj = meta.get("polarity");
+                String polarity = polarityObj != null ? String.format("%.1f", ((Number) polarityObj).doubleValue()) : "?";
+                prompt.append("\"").append(text).append("\" (polarité: ").append(polarity).append(")");
+                if (i < docs.size() - 1) { prompt.append(" | "); }
+            }
+            prompt.append("\nIntègre naturellement si pertinent. N'invente pas d'opinions.\n");
+        } catch (Exception e) {
+            log.warn("Failed to retrieve opinions for prompt: {}", e.getMessage());
         }
     }
 
