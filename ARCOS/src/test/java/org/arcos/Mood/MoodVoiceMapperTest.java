@@ -18,8 +18,8 @@ class MoodVoiceMapperTest {
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
         assertEquals(1.05f, params.lengthScale, 0.01f, "Neutral arousal -> base speed");
-        assertEquals(0.6f, params.noiseScale, 0.01f, "Neutral pleasure -> base noise");
-        assertEquals(0.8f, params.noiseW, 0.01f, "Neutral dominance -> base noiseW");
+        assertEquals(0.50f, params.noiseScale, 0.01f, "Neutral pleasure -> base noise");
+        assertEquals(0.80f, params.noiseW, 0.01f, "Neutral dominance -> base noiseW");
     }
 
     @Test
@@ -29,8 +29,8 @@ class MoodVoiceMapperTest {
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
         assertTrue(params.lengthScale < 1.05f, "High arousal -> faster than base");
-        assertTrue(params.noiseScale < 0.6f, "High pleasure -> smoother than base");
-        assertTrue(params.noiseW < 0.8f, "High dominance -> more regular than base");
+        assertTrue(params.noiseScale < 0.50f, "High pleasure -> smoother than base");
+        assertTrue(params.noiseW < 0.80f, "High dominance -> more regular than base");
     }
 
     @Test
@@ -40,8 +40,8 @@ class MoodVoiceMapperTest {
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
         assertTrue(params.lengthScale < 0.8f, "Very high arousal -> very fast");
-        assertTrue(params.noiseScale > 0.6f, "Negative pleasure -> rougher than base");
-        assertTrue(params.noiseW < 0.8f, "High dominance -> regular");
+        assertTrue(params.noiseScale > 0.50f, "Negative pleasure -> rougher than base");
+        assertTrue(params.noiseW < 0.80f, "High dominance -> regular");
     }
 
     @Test
@@ -51,8 +51,8 @@ class MoodVoiceMapperTest {
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
         assertTrue(params.lengthScale > 1.2f, "Low arousal -> slow");
-        assertTrue(params.noiseScale > 0.6f, "Negative pleasure -> rougher");
-        assertTrue(params.noiseW > 0.8f, "Low dominance -> variable");
+        assertTrue(params.noiseScale > 0.50f, "Negative pleasure -> rougher");
+        assertTrue(params.noiseW > 0.80f, "Low dominance -> variable");
     }
 
     @Test
@@ -62,8 +62,8 @@ class MoodVoiceMapperTest {
         MoodVoiceMapper.VoiceParams params = mapper.mapToVoice(pad);
 
         assertTrue(params.lengthScale < 1.05f, "High arousal -> fast");
-        assertTrue(params.noiseScale > 0.6f, "Negative pleasure -> rough");
-        assertTrue(params.noiseW > 0.8f, "Low dominance -> variable");
+        assertTrue(params.noiseScale > 0.50f, "Negative pleasure -> rough");
+        assertTrue(params.noiseW > 0.80f, "Low dominance -> variable");
     }
 
     @ParameterizedTest
@@ -79,8 +79,8 @@ class MoodVoiceMapperTest {
 
         assertTrue(params.lengthScale >= 0.7f && params.lengthScale <= 1.4f,
                 "lengthScale " + params.lengthScale + " out of range [0.7, 1.4]");
-        assertTrue(params.noiseScale >= 0.3f && params.noiseScale <= 0.9f,
-                "noiseScale " + params.noiseScale + " out of range [0.3, 0.9]");
+        assertTrue(params.noiseScale >= 0.25f && params.noiseScale <= 0.9f,
+                "noiseScale " + params.noiseScale + " out of range [0.25, 0.9]");
         assertTrue(params.noiseW >= 0.5f && params.noiseW <= 1.1f,
                 "noiseW " + params.noiseW + " out of range [0.5, 1.1]");
     }

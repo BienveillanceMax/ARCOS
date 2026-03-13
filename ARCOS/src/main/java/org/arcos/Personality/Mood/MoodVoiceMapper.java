@@ -5,21 +5,21 @@ import org.springframework.stereotype.Component;
 @Component
 public class MoodVoiceMapper {
 
-    // --- Tunable coefficients (adjust during calibration) ---
+    // --- Tunable coefficients (calibrated with GLaDOS fr_FR-medium model) ---
     private static final float BASE_LENGTH = 1.05f;
     private static final float AROUSAL_LENGTH_COEFF = 0.35f;
-    private static final float MIN_LENGTH = 0.7f;
-    private static final float MAX_LENGTH = 1.4f;
+    private static final float MIN_LENGTH = 0.70f;
+    private static final float MAX_LENGTH = 1.40f;
 
-    private static final float BASE_NOISE = 0.6f;
-    private static final float PLEASURE_NOISE_COEFF = 0.3f;
-    private static final float MIN_NOISE = 0.3f;
-    private static final float MAX_NOISE = 0.9f;
+    private static final float BASE_NOISE = 0.50f;
+    private static final float PLEASURE_NOISE_COEFF = 0.45f;
+    private static final float MIN_NOISE = 0.25f;
+    private static final float MAX_NOISE = 0.90f;
 
-    private static final float BASE_NOISEW = 0.8f;
-    private static final float DOMINANCE_NOISEW_COEFF = 0.3f;
-    private static final float MIN_NOISEW = 0.5f;
-    private static final float MAX_NOISEW = 1.1f;
+    private static final float BASE_NOISEW = 0.80f;
+    private static final float DOMINANCE_NOISEW_COEFF = 0.45f;
+    private static final float MIN_NOISEW = 0.50f;
+    private static final float MAX_NOISEW = 1.10f;
 
     public static class VoiceParams {
         public final float lengthScale;
