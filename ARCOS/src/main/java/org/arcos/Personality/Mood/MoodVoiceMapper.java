@@ -5,6 +5,22 @@ import org.springframework.stereotype.Component;
 @Component
 public class MoodVoiceMapper {
 
+    // --- Tunable coefficients (adjust during calibration) ---
+    private static final float BASE_LENGTH = 1.05f;
+    private static final float AROUSAL_LENGTH_COEFF = 0.35f;
+    private static final float MIN_LENGTH = 0.7f;
+    private static final float MAX_LENGTH = 1.4f;
+
+    private static final float BASE_NOISE = 0.6f;
+    private static final float PLEASURE_NOISE_COEFF = 0.3f;
+    private static final float MIN_NOISE = 0.3f;
+    private static final float MAX_NOISE = 0.9f;
+
+    private static final float BASE_NOISEW = 0.8f;
+    private static final float DOMINANCE_NOISEW_COEFF = 0.3f;
+    private static final float MIN_NOISEW = 0.5f;
+    private static final float MAX_NOISEW = 1.1f;
+
     public static class VoiceParams {
         public final float lengthScale;
         public final float noiseScale;
@@ -18,32 +34,17 @@ public class MoodVoiceMapper {
     }
 
     public VoiceParams mapToVoice(PadState pad) {
-        // Base values
-        float baseLength = 1.2f;
-        float baseNoise = 0.667f;
-        float baseNoiseW = 0.8f;
+        float lengthScale = clamp(
+                BASE_LENGTH - (float)(pad.getArousal() * AROUSAL_LENGTH_COEFF),
+                MIN_LENGTH, MAX_LENGTH);
 
-        // Arousal affects Speed (Length Scale)
-        // High Arousal -> Faster (lower length)
-        // Low Arousal -> Slower (higher length)
-        // Range: -1.0 to 1.0
-        // If A=1.0 -> length = 0.8 (Fast)
-        // If A=-1.0 -> length = 1.2 (Slow)
-        float lengthScale = baseLength - (float)(pad.getArousal() * 0.2);
+        float noiseScale = clamp(
+                BASE_NOISE - (float)(pad.getPleasure() * PLEASURE_NOISE_COEFF),
+                MIN_NOISE, MAX_NOISE);
 
-        // Pleasure affects Noise Scale? (Stability/Calmness)
-        // High Pleasure -> Smoother?
-        // This is experimental. Let's vary Noise Scale slightly with Arousal too.
-        // High Energy -> More Noise
-        float noiseScale = baseNoise + (float)(pad.getArousal() * 0.1);
-
-        // Dominance affects NoiseW? (Pronunciation/Width)
-        // High Dominance -> Clearer?
-        float noiseW = baseNoiseW;
-
-        // Clamp values to safe ranges
-        lengthScale = clamp(lengthScale, 0.5f, 2.0f);
-        noiseScale = clamp(noiseScale, 0.1f, 1.0f);
+        float noiseW = clamp(
+                BASE_NOISEW - (float)(pad.getDominance() * DOMINANCE_NOISEW_COEFF),
+                MIN_NOISEW, MAX_NOISEW);
 
         return new VoiceParams(lengthScale, noiseScale, noiseW);
     }
