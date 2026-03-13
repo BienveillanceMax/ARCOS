@@ -394,8 +394,10 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    // Buffer audio for Whisper
-                    speechToText.processAudio(whisperBuffer);
+                    // Only buffer audio once speech has been detected
+                    if (hasDetectedSpeech) {
+                        speechToText.processAudio(whisperBuffer);
+                    }
 
                     // Check if we should stop due to silence
                     if (hasDetectedSpeech && isSilent) {
@@ -407,23 +409,26 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    // Safety timeout
-                    long totalRecordingTime = System.currentTimeMillis() - recordingStartTime;
-                    long maxRecordingMs = (long) audioProperties.getMaxRecordingSeconds() * 1000;
-                    if (totalRecordingTime > maxRecordingMs) {
-                        log.info("Maximum recording time reached ({}s), processing transcription...",
-                                audioProperties.getMaxRecordingSeconds());
+                    // Timeout: short window while waiting for speech, full duration once speaking
+                    long elapsed = System.currentTimeMillis() - recordingStartTime;
+                    long timeoutMs = hasDetectedSpeech
+                            ? (long) audioProperties.getMaxRecordingSeconds() * 1000
+                            : audioProperties.getPostResponseListeningWindowMs();
+                    if (elapsed >= timeoutMs) {
+                        log.info(hasDetectedSpeech
+                                ? "Maximum recording time reached, processing transcription..."
+                                : "No speech detected within {}ms, aborting", timeoutMs);
                         break;
                     }
                 }
             }
 
-            // Process transcription
-            if (speechToText.hasMinimumAudio()) {
+            // Process transcription only if speech was actually detected
+            if (hasDetectedSpeech && speechToText.hasMinimumAudio()) {
                 log.info("Processing {}ms of audio...", speechToText.getBufferedAudioDurationMs());
                 return speechToText.getTranscription();
             } else {
-                log.info("Not enough audio data for transcription");
+                log.info(hasDetectedSpeech ? "Not enough audio data for transcription" : "No speech detected");
                 return "";
             }
 
@@ -470,10 +475,12 @@ public class WakeWordProducer implements Runnable {
             log.debug("openConversationWindow ignorée : Porcupine non actif");
             return;
         }
-        // Drain happens on the wakeword-producer thread when it exits suspension
-        suspended = false;
-        inConversationWindowMode = true;
+        // Set conversation state BEFORE clearing suspended, so the wakeword thread
+        // sees the conversation window as soon as it resumes (avoids race condition
+        // where thread wakes, drains instantly with JavaSound, and misses the flag).
         conversationWindowExpiry = System.currentTimeMillis() + durationMs;
+        inConversationWindowMode = true;
+        suspended = false;
         log.debug("Fenêtre conversation ouverte pour {}ms", durationMs);
     }
 
@@ -541,7 +548,10 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    speechToText.processAudio(whisperBuffer);
+                    // Only buffer audio once speech has been detected
+                    if (hasDetectedSpeech) {
+                        speechToText.processAudio(whisperBuffer);
+                    }
 
                     if (hasDetectedSpeech && isSilent) {
                         long silenceDuration = System.currentTimeMillis() - lastSoundTime;
@@ -567,11 +577,11 @@ public class WakeWordProducer implements Runnable {
                 }
             }
 
-            if (speechToText.hasMinimumAudio()) {
+            if (hasDetectedSpeech && speechToText.hasMinimumAudio()) {
                 log.info("[CONVERSATION] Traitement de {}ms d'audio...", speechToText.getBufferedAudioDurationMs());
                 return speechToText.getTranscription();
             } else {
-                log.info("[CONVERSATION] Pas assez d'audio pour la transcription");
+                log.info(hasDetectedSpeech ? "[CONVERSATION] Pas assez d'audio pour la transcription" : "[CONVERSATION] Aucune parole détectée");
                 return "";
             }
 
