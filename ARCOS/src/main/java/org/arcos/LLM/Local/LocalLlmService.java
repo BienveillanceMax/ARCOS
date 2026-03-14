@@ -3,10 +3,10 @@ package org.arcos.LLM.Local;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
-import org.arcos.UserModel.UserModelProperties;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.ollama.OllamaChatModel;
 import org.springframework.ai.ollama.api.OllamaOptions;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -19,17 +19,20 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class LocalLlmService {
 
     private final OllamaChatModel ollamaChatModel;
-    private final UserModelProperties properties;
     private final LocalLlmHealthIndicator healthIndicator;
     private final ExecutorService executor;
     private final AtomicBoolean isProcessing = new AtomicBoolean(false);
+    private final long timeoutMs;
+    private final String model;
 
     public LocalLlmService(OllamaChatModel ollamaChatModel,
-                           UserModelProperties properties,
-                           LocalLlmHealthIndicator healthIndicator) {
+                           LocalLlmHealthIndicator healthIndicator,
+                           @Value("${arcos.local-llm.timeout-ms:90000}") long timeoutMs,
+                           @Value("${arcos.local-llm.model:qwen3.5:4b}") String model) {
         this.ollamaChatModel = ollamaChatModel;
-        this.properties = properties;
         this.healthIndicator = healthIndicator;
+        this.timeoutMs = timeoutMs;
+        this.model = model;
 
         ThreadFactory daemonFactory = r -> {
             Thread t = new Thread(r, "arcos-local-llm");
@@ -54,9 +57,6 @@ public class LocalLlmService {
             return CompletableFuture.failedFuture(
                     new RejectedExecutionException("Local LLM is already processing a request"));
         }
-
-        long timeoutMs = properties.getConsolidation().getTimeoutMs();
-        String model = properties.getConsolidation().getModel();
 
         return CompletableFuture.supplyAsync(() -> {
             try {

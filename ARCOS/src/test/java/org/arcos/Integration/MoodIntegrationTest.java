@@ -32,7 +32,7 @@ public class MoodIntegrationTest {
     @BeforeEach
     void setUp() {
         valueProfile = new ValueProfile(); // Real object
-        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null); // Real object
+        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null, null); // Real object
         context = new ConversationContext(); // Real object
         personalityProperties = new PersonalityProperties(); // Real object with defaults
         moodService = new MoodService(context, personalityProperties); // Service under test

@@ -3,7 +3,6 @@ package org.arcos.UnitTests.LLM;
 import org.arcos.LLM.Local.LocalLlmHealthIndicator;
 import org.arcos.LLM.Local.LocalLlmService;
 import org.arcos.LLM.Local.ThinkingMode;
-import org.arcos.UserModel.UserModelProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,18 +32,14 @@ class LocalLlmServiceTest {
     @Mock
     private LocalLlmHealthIndicator healthIndicator;
 
-    private UserModelProperties properties;
     private LocalLlmService service;
     private AutoCloseable mocks;
 
     @BeforeEach
     void setUp() {
         mocks = MockitoAnnotations.openMocks(this);
-        properties = new UserModelProperties();
-        properties.getConsolidation().setTimeoutMs(5000);
-        properties.getConsolidation().setModel("qwen3.5:4b");
         when(healthIndicator.isOllamaUp()).thenReturn(true);
-        service = new LocalLlmService(ollamaChatModel, properties, healthIndicator);
+        service = new LocalLlmService(ollamaChatModel, healthIndicator, 5000L, "qwen3.5:4b");
     }
 
     @AfterEach
@@ -136,9 +131,8 @@ class LocalLlmServiceTest {
     @Test
     void timeout_shouldCompleteExceptionallyOnTimeout() {
         // Given — make the call take longer than timeout
-        properties.getConsolidation().setTimeoutMs(200);
         service.shutdown();
-        service = new LocalLlmService(ollamaChatModel, properties, healthIndicator);
+        service = new LocalLlmService(ollamaChatModel, healthIndicator, 200L, "qwen3.5:4b");
 
         when(ollamaChatModel.call(any(Prompt.class))).thenAnswer(inv -> {
             Thread.sleep(5000);

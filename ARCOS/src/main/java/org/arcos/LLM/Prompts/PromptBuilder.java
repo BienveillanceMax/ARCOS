@@ -13,8 +13,9 @@ import org.arcos.Personality.Values.Entities.ValueSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.Tools.Actions.ActionResult;
-import org.arcos.UserModel.Models.UserProfileContext;
-import org.arcos.UserModel.Retrieval.UserModelRetrievalService;
+import org.arcos.UserModel.DfsNavigator.DfsNavigatorService;
+import org.arcos.UserModel.DfsNavigator.DfsResult;
+import org.arcos.UserModel.DfsNavigator.UserContextFormatter;
 import com.google.api.services.calendar.model.Event;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
@@ -43,7 +44,8 @@ public class PromptBuilder {
     private final ConversationSummaryService conversationSummaryService;
     private final int recentMessagesCount;
     private final boolean userModelEnabled;
-    private final UserModelRetrievalService userModelRetrievalService;
+    private final DfsNavigatorService dfsNavigatorService;
+    private final UserContextFormatter userContextFormatter;
     private final OpinionRepository opinionRepository;
 
     @Autowired
@@ -51,13 +53,15 @@ public class PromptBuilder {
                          ConversationSummaryService conversationSummaryService,
                          @Value("${arcos.conversation.summary.recent-messages-count:3}") int recentMessagesCount,
                          @Value("${arcos.user-model.enabled:true}") boolean userModelEnabled,
-                         @Nullable UserModelRetrievalService userModelRetrievalService,
+                         @Nullable DfsNavigatorService dfsNavigatorService,
+                         @Nullable UserContextFormatter userContextFormatter,
                          @Nullable OpinionRepository opinionRepository) {
         this.valueProfile = valueProfile;
         this.conversationSummaryService = conversationSummaryService;
         this.recentMessagesCount = recentMessagesCount;
         this.userModelEnabled = userModelEnabled;
-        this.userModelRetrievalService = userModelRetrievalService;
+        this.dfsNavigatorService = dfsNavigatorService;
+        this.userContextFormatter = userContextFormatter;
         this.opinionRepository = opinionRepository;
     }
 
@@ -175,9 +179,6 @@ public class PromptBuilder {
 
         system.append(fullConversation);
         appendMemoryRules(system);
-        if (userModelEnabled) {
-            appendUserObservationExtractionInstructions(system);
-        }
 
         return new Prompt(new SystemMessage(system.toString()));
     }
@@ -514,53 +515,24 @@ public class PromptBuilder {
         """);
     }
 
-    private void appendUserObservationExtractionInstructions(StringBuilder prompt) {
-        prompt.append("""
-        ## Observations utilisateur
-        Extrais observations dans "userObservations":
-        - Commence par "Mon créateur..."
-        - Catégorie: IDENTITE, COMMUNICATION, HABITUDES, OBJECTIFS, EMOTIONS, INTERETS
-        - Si contredit précédente: "remplace" = texte exact remplacé
-        - Si déclaration explicite: "explicite": true
-        - Conversation fonctionnelle → liste vide []
-        """);
-    }
-
     // ==================== PROFIL UTILISATEUR ====================
 
     private void appendUserProfileIfAvailable(StringBuilder prompt, String userQuery) {
-        if (!userModelEnabled || userModelRetrievalService == null) {
+        if (!userModelEnabled || dfsNavigatorService == null || userContextFormatter == null) {
             return;
         }
         try {
-            UserProfileContext profile = userModelRetrievalService.retrieveUserContext(userQuery);
-            if (profile == null || (profile.isEmpty() && !profile.hasProactiveHint() && !profile.hasGreetingContext())) {
+            DfsResult dfsResult = dfsNavigatorService.navigate(userQuery);
+            if (dfsResult.relevantLeaves().isEmpty()) {
                 return;
             }
-            if (!profile.isEmpty()) {
-                prompt.append("## Profil utilisateur\n");
-                if (profile.identitySummary() != null && !profile.identitySummary().isBlank()) {
-                    prompt.append(profile.identitySummary()).append("\n");
-                }
-                if (profile.communicationSummary() != null && !profile.communicationSummary().isBlank()) {
-                    prompt.append(profile.communicationSummary()).append("\n");
-                }
-                if (profile.onDemandLeafText() != null && !profile.onDemandLeafText().isBlank()) {
-                    prompt.append(profile.onDemandLeafText()).append("\n");
-                }
-                if (profile.engagementDecayDetected()) {
-                    prompt.append("Utilisateur moins engagé récemment. Sois concis et proactif.\n");
-                }
+            String formattedProfile = userContextFormatter.format(dfsResult.relevantLeaves());
+            if (!formattedProfile.isEmpty()) {
+                prompt.append(formattedProfile);
                 prompt.append("Adapte occasionnellement tes réponses de manière naturelle.\n\n");
             }
-            if (profile.hasGreetingContext()) {
-                prompt.append("Contexte salutation: ").append(profile.greetingContext()).append("\n\n");
-            }
-            if (profile.hasProactiveHint()) {
-                prompt.append("Découverte: ").append(profile.proactiveGapHint()).append("\n\n");
-            }
         } catch (Exception e) {
-            log.warn("Failed to retrieve user profile: {}", e.getMessage());
+            log.warn("Failed to retrieve user profile via DFS: {}", e.getMessage());
         }
     }
 

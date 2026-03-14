@@ -42,8 +42,7 @@ class MemoryServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        // userModelEnabled=false to preserve legacy behavior in existing tests
-        memoryService = new MemoryService(memoryRepository, llmClient, promptBuilder, false);
+        memoryService = new MemoryService(memoryRepository, llmClient, promptBuilder);
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {

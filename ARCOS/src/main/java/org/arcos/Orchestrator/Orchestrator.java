@@ -26,7 +26,11 @@ import org.arcos.PlannedAction.ExecutionHistoryService;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.PlannedAction.PlannedActionService;
-import org.arcos.UserModel.Lifecycle.UserModelPipelineOrchestrator;
+import org.arcos.UserModel.BatchPipeline.BatchPipelineOrchestrator;
+import org.arcos.UserModel.BatchPipeline.IdleDetectionService;
+import org.arcos.UserModel.BatchPipeline.Queue.ConversationPair;
+import org.arcos.UserModel.BatchPipeline.Queue.ConversationQueueService;
+import org.arcos.UserModel.BatchPipeline.Queue.QueuedConversation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -42,7 +46,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.stream.Collectors;
 
 @Component
 @Slf4j
@@ -67,7 +70,9 @@ public class Orchestrator
     private final ConversationSummaryService conversationSummaryService;
     private final WakeWordProducer wakeWordProducer;
     private final AudioProperties audioProperties;
-    private final UserModelPipelineOrchestrator userModelPipeline;
+    private final ConversationQueueService conversationQueueService;
+    private final IdleDetectionService idleDetectionService;
+    private final BatchPipelineOrchestrator batchPipelineOrchestrator;
     private volatile boolean isExecutingAction = false;
     private volatile boolean inConversationMode = false;
 
@@ -86,7 +91,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable UserModelPipelineOrchestrator userModelPipeline) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable ConversationQueueService conversationQueueService, @Nullable IdleDetectionService idleDetectionService, @Nullable BatchPipelineOrchestrator batchPipelineOrchestrator) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -106,7 +111,9 @@ public class Orchestrator
         this.wakeWordProducer = wakeWordProducer;
         this.audioProperties = audioProperties;
         this.conversationSummaryService = conversationSummaryService;
-        this.userModelPipeline = userModelPipeline;
+        this.conversationQueueService = conversationQueueService;
+        this.idleDetectionService = idleDetectionService;
+        this.batchPipelineOrchestrator = batchPipelineOrchestrator;
         lastInteracted = LocalDateTime.now();
     }
 
@@ -210,6 +217,12 @@ public class Orchestrator
 
     private void processAndSpeak(String userQuery, boolean isMultiTurn) {
         log.info("Processing query: {}", userQuery);
+        if (idleDetectionService != null) {
+            idleDetectionService.recordInteraction();
+        }
+        if (batchPipelineOrchestrator != null) {
+            batchPipelineOrchestrator.interrupt();
+        }
         centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.THINKING_START));
 
         // Create the prompt for streaming response
@@ -355,13 +368,27 @@ public class Orchestrator
                     lastInteracted = LocalDateTime.now();
                 }
 
-                if (userModelPipeline != null) {
-                    List<String> userMessages = context.getRecentMessages().stream()
-                            .filter(msg -> msg.startsWith("USER: "))
-                            .map(msg -> msg.substring("USER: ".length()))
-                            .collect(java.util.stream.Collectors.toList());
-                    if (!userMessages.isEmpty()) {
-                        userModelPipeline.processConversationAsync(userMessages, false);
+                if (conversationQueueService != null) {
+                    List<String> recentMessages = context.getRecentMessages();
+                    List<ConversationPair> pairs = new java.util.ArrayList<>();
+                    String pendingUser = null;
+                    for (String msg : recentMessages) {
+                        if (msg.startsWith("USER: ")) {
+                            pendingUser = msg.substring("USER: ".length());
+                        } else if (msg.startsWith("ASSISTANT: ") && pendingUser != null) {
+                            pairs.add(new ConversationPair(pendingUser, msg.substring("ASSISTANT: ".length())));
+                            pendingUser = null;
+                        }
+                    }
+                    if (!pairs.isEmpty()) {
+                        QueuedConversation queued = new QueuedConversation(
+                                java.util.UUID.randomUUID().toString(),
+                                pairs,
+                                LocalDateTime.now(),
+                                false
+                        );
+                        conversationQueueService.enqueue(queued);
+                        log.debug("Enqueued conversation with {} pairs for batch processing", pairs.size());
                     }
                 }
             } catch (Exception e) {

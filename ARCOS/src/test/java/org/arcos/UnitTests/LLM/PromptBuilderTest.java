@@ -41,7 +41,7 @@ class PromptBuilderTest {
         MockitoAnnotations.openMocks(this);
         // ValueProfile avec profil DEFAULT (scores à 50.0) — pas de valeurs dominantes/supprimées
         ValueProfile valueProfile = new ValueProfile();
-        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null);
+        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null, null);
     }
 
     // ===== T7 : résumé disponible + contexte non vide =====
@@ -132,7 +132,7 @@ class PromptBuilderTest {
                 .thenReturn(List.of(doc1, doc2));
 
         PromptBuilder builderWithOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, opinionRepository);
+                new ValueProfile(), conversationSummaryService, 3, true, null, null, opinionRepository);
 
         Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "test météo");
         String systemContent = getSystemContent(prompt);
@@ -156,7 +156,7 @@ class PromptBuilderTest {
                 .thenReturn(List.of(doc));
 
         PromptBuilder builderWithOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, opinionRepository);
+                new ValueProfile(), conversationSummaryService, 3, true, null, null, opinionRepository);
 
         Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "café");
         String systemContent = getSystemContent(prompt);
@@ -174,7 +174,7 @@ class PromptBuilderTest {
                 .thenReturn(Collections.emptyList());
 
         PromptBuilder builderWithOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, opinionRepository);
+                new ValueProfile(), conversationSummaryService, 3, true, null, null, opinionRepository);
 
         Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "bonjour");
         String systemContent = getSystemContent(prompt);
@@ -188,7 +188,7 @@ class PromptBuilderTest {
         when(conversationSummaryService.getSummary()).thenReturn("");
 
         PromptBuilder builderNoOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, null);
+                new ValueProfile(), conversationSummaryService, 3, true, null, null, null);
 
         assertDoesNotThrow(() ->
                 builderNoOpinions.buildConversationnalPrompt(new ConversationContext(), "test"));
