@@ -26,6 +26,8 @@ public class UserModelProperties {
     private long memlistenerTimeoutMs = 120000;
     private String memlistenerKeepAlive = "0";
 
+    private int leafMaxChars = 300;
+
     // DFS Navigator (Epic 3)
     private String crossEncoderModelPath = "models/finetuned-navigator-deep/model.onnx";
     private String crossEncoderTokenizerPath = "models/finetuned-navigator-deep/tokenizer.json";

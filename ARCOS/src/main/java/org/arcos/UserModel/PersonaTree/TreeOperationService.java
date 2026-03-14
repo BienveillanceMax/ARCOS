@@ -1,6 +1,7 @@
 package org.arcos.UserModel.PersonaTree;
 
 import lombok.extern.slf4j.Slf4j;
+import org.arcos.UserModel.UserModelProperties;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -14,6 +15,7 @@ public class TreeOperationService {
 
     private final PersonaTreeService treeService;
     private final PersonaTreeSchemaLoader schemaLoader;
+    private final UserModelProperties properties;
 
     // Case-insensitive regex patterns
     private static final Pattern ADD_PATTERN = Pattern.compile(
@@ -25,9 +27,12 @@ public class TreeOperationService {
     private static final Pattern NO_OP_PATTERN = Pattern.compile(
             "NO_OP\\(\\s*\\)", Pattern.CASE_INSENSITIVE);
 
-    public TreeOperationService(PersonaTreeService treeService, PersonaTreeSchemaLoader schemaLoader) {
+    public TreeOperationService(PersonaTreeService treeService,
+                                PersonaTreeSchemaLoader schemaLoader,
+                                UserModelProperties properties) {
         this.treeService = treeService;
         this.schemaLoader = schemaLoader;
+        this.properties = properties;
     }
 
     /**
@@ -152,7 +157,13 @@ public class TreeOperationService {
                         return new TreeOperationResult(operation, false,
                                 "Invalid or non-leaf path: " + operation.path());
                     }
-                    treeService.setLeafValue(operation.path(), operation.value());
+                    String value = operation.value();
+                    if (value != null && value.length() > properties.getLeafMaxChars()) {
+                        log.warn("Truncated leaf value for {}: {} → {} chars",
+                                operation.path(), value.length(), properties.getLeafMaxChars());
+                        value = value.substring(0, properties.getLeafMaxChars());
+                    }
+                    treeService.setLeafValue(operation.path(), value);
                     return new TreeOperationResult(operation, true, null);
                 }
                 case DELETE -> {

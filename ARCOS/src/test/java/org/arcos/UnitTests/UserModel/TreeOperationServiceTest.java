@@ -44,7 +44,7 @@ class TreeOperationServiceTest {
         treeService = new PersonaTreeService(schemaLoader, repository, properties);
         treeService.initialize();
 
-        operationService = new TreeOperationService(treeService, schemaLoader);
+        operationService = new TreeOperationService(treeService, schemaLoader, properties);
     }
 
     // ========== Parsing Tests ==========
@@ -305,5 +305,39 @@ class TreeOperationServiceTest {
 
         // Verify persist was called once (after batch)
         verify(repository, times(1)).save(any(), any());
+    }
+
+    // ========== Truncation Tests ==========
+
+    @Test
+    void applyAdd_truncatesOverlongValue() {
+        // Given
+        properties.setLeafMaxChars(20);
+        String longValue = "a]".repeat(25); // 50 chars
+        TreeOperation addOp = new TreeOperation(TreeOperationType.ADD, HAIR_PATH, longValue);
+
+        // When
+        List<TreeOperationResult> results = operationService.applyOperations(List.of(addOp));
+
+        // Then
+        assertThat(results.get(0).success()).isTrue();
+        String stored = treeService.getLeafValue(HAIR_PATH);
+        assertThat(stored).hasSize(20);
+    }
+
+    @Test
+    void applyUpdate_valueBelowLimit_storedAsIs() {
+        // Given
+        properties.setLeafMaxChars(300);
+        String shortValue = "brun clair";
+        TreeOperation addOp = new TreeOperation(TreeOperationType.ADD, HAIR_PATH, shortValue);
+
+        // When
+        List<TreeOperationResult> results = operationService.applyOperations(List.of(addOp));
+
+        // Then
+        assertThat(results.get(0).success()).isTrue();
+        String stored = treeService.getLeafValue(HAIR_PATH);
+        assertThat(stored).isEqualTo("brun clair");
     }
 }
