@@ -36,17 +36,35 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+      - memlistener_staging:/staging
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 5G
+          memory: 8G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
+
+  memlistener-init:
+    build:
+      context: ./docker/memlistener-init
+    container_name: memlistener_init
+    depends_on:
+      ollama:
+        condition: service_healthy
+    volumes:
+      - memlistener_staging:/staging
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - HF_REPO=Robot2050/MemListener
+      - HF_SUBFOLDER=dapo_qwen3_8B_mem
+      - OLLAMA_MODEL_NAME=memlistener:q4_k_m
+      - QUANTIZATION=q4_k_m
+    restart: "no"
 
   arcos-app:
     build:
@@ -56,10 +74,11 @@ services:
         GROUP_ID: ${GID:-1000}
     container_name: arcos_app
     restart: unless-stopped
-    #depends_on:
-      #- qdrant
-      #- faster-whisper
-      #- ollama
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
 
     tty: true
     stdin_open: true
@@ -83,24 +102,24 @@ services:
     volumes:
       - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
       - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
-      
+
       # D-Bus - CRITIQUE pour Bluetooth
       - /var/run/dbus:/var/run/dbus
       - /run/user/${UID:-1000}/bus:/run/user/${UID:-1000}/bus
-      
+
       # PipeWire/PulseAudio
       - /run/user/${UID:-1000}/pipewire-0:/run/user/${UID:-1000}/pipewire-0
       - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
-      
+
       # Devices audio
       - /dev/snd:/dev/snd
-      
+
       # USB pour périphériques Bluetooth USB
       - /dev/bus/usb:/dev/bus/usb
 
     devices:
       - /dev/snd:/dev/snd
-    
+
     # Ajouter les groupes nécessaires
     group_add:
       - audio
@@ -109,3 +128,4 @@ services:
 volumes:
   qdrant_storage:
   ollama_data:
+  memlistener_staging:

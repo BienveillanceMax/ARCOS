@@ -29,6 +29,7 @@ class BatchPipelineOrchestratorTest {
     @Mock private MemListenerPromptBuilder promptBuilder;
     @Mock private PersonaTreeGate personaTreeGate;
     @Mock private IdleDetectionService idleDetectionService;
+    @Mock private MemListenerReadinessCheck readinessCheck;
 
     private BatchPipelineOrchestrator orchestrator;
 
@@ -36,12 +37,28 @@ class BatchPipelineOrchestratorTest {
     void setUp() {
         orchestrator = new BatchPipelineOrchestrator(
                 queueService, chunker, memListenerClient,
-                promptBuilder, personaTreeGate, idleDetectionService);
+                promptBuilder, personaTreeGate, idleDetectionService,
+                readinessCheck);
+    }
+
+    @Test
+    void checkAndRun_doesNothingWhenModelNotReady() {
+        // Given
+        when(readinessCheck.isModelReady()).thenReturn(false);
+
+        // When
+        orchestrator.checkAndRun();
+
+        // Then
+        verify(idleDetectionService, never()).isIdle();
+        verify(queueService, never()).drainAll();
+        verify(personaTreeGate, never()).createSnapshot();
     }
 
     @Test
     void checkAndRun_doesNothingWhenNotIdle() {
         // Given
+        when(readinessCheck.isModelReady()).thenReturn(true);
         when(idleDetectionService.isIdle()).thenReturn(false);
 
         // When
@@ -55,6 +72,7 @@ class BatchPipelineOrchestratorTest {
     @Test
     void checkAndRun_doesNothingWhenQueueEmpty() {
         // Given
+        when(readinessCheck.isModelReady()).thenReturn(true);
         when(idleDetectionService.isIdle()).thenReturn(true);
         when(queueService.isEmpty()).thenReturn(true);
 
