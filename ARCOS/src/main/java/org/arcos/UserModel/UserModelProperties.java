@@ -32,6 +32,14 @@ public class UserModelProperties {
             "genre", "voilà", "enfin", "donc"
     );
 
+    // DFS Navigator (Epic 3)
+    private String crossEncoderModelPath = "models/finetuned-navigator-deep/model.onnx";
+    private String crossEncoderTokenizerPath = "models/finetuned-navigator-deep/tokenizer.json";
+    private int dfsTopNL1 = 3;
+    private float dfsL2Threshold = 0.0f;
+    private int dfsMaxLength = 128;
+    private int dfsIntraOpThreads = 4;
+
     private Consolidation consolidation = new Consolidation();
     private ProactiveGapFilling proactiveGapFilling = new ProactiveGapFilling();
     private Engagement engagement = new Engagement();

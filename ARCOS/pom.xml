@@ -229,6 +229,19 @@
             <version>3.1.2</version>
         </dependency>
 
+        <!-- ONNX Runtime for cross-encoder inference -->
+        <dependency>
+            <groupId>com.microsoft.onnxruntime</groupId>
+            <artifactId>onnxruntime</artifactId>
+            <version>1.17.3</version>
+        </dependency>
+        <!-- HuggingFace Tokenizers for Java (DJL) -->
+        <dependency>
+            <groupId>ai.djl.huggingface</groupId>
+            <artifactId>tokenizers</artifactId>
+            <version>0.29.0</version>
+        </dependency>
+
     </dependencies>
 
     <build>

@@ -1,0 +1,170 @@
+{
+  "l1Branches": [
+    {"key": "Physical_Appearance", "description": "Apparence physique : morphologie, traits du visage, peau, cheveux, voix", "treePath": "1_Biological_Characteristics.Physical_Appearance"},
+    {"key": "Physiological_Status", "description": "État physiologique : santé, forme physique, fonctions sensorielles, âge, paramètres vitaux", "treePath": "1_Biological_Characteristics.Physiological_Status"},
+    {"key": "Biological_Rhythms", "description": "Rythmes biologiques : rythme circadien, cycles d'énergie, sommeil, rythmes alimentaires", "treePath": "1_Biological_Characteristics.Biological_Rhythms"},
+    {"key": "Dynamic_Expressions", "description": "Expressions dynamiques : expressions faciales habituelles, gestuelle, posture, langage corporel non verbal", "treePath": "1_Biological_Characteristics.Dynamic_Expressions"},
+    {"key": "Cognitive_Abilities", "description": "Capacités cognitives : intelligence, mémoire, attention, apprentissage, créativité, perception", "treePath": "2_Psychological_Characteristics.Cognitive_Abilities"},
+    {"key": "Thinking_Patterns", "description": "Schémas de pensée : style de décision, résolution de problèmes, tendances cognitives, flexibilité mentale", "treePath": "2_Psychological_Characteristics.Thinking_Patterns"},
+    {"key": "Psychological_State", "description": "État psychologique : bien-être, santé mentale, niveau de stress, humeur de base, anxiété", "treePath": "2_Psychological_Characteristics.Psychological_State"},
+    {"key": "Self_Perception", "description": "Perception de soi : estime de soi, confiance, efficacité personnelle, identité", "treePath": "2_Psychological_Characteristics.Self_Perception"},
+    {"key": "Core_Personality", "description": "Personnalité fondamentale : ouverture, conscienciosité, extraversion, agréabilité, névrosisme, MBTI", "treePath": "3_Personality_Characteristics.Core_Personality"},
+    {"key": "Emotional_Characteristics", "description": "Caractéristiques émotionnelles : spectre émotionnel, expression, régulation, empathie, humour, sensibilité", "treePath": "3_Personality_Characteristics.Emotional_Characteristics"},
+    {"key": "Attitudinal_Tendencies", "description": "Tendances attitudinales : attitudes récurrentes envers autrui et le monde, dispositions mentales stables, orientations affectives durables", "treePath": "3_Personality_Characteristics.Attitudinal_Tendencies"},
+    {"key": "Coping_with_Adversity", "description": "Gestion de l'adversité : mécanismes d'adaptation, résilience, récupération, mentalité de croissance", "treePath": "3_Personality_Characteristics.Coping_with_Adversity"},
+    {"key": "Life_Beliefs", "description": "Croyances : valeurs, vision du monde, principes moraux, foi, position politique, sens de la vie", "treePath": "4_Identity_Characteristics.Life_Beliefs"},
+    {"key": "Motivations_and_Goals", "description": "Motivations et objectifs : forces motrices, aspirations, objectifs à long et court terme", "treePath": "4_Identity_Characteristics.Motivations_and_Goals"},
+    {"key": "Social_Identity", "description": "Identité sociale : culture, statut socioéconomique, éducation, métier, lieu de résidence", "treePath": "4_Identity_Characteristics.Social_Identity"},
+    {"key": "Family_System", "description": "Système familial : statut marital, rôles familiaux, relations, responsabilités, animaux", "treePath": "4_Identity_Characteristics.Family_System"},
+    {"key": "Life_Course", "description": "Parcours de vie : récit personnel, événements clés, étape de vie, orientation future", "treePath": "4_Identity_Characteristics.Life_Course"},
+    {"key": "Behavioral_Habits", "description": "Habitudes comportementales : routine, alimentation, vêtements, exercice, hygiène, sommeil", "treePath": "5_Behavioral_Characteristics.Behavioral_Habits"},
+    {"key": "Lifestyle", "description": "Mode de vie : emploi du temps, loisirs, santé émotionnelle, bien-être, logement, voyages", "treePath": "5_Behavioral_Characteristics.Lifestyle"},
+    {"key": "Social_Interactions", "description": "Interactions sociales : style de communication, préférences sociales, relations, gestion des conflits", "treePath": "5_Behavioral_Characteristics.Social_Interactions"},
+    {"key": "Interests_and_Skills", "description": "Intérêts et compétences : loisirs, compétences professionnelles, connaissances, créations", "treePath": "5_Behavioral_Characteristics.Interests_and_Skills"},
+    {"key": "Resource_Management", "description": "Gestion des ressources : temps, finances, espace, énergie, organisation", "treePath": "5_Behavioral_Characteristics.Resource_Management"},
+    {"key": "Digital_Behavior", "description": "Comportement numérique : réseaux sociaux, temps d'écran, applications, scrolling, publications en ligne, addiction au téléphone", "treePath": "5_Behavioral_Characteristics.Digital_Behavior"},
+    {"key": "Material_Security", "description": "Sécurité matérielle : statut économique, capital social et culturel, filets de sécurité personnels", "treePath": "5_Behavioral_Characteristics.Material_Security"},
+    {"key": "Coping_Capacity", "description": "Capacité d'adaptation : ressources internes pour faire face aux difficultés, seuils de tolérance, récupération après adversité", "treePath": "5_Behavioral_Characteristics.Coping_Capacity"},
+    {"key": "Knowledge_Base", "description": "Base de connaissances : préférences artistiques et culturelles, pratiques culturelles, domaines d'expertise personnelle", "treePath": "5_Behavioral_Characteristics.Knowledge_Base"},
+    {"key": "Social_Engagement", "description": "Engagement social : bénévolat, participation communautaire, causes défendues, implication civique et associative", "treePath": "5_Behavioral_Characteristics.Social_Engagement"},
+    {"key": "Safety_and_Protection", "description": "Sécurité et protection : sécurité personnelle et familiale, sanitaire, financière, précautions au quotidien", "treePath": "5_Behavioral_Characteristics.Safety_and_Protection"},
+    {"key": "Cross_Cultural_Adaptation", "description": "Adaptation interculturelle : navigation entre cultures, expériences d'intégration, identité biculturelle ou multilingue", "treePath": "5_Behavioral_Characteristics.Cross_Cultural_Adaptation"}
+  ],
+  "l2Groups": [
+    {
+      "parentKey": "Physical_Appearance",
+      "branches": [
+        {"key": "Body_Build", "description": "Morphologie et silhouette : taille, poids, corpulence, prise ou perte de poids"},
+        {"key": "Facial_Features", "description": "Traits du visage : ressemblance familiale, forme du visage, yeux, nez, bouche, expressions faciales au repos"},
+        {"key": "Skin", "description": "Peau et dermatologie : teint, sensibilité cutanée, cicatrices, taches, acné, eczéma, protection solaire"},
+        {"key": "Hair", "description": "Cheveux et pilosité : couleur, longueur, style des cheveux, barbe, pilosité corporelle"}
+      ]
+    },
+    {
+      "parentKey": "Physiological_Status",
+      "branches": [
+        {"key": "Physical_Fitness", "description": "Condition physique : niveau d'énergie, force musculaire, endurance, agilité, coordination, cardio"},
+        {"key": "Sensory_Functions", "description": "Fonctions sensorielles : vue, audition, odorat, goût, toucher"},
+        {"key": "Genetic_Characteristics", "description": "Caractéristiques génétiques : maladies héréditaires, traits constitutionnels familiaux"},
+        {"key": "Age_Related_Characteristics", "description": "Caractéristiques liées à l'âge : stade de vie, âge chronologique"},
+        {"key": "Physiological_Parameters", "description": "Paramètres vitaux : tension artérielle, glycémie, cholestérol, saturation en oxygène, température corporelle"},
+        {"key": "Reproduction_and_Endocrine_Function", "description": "Santé reproductive et hormonale : fertilité, cycles hormonaux, ménopause, andropause"}
+      ]
+    },
+    {
+      "parentKey": "Cognitive_Abilities",
+      "branches": [
+        {"key": "Learning_Ability", "description": "Capacité d'apprentissage : style d'apprentissage, vitesse d'acquisition, compréhension"},
+        {"key": "Creativity", "description": "Créativité : imagination, pensée créative, originalité, capacité à innover"},
+        {"key": "Perception_and_Intuition", "description": "Perception et intuition : sens de l'observation, reconnaissance de patterns, intuition"}
+      ]
+    },
+    {
+      "parentKey": "Thinking_Patterns",
+      "branches": [
+        {"key": "Decision_Making_Style", "description": "Style de prise de décision : tendances décisionnelles, rapidité, stratégies, tolérance au risque"},
+        {"key": "Problem_Solving", "description": "Résolution de problèmes : approche face aux obstacles, méthode analytique ou créative"},
+        {"key": "Cognitive_Tendencies", "description": "Tendances cognitives : biais cognitifs, perspective globale ou détaillée, orientations mentales"},
+        {"key": "Mental_Flexibility", "description": "Flexibilité mentale : ouverture au changement, adaptabilité, pensée divergente"}
+      ]
+    },
+    {
+      "parentKey": "Psychological_State",
+      "branches": [
+        {"key": "Mental_Health", "description": "Santé mentale : niveau de stress, résilience face au stress, anxiété, bien-être psychologique"}
+      ]
+    },
+    {
+      "parentKey": "Self_Perception",
+      "branches": [
+        {"key": "Self_Reflection", "description": "Réflexivité : capacité d'introspection, connaissance de soi, lucidité sur ses propres limites"},
+        {"key": "Identity", "description": "Identité personnelle : sens du soi, identité de genre, appartenance communautaire, rôles identitaires"}
+      ]
+    },
+    {
+      "parentKey": "Life_Beliefs",
+      "branches": [
+        {"key": "Public_Interest_Engagement", "description": "Engagement pour l'intérêt général : participation citoyenne, causes sociales, militantisme"}
+      ]
+    },
+    {
+      "parentKey": "Motivations_and_Goals",
+      "branches": [
+        {"key": "Goals", "description": "Objectifs personnels : buts à long terme (carrière, vie) et objectifs à court terme (projets immédiats)"}
+      ]
+    },
+    {
+      "parentKey": "Social_Identity",
+      "branches": [
+        {"key": "Cultural_Background", "description": "Origines culturelles : langue maternelle, ethnicité, traditions familiales, patrimoine culturel"},
+        {"key": "Socioeconomic_Status", "description": "Statut socio-économique : classe sociale, niveau de revenus, patrimoine, niveau de vie"},
+        {"key": "Educational_Background", "description": "Parcours éducatif : diplômes obtenus, domaine d'études, niveau d'instruction, spécialisation"},
+        {"key": "Occupational_Role", "description": "Rôle professionnel : secteur d'activité, poste occupé, satisfaction au travail, valeurs professionnelles"},
+        {"key": "Legal_and_Civic_Status", "description": "Statut juridique et civique : nationalité, citoyenneté, droits, statut légal"},
+        {"key": "Migration_and_Mobility", "description": "Migration et mobilité géographique : pays d'origine, déménagements, expatriation, ancrage géographique"},
+        {"key": "Social_Credit", "description": "Réputation et capital social : réseau professionnel, reconnaissance dans son domaine, prestige"}
+      ]
+    },
+    {
+      "parentKey": "Family_System",
+      "branches": [
+        {"key": "Family_Roles", "description": "Rôles familiaux : statut marital, rôle de parent, d'enfant, de conjoint au sein de la famille"},
+        {"key": "Family_Structure", "description": "Structure familiale : composition du foyer, fratrie, famille élargie, configuration familiale"},
+        {"key": "Family_Communication_Patterns", "description": "Communication familiale : dynamiques relationnelles, patterns d'interaction, tensions récurrentes"},
+        {"key": "Caregiving_Responsibilities", "description": "Responsabilités de soin : garde d'enfants, soins aux personnes âgées, animaux de compagnie"}
+      ]
+    },
+    {
+      "parentKey": "Lifestyle",
+      "branches": [
+        {"key": "Daily_Schedule", "description": "Emploi du temps et routine quotidienne : horaires récurrents, habitudes du matin et du soir, régularité, planification des journées"},
+        {"key": "Emotional_Health", "description": "Santé émotionnelle : gestion des émotions au quotidien, journal intime, autorégulation affective, équilibre émotionnel intérieur"},
+        {"key": "Self_Care", "description": "Pratiques intentionnelles de bien-être : méditation, yoga, relaxation, soins du corps, hygiène de vie, déconnexion volontaire"},
+        {"key": "Residential_Environment", "description": "Environnement résidentiel : quartier, voisinage, bruit, calme, type de logement, cadre de vie extérieur"},
+        {"key": "Living_Amenities", "description": "Équipements du domicile : domotique, objets connectés, électroménager, aménagement intérieur, confort matériel"},
+        {"key": "Mobility_and_Travel", "description": "Mobilité et déplacements : mode de transport (vélo, voiture, métro), trajets domicile-travail, voyages, distances parcourues"}
+      ]
+    },
+    {
+      "parentKey": "Social_Interactions",
+      "branches": [
+        {"key": "Communication_Style", "description": "Style de communication : tendances verbales, communication directe ou indirecte, écoute active"},
+        {"key": "Social_Style", "description": "Style social : préférences de socialisation, introversion ou extraversion, taille de groupe préférée"},
+        {"key": "Interpersonal_Relationships", "description": "Relations interpersonnelles : amis, collègues, gestion des conflits, qualité des liens"},
+        {"key": "Significant_Others", "description": "Personnes importantes dans la vie : partenaire, amis proches, mentors, relations clés"}
+      ]
+    },
+    {
+      "parentKey": "Digital_Behavior",
+      "branches": [
+        {"key": "Digital_Identity", "description": "Identité numérique : qui on est en ligne, profil, pseudonyme, e-réputation, image publique sur internet"},
+        {"key": "Platform_Use", "description": "Plateformes et applications utilisées : quels réseaux sociaux (Instagram, TikTok, Reddit), quelles apps, quels services numériques"},
+        {"key": "Online_Behavioral_Style", "description": "Comportement en ligne : créateur ou consommateur de contenu, fréquence de publication, lurker ou participant actif"},
+        {"key": "Digital_Well_Being", "description": "Bien-être numérique : addiction aux écrans, temps d'écran excessif, détox digitale, impact de la technologie sur la santé"}
+      ]
+    },
+    {
+      "parentKey": "Material_Security",
+      "branches": [
+        {"key": "Economic_Status", "description": "Situation économique : revenus, patrimoine, niveau de vie, indépendance financière"},
+        {"key": "Social_Capital", "description": "Capital social : réseau de relations, soutien social, appartenance à des communautés"},
+        {"key": "Cultural_Capital", "description": "Capital culturel : diplômes et formations, connaissances valorisées, accès à la culture"}
+      ]
+    },
+    {
+      "parentKey": "Knowledge_Base",
+      "branches": [
+        {"key": "Artistic_Preferences", "description": "Préférences artistiques : musique, cinéma, littérature, arts visuels, spectacles vivants"},
+        {"key": "Cultural_Practices", "description": "Pratiques culturelles : traditions, rituels, participation à des événements culturels"}
+      ]
+    },
+    {
+      "parentKey": "Safety_and_Protection",
+      "branches": [
+        {"key": "Personal_and_Family_Safety", "description": "Sécurité personnelle et familiale : mesures de protection, sentiment de sécurité, précautions au quotidien"},
+        {"key": "Health_Safety", "description": "Sécurité sanitaire : prévention des maladies, vaccinations, suivi médical régulier"},
+        {"key": "Financial_Security", "description": "Sécurité financière : épargne d'urgence, assurances, protection contre les risques financiers"}
+      ]
+    }
+  ]
+}
