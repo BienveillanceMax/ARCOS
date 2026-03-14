@@ -12,6 +12,8 @@ public class UserModelProperties {
     private boolean enabled = true;
     private String storagePath = "data/user-tree.json";
     private String archivePath = "data/user-tree-archive.json";
+    private String personaTreeSchemaPath = "persona-tree-schema.json";
+    private String personaTreePath = "data/persona-tree.json";
     private int maxActiveObservations = 300;
     private int minConversationsBeforeInjection = 3;
     private String embeddingModelName = "all-MiniLM-L6-v2";
