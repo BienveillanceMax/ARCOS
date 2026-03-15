@@ -49,15 +49,14 @@ services:
       start_period: 30s
 
   memlistener-init:
-    build:
-      context: ./docker/memlistener-init
+    image: ollama/ollama:latest
     container_name: memlistener_init
     depends_on:
       ollama:
         condition: service_healthy
     environment:
       - OLLAMA_HOST=http://ollama:11434
-      - OLLAMA_MODEL_NAME=pierrewagniart/memlistener:q4_k_m
+    entrypoint: ["/bin/sh", "-c", "ollama pull pierrewagniart/memlistener:q4_k_m"]
     restart: "no"
 
   arcos-app:
