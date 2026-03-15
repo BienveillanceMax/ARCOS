@@ -20,7 +20,7 @@ public class UserModelProperties {
     private int chunkWindowSize = 3;
     private int chunkMaxChars = 8000;
     private String conversationQueuePath = "data/conversation-queue.json";
-    private String memlistenerModel = "memlistener:q4_k_m";
+    private String memlistenerModel = "pierrewagniart/memlistener:q4_k_m";
     private int memlistenerMaxTokens = 512;
     private double memlistenerTemperature = 0.2;
     private long memlistenerTimeoutMs = 120000;
