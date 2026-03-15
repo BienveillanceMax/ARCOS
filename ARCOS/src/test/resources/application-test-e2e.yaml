@@ -1,0 +1,41 @@
+spring:
+  config:
+    import: ""   # suppress optional application-local.yaml
+
+qdrant:
+  host: localhost
+  port: 6334
+
+arcos:
+  qdrant:
+    memories-collection: e2e_memories
+    opinions-collection: e2e_opinions
+    desires-collection: e2e_desires
+    embedding-dimension: 384        # TransformersEmbeddingModel (all-MiniLM-L6-v2)
+    distance-metric: COSINE
+
+  audio:
+    wake-word:
+      enabled: false
+    tts:
+      piper:
+        enabled: false
+
+  local-llm:
+    enabled: true
+    base-url: http://localhost:11434
+
+  user-model:
+    enabled: true
+    persona-tree-path: data/e2e-persona-tree.json
+    conversation-queue-path: data/e2e-conversation-queue.json
+    idle-threshold-minutes: 0
+    batch-check-interval-ms: 99999999   # disable scheduler; tests call runBatch() directly
+
+  personality:
+    initiative-no-initiative-until-hour: 0  # disable time gate in tests
+
+spring.ai.vectorstore.qdrant:
+  host: localhost
+  port: 6334
+  collection-name: e2e_memories
