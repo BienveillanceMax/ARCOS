@@ -68,7 +68,8 @@ public class PlannedActionExecutor {
 
         toolRegistry.put("Supprimer_un_evenement", params -> {
             String title = (String) params.get("title");
-            return calendarActions.deleteCalendarEvent(title);
+            String dateStr = (String) params.get("dateStr");
+            return calendarActions.deleteCalendarEvent(title, dateStr);
         });
 
         toolRegistry.put("Python_Execution", params -> {

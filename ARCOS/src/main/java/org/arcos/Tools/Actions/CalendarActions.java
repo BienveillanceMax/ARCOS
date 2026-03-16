@@ -115,35 +115,109 @@ public class CalendarActions
         }
     }
 
-    @Tool(name = "Supprimer_un_evenement", description = "Supprime un évenement aujourd'hui")
-    public ActionResult deleteCalendarEvent(String title) {
+    @Tool(name = "Supprimer_un_evenement", description = "Supprime un événement du calendrier par titre (recherche partielle) et date optionnelle (format yyyy-MM-dd, défaut: aujourd'hui)")
+    public ActionResult deleteCalendarEvent(String title, String dateStr) {
         if (!calendarService.isAvailable()) {
             log.warn("Suppression calendrier demandée mais service non disponible.");
             return ActionResult.failure(CALENDAR_UNAVAILABLE_MESSAGE, null);
         }
         try {
-            LocalDate today = LocalDate.now();
-            LocalDateTime startOfDay = today.atStartOfDay();
-            LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+            LocalDate targetDate = parseOptionalDate(dateStr);
 
-            List<Event> events = calendarService.listEventsBetweenDates(startOfDay, endOfDay, 100);
+            // Use Google's server-side fuzzy search first
+            List<Event> searchResults = calendarService.searchEvents(title, 20);
 
-            Event eventToDelete = null;
-            for (Event event : events) {
-                if (event.getSummary().equalsIgnoreCase(title)) {
-                    eventToDelete = event;
-                    break;
-                }
+            // Filter by target date if provided
+            List<Event> candidates;
+            if (targetDate != null) {
+                candidates = searchResults.stream()
+                        .filter(event -> matchesDate(event, targetDate))
+                        .collect(Collectors.toList());
+            } else {
+                candidates = searchResults;
             }
+
+            // Find best match: case-insensitive contains on summary
+            Event eventToDelete = candidates.stream()
+                    .filter(event -> event.getSummary() != null
+                            && event.getSummary().toLowerCase().contains(title.toLowerCase()))
+                    .findFirst()
+                    .orElse(null);
 
             if (eventToDelete != null) {
+                String deletedTitle = eventToDelete.getSummary();
                 calendarService.deleteEvent(eventToDelete.getId());
-                return ActionResult.successWithMessage("L'événement '" + title + "' a été supprimé avec succès.");
-            } else {
-                return ActionResult.failure("Aucun événement trouvé avec le titre '" + title + "' pour aujourd'hui.", null);
+                return ActionResult.successWithMessage("L'événement '" + deletedTitle + "' a été supprimé avec succès.");
             }
+
+            // No match found — build helpful failure message listing events for context
+            return buildNoMatchMessage(title, targetDate);
         } catch (Exception e) {
             return ActionResult.failure("Erreur lors de la suppression de l'événement : " + e.getMessage(), e);
+        }
+    }
+
+    private LocalDate parseOptionalDate(String dateStr) {
+        if (dateStr == null || dateStr.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(dateStr.trim(), DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (DateTimeParseException e) {
+            log.warn("Format de date invalide pour suppression: '{}', recherche sans filtre de date", dateStr);
+            return null;
+        }
+    }
+
+    private boolean matchesDate(Event event, LocalDate date) {
+        if (event.getStart() == null) return false;
+        if (event.getStart().getDateTime() != null) {
+            long epochMillis = event.getStart().getDateTime().getValue();
+            LocalDate eventDate = java.time.Instant.ofEpochMilli(epochMillis)
+                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            return eventDate.equals(date);
+        }
+        if (event.getStart().getDate() != null) {
+            String dateValue = event.getStart().getDate().toStringRfc3339();
+            return dateValue.equals(date.toString());
+        }
+        return false;
+    }
+
+    private ActionResult buildNoMatchMessage(String title, LocalDate targetDate) {
+        try {
+            if (targetDate == null) {
+                return ActionResult.failure(
+                        "Aucun événement correspondant à '" + title + "' trouvé.", null);
+            }
+            LocalDateTime startOfDay = targetDate.atStartOfDay();
+            LocalDateTime endOfDay = targetDate.atTime(LocalTime.MAX);
+            List<Event> dayEvents = calendarService.listEventsBetweenDates(startOfDay, endOfDay, 20);
+
+            if (dayEvents.isEmpty()) {
+                return ActionResult.failure(
+                        "Aucun événement correspondant à '" + title + "' trouvé pour le "
+                                + targetDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                + ". Aucun événement ce jour.", null);
+            }
+            String eventList = dayEvents.stream()
+                    .map(e -> {
+                        String summary = e.getSummary() != null ? e.getSummary() : "(sans titre)";
+                        String time = e.getStart().getDateTime() != null
+                                ? java.time.Instant.ofEpochMilli(e.getStart().getDateTime().getValue())
+                                    .atZone(java.time.ZoneId.systemDefault())
+                                    .format(DateTimeFormatter.ofPattern("HH'h'mm"))
+                                : "journée";
+                        return "'" + summary + " (" + time + ")'";
+                    })
+                    .collect(Collectors.joining(", "));
+            return ActionResult.failure(
+                    "Aucun événement correspondant à '" + title + "' trouvé pour le "
+                            + targetDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            + ". Événements ce jour : " + eventList + ".", null);
+        } catch (Exception e) {
+            return ActionResult.failure(
+                    "Aucun événement correspondant à '" + title + "' trouvé.", null);
         }
     }
 
