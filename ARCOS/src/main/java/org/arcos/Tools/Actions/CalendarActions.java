@@ -6,9 +6,11 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -25,6 +27,8 @@ public class CalendarActions
 
     private static final String CALENDAR_UNAVAILABLE_MESSAGE =
             "Calendrier non disponible : autorisation Google manquante.";
+    private static final DateTimeFormatter FRENCH_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter FRENCH_TIME_FORMAT = DateTimeFormatter.ofPattern("HH'h'mm");
 
     @Autowired
     public CalendarActions(CalendarService calendarService) {
@@ -138,9 +142,10 @@ public class CalendarActions
             }
 
             // Find best match: case-insensitive contains on summary
+            String lowerTitle = title.toLowerCase();
             Event eventToDelete = candidates.stream()
                     .filter(event -> event.getSummary() != null
-                            && event.getSummary().toLowerCase().contains(title.toLowerCase()))
+                            && event.getSummary().toLowerCase().contains(lowerTitle))
                     .findFirst()
                     .orElse(null);
 
@@ -151,7 +156,7 @@ public class CalendarActions
             }
 
             // No match found — build helpful failure message listing events for context
-            return buildNoMatchMessage(title, targetDate);
+            return buildNoMatchMessage(title, targetDate, searchResults);
         } catch (Exception e) {
             return ActionResult.failure("Erreur lors de la suppression de l'événement : " + e.getMessage(), e);
         }
@@ -173,8 +178,8 @@ public class CalendarActions
         if (event.getStart() == null) return false;
         if (event.getStart().getDateTime() != null) {
             long epochMillis = event.getStart().getDateTime().getValue();
-            LocalDate eventDate = java.time.Instant.ofEpochMilli(epochMillis)
-                    .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+            LocalDate eventDate = Instant.ofEpochMilli(epochMillis)
+                    .atZone(ZoneId.systemDefault()).toLocalDate();
             return eventDate.equals(date);
         }
         if (event.getStart().getDate() != null) {
@@ -184,36 +189,43 @@ public class CalendarActions
         return false;
     }
 
-    private ActionResult buildNoMatchMessage(String title, LocalDate targetDate) {
+    private ActionResult buildNoMatchMessage(String title, LocalDate targetDate, List<Event> searchResults) {
         try {
             if (targetDate == null) {
                 return ActionResult.failure(
                         "Aucun événement correspondant à '" + title + "' trouvé.", null);
             }
-            LocalDateTime startOfDay = targetDate.atStartOfDay();
-            LocalDateTime endOfDay = targetDate.atTime(LocalTime.MAX);
-            List<Event> dayEvents = calendarService.listEventsBetweenDates(startOfDay, endOfDay, 20);
+            // Reuse already-fetched results filtered by date instead of an extra API call
+            List<Event> dayEvents = searchResults.stream()
+                    .filter(event -> matchesDate(event, targetDate))
+                    .collect(Collectors.toList());
+
+            // If search returned nothing for this date, fetch all events for the day
+            if (dayEvents.isEmpty()) {
+                dayEvents = calendarService.listEventsBetweenDates(
+                        targetDate.atStartOfDay(), targetDate.atTime(LocalTime.MAX), 20);
+            }
 
             if (dayEvents.isEmpty()) {
                 return ActionResult.failure(
                         "Aucun événement correspondant à '" + title + "' trouvé pour le "
-                                + targetDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                                + targetDate.format(FRENCH_DATE_FORMAT)
                                 + ". Aucun événement ce jour.", null);
             }
             String eventList = dayEvents.stream()
                     .map(e -> {
                         String summary = e.getSummary() != null ? e.getSummary() : "(sans titre)";
                         String time = e.getStart().getDateTime() != null
-                                ? java.time.Instant.ofEpochMilli(e.getStart().getDateTime().getValue())
-                                    .atZone(java.time.ZoneId.systemDefault())
-                                    .format(DateTimeFormatter.ofPattern("HH'h'mm"))
+                                ? Instant.ofEpochMilli(e.getStart().getDateTime().getValue())
+                                    .atZone(ZoneId.systemDefault())
+                                    .format(FRENCH_TIME_FORMAT)
                                 : "journée";
                         return "'" + summary + " (" + time + ")'";
                     })
                     .collect(Collectors.joining(", "));
             return ActionResult.failure(
                     "Aucun événement correspondant à '" + title + "' trouvé pour le "
-                            + targetDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))
+                            + targetDate.format(FRENCH_DATE_FORMAT)
                             + ". Événements ce jour : " + eventList + ".", null);
         } catch (Exception e) {
             return ActionResult.failure(
