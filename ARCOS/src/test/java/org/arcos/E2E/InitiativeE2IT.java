@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,14 +25,18 @@ class InitiativeE2IT extends BaseE2IT {
     @Autowired private EventQueue eventQueue;
 
     @BeforeEach
-    void clearQueue() {
+    void clearQueueAndDesires() throws Exception {
         eventQueue.clear();
+        var client = qdrantClientProvider.getClient();
+        io.qdrant.client.grpc.Points.Filter matchAll = io.qdrant.client.grpc.Points.Filter.newBuilder().build();
+        try { client.deleteAsync("Desires", matchAll).get(); } catch (Exception ignored) {}
     }
 
     @Test
     void t1_highIntensityDesireFiresInitiativeEvent() {
+        String desireId = UUID.randomUUID().toString();
         DesireEntry desire = new DesireEntry();
-        desire.setId("des-high-t1");
+        desire.setId(desireId);
         desire.setLabel("Partager une réflexion sur la créativité");
         desire.setDescription("Envie de partager des pensées sur la créativité humaine");
         desire.setIntensity(0.85);
@@ -47,13 +52,13 @@ class InitiativeE2IT extends BaseE2IT {
         assertNotNull(queued);
         assertEquals(EventType.INITIATIVE, queued.getType());
         DesireEntry payload = (DesireEntry) queued.getPayload();
-        assertEquals("des-high-t1", payload.getId());
+        assertEquals(desireId, payload.getId());
     }
 
     @Test
     void t2_lowIntensityDesireDoesNotFire() {
         DesireEntry desire = new DesireEntry();
-        desire.setId("des-low-t2");
+        desire.setId(UUID.randomUUID().toString());
         desire.setLabel("Quelque chose de peu important");
         desire.setDescription("Désir de faible intensité");
         desire.setIntensity(0.3);
@@ -72,7 +77,7 @@ class InitiativeE2IT extends BaseE2IT {
     @Tag("requires-llm")
     void t3_initiativeEventDispatchedProducesSpeech() {
         DesireEntry desire = new DesireEntry();
-        desire.setId("des-high-t3");
+        desire.setId(UUID.randomUUID().toString());
         desire.setLabel("Partager une réflexion sur la créativité");
         desire.setDescription("Envie de partager des pensées créatives");
         desire.setIntensity(0.85);
@@ -92,8 +97,9 @@ class InitiativeE2IT extends BaseE2IT {
         mockTTS.getSpokenTexts().forEach(t -> assertFalse(t.isBlank()));
 
         // Desire status updated
+        String storedId = desire.getId();
         DesireEntry updated = desireService.getPendingDesires().stream()
-            .filter(d -> "des-high-t3".equals(d.getId())).findFirst().orElse(null);
+            .filter(d -> storedId.equals(d.getId())).findFirst().orElse(null);
         assertNull(updated, "After ACTIVE/dispatch, desire should no longer be PENDING");
     }
 }

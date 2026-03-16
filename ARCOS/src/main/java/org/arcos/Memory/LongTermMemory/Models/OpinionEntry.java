@@ -59,6 +59,7 @@ public class OpinionEntry implements QdrantEntry
     private DimensionSchwartz mainDimension;
 
     public OpinionEntry() {
+        narrative = "";
         associatedMemories = new ArrayList<>();
         associatedDesire = "";
     }

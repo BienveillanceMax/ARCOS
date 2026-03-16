@@ -51,7 +51,7 @@ class DesireServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        when(personalityProperties.getDesireCreateThreshold()).thenReturn(0.5);
+        when(personalityProperties.getDesireCreateThreshold()).thenReturn(0.3);
         when(personalityProperties.getDesirePendingThreshold()).thenReturn(0.7);
         when(personalityProperties.getDesireSmoothingFactor()).thenReturn(0.7);
     }
@@ -122,6 +122,7 @@ class DesireServiceTest {
         // Given
         OpinionEntry opinionEntry = new OpinionEntry();
         opinionEntry.setPolarity(0.8);
+        opinionEntry.setConfidence(0.8);
         opinionEntry.setStability(0.9);
         when(valueProfile.averageByDimension(any())).thenReturn(80.0);
         when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn(new Prompt("prompt"));

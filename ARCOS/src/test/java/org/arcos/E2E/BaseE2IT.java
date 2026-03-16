@@ -7,7 +7,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
@@ -37,10 +36,6 @@ public abstract class BaseE2IT {
     @Autowired protected Orchestrator orchestrator;
     @Autowired protected QdrantClientProvider qdrantClientProvider;
 
-    @Value("${arcos.qdrant.memories-collection}") protected String memoriesCollection;
-    @Value("${arcos.qdrant.opinions-collection}")  protected String opinionsCollection;
-    @Value("${arcos.qdrant.desires-collection}")   protected String desiresCollection;
-
     protected final MockTTSCapture mockTTS = new MockTTSCapture();
 
     @BeforeAll
@@ -48,7 +43,7 @@ public abstract class BaseE2IT {
         var client = qdrantClientProvider.getClient();
         // Empty filter matches all points — clears data without dropping collection schema
         Points.Filter matchAll = Points.Filter.newBuilder().build();
-        for (String col : List.of(memoriesCollection, opinionsCollection, desiresCollection)) {
+        for (String col : List.of("Memories", "Opinions", "Desires")) {
             try {
                 client.deleteAsync(col, matchAll).get();
             } catch (Exception ignored) {

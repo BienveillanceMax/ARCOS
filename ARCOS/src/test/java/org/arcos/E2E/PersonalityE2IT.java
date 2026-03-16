@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -23,9 +24,9 @@ class PersonalityE2IT extends BaseE2IT {
     @Autowired private DesireService desireService;
     @Autowired private MemoryService memoryService;
 
-    // Helper: build a MemoryEntry directly (bypasses LLM extraction)
-    private MemoryEntry storedMemory(String id, String content) {
-        MemoryEntry mem = new MemoryEntry(id, content, Subject.SELF, 0.7, LocalDateTime.now(), null);
+    // Helper: build a MemoryEntry directly (bypasses LLM extraction); uses a fresh UUID as ID
+    private MemoryEntry storedMemory(String content) {
+        MemoryEntry mem = new MemoryEntry(UUID.randomUUID().toString(), content, Subject.SELF, 0.7, LocalDateTime.now(), null);
         memoryService.storeMemory(mem);
         return mem;
     }
@@ -48,7 +49,7 @@ class PersonalityE2IT extends BaseE2IT {
     @Test
     @Tag("requires-llm")
     void t1_opinionFormationFromMemory() {
-        MemoryEntry mem = storedMemory("mem-tech-t1",
+        MemoryEntry mem = storedMemory(
             "Pierre trouve l'évolution des IA très stimulante, il suit l'actualité tech avec enthousiasme");
 
         List<OpinionEntry> result = opinionService.processInteraction(mem);
@@ -68,15 +69,15 @@ class PersonalityE2IT extends BaseE2IT {
         // Store a known opinion directly
         OpinionEntry seed = highConfidenceOpinion(
             "L'intelligence artificielle est une avancée stimulante");
-        seed.setId("op-tech-t2");
-        MemoryEntry seedMem = storedMemory("mem-seed-t2", "seed memory");
+        seed.setId(UUID.randomUUID().toString());
+        MemoryEntry seedMem = storedMemory("seed memory");
         opinionService.addOpinion(seed, seedMem);  // stores in Qdrant
 
         double confidenceBefore = seed.getConfidence();
         double polarityBefore   = seed.getPolarity();
 
         // Process a similar memory — should reinforce, not create duplicate
-        MemoryEntry similar = storedMemory("mem-similar-t2",
+        MemoryEntry similar = storedMemory(
             "Les derniers modèles de langage sont impressionnants, les progrès sont rapides");
         List<OpinionEntry> result = opinionService.processInteraction(similar);
 
@@ -97,7 +98,6 @@ class PersonalityE2IT extends BaseE2IT {
     void t3_opinionRetrievalByUserMessage() {
         // Store a jazz opinion directly
         OpinionEntry jazzOp = new OpinionEntry();
-        jazzOp.setId("op-jazz-t3");
         jazzOp.setCanonicalText("La musique jazz est une source de sérénité et d'équilibre");
         jazzOp.setSubject("musique jazz");
         jazzOp.setSummary("Le jazz apporte de la sérénité");
@@ -107,15 +107,16 @@ class PersonalityE2IT extends BaseE2IT {
         jazzOp.setMainDimension(DimensionSchwartz.SELF_TRANSCENDENCE);
         jazzOp.setCreatedAt(LocalDateTime.now());
         jazzOp.setUpdatedAt(LocalDateTime.now());
-        MemoryEntry mem = storedMemory("mem-jazz-t3", "jazz memory");
-        opinionService.addOpinion(jazzOp, mem);
+        MemoryEntry mem = storedMemory("jazz memory");
+        OpinionEntry stored = opinionService.addOpinion(jazzOp, mem);
+        String jazzOpId = stored.getId(); // addOpinion always assigns a new UUID
 
         // Simulate: user message triggers opinion retrieval
         List<OpinionEntry> retrieved = opinionService.searchOpinions(
             "J'ai passé la soirée à écouter du jazz");
 
         assertFalse(retrieved.isEmpty(), "Should find opinions matching user's jazz message");
-        assertTrue(retrieved.stream().anyMatch(o -> "op-jazz-t3".equals(o.getId())),
+        assertTrue(retrieved.stream().anyMatch(o -> jazzOpId.equals(o.getId())),
             "Should retrieve the stored jazz opinion by ID");
     }
 
@@ -124,7 +125,7 @@ class PersonalityE2IT extends BaseE2IT {
     void t4_desireCreationFromHighConfidenceOpinion() {
         OpinionEntry strongOp = highConfidenceOpinion(
             "Les nouvelles avancées en IA sont passionnantes et méritent d'être explorées");
-        MemoryEntry mem = storedMemory("mem-desire-t4", "desire creation memory");
+        MemoryEntry mem = storedMemory("desire creation memory");
         opinionService.addOpinion(strongOp, mem);  // stores in Qdrant, returns stored entry with ID
 
         DesireEntry desire = desireService.processOpinion(strongOp);
@@ -141,7 +142,7 @@ class PersonalityE2IT extends BaseE2IT {
     void t5_desireReinforcementNoDuplicate() {
         // Create initial desire via LLM
         OpinionEntry op = highConfidenceOpinion("Explorer les avancées en intelligence artificielle");
-        MemoryEntry mem = storedMemory("mem-desire-t5", "desire reinforcement memory");
+        MemoryEntry mem = storedMemory("desire reinforcement memory");
         opinionService.addOpinion(op, mem);
         DesireEntry initial = desireService.processOpinion(op);
         assumeNotNull(initial, "Initial desire must be created for this test to run");

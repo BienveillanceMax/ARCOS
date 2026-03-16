@@ -1,6 +1,11 @@
 spring:
   config:
     import: ""   # suppress optional application-local.yaml
+  ai:
+    retry:
+      max-attempts: 2
+      backoff:
+        initial-interval: 500ms
 
 qdrant:
   host: localhost
@@ -8,9 +13,6 @@ qdrant:
 
 arcos:
   qdrant:
-    memories-collection: e2e_memories
-    opinions-collection: e2e_opinions
-    desires-collection: e2e_desires
     embedding-dimension: 384        # TransformersEmbeddingModel (all-MiniLM-L6-v2)
     distance-metric: COSINE
 
@@ -31,6 +33,10 @@ arcos:
     conversation-queue-path: data/e2e-conversation-queue.json
     idle-threshold-minutes: 0
     batch-check-interval-ms: 99999999   # disable scheduler; tests call runBatch() directly
+
+  planned-action:
+    storage-path: data/e2e-planned-actions.json
+    history-storage-path: data/e2e-execution-history.json
 
   personality:
     initiative-no-initiative-until-hour: 0  # disable time gate in tests

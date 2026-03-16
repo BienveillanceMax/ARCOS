@@ -3,3 +3,6 @@ ARCOS/.env
 ARCOS/HELP.md
 ARCOS/target/
 ARCOS/src/main/resources/client_secrets.json
+ARCOS/data/e2e-*
+ARCOS/data/execution-history.json
+ARCOS/data/persona-tree.json

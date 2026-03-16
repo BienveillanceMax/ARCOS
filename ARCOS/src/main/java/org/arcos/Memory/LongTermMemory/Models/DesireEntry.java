@@ -22,6 +22,8 @@ public class DesireEntry implements QdrantEntry
 
         entry.id = UUID.randomUUID().toString();
         entry.label = response.getLabel();
+        entry.description = response.getDescription();
+        entry.intensity = response.getIntensity();
         entry.status = response.getStatus();
         entry.reasoning = response.getReasoning();
         entry.setCreatedAt(LocalDateTime.now());
@@ -42,6 +44,13 @@ public class DesireEntry implements QdrantEntry
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
     private float[] embedding;
+
+    public DesireEntry() {
+        label = "";
+        description = "";
+        reasoning = "";
+        opinionId = "";
+    }
 
     public String getReasoning() {
         return reasoning;

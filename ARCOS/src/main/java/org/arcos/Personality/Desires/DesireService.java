@@ -98,7 +98,8 @@ public class DesireService
 
     private double calculateOpinionIntensity(OpinionEntry opinionEntry) {
         double absPolarity = Math.abs(opinionEntry.getPolarity());
-        return absPolarity * opinionEntry.getStability() * (valueProfile.averageByDimension(opinionEntry.getMainDimension()) / 100);
+        return absPolarity * opinionEntry.getConfidence() * opinionEntry.getStability()
+                * (valueProfile.averageByDimension(opinionEntry.getMainDimension()) / 100);
     }
 
     private DesireEntry createDesire(OpinionEntry opinionEntry, double desireIntensity) throws DesireCreationException {
@@ -165,7 +166,7 @@ public class DesireService
         double stabilityFactor = opinionEntry.getStability();
         double valueDimensionAverage = valueProfile.averageByDimension(opinionEntry.getMainDimension()) / 100.0;
         double valueAlignment = valueProfile.calculateValueAlignment(opinionEntry.getMainDimension());
-        double baseIntensity = absPolarity * stabilityFactor * valueDimensionAverage;
+        double baseIntensity = absPolarity * opinionEntry.getConfidence() * stabilityFactor * valueDimensionAverage;
         double adjustedIntensity = baseIntensity * valueAlignment;
         return Math.max(0.0, Math.min(1.0, adjustedIntensity));
     }
@@ -185,7 +186,9 @@ public class DesireService
         DesireEntry desireEntry = new DesireEntry();
         desireEntry.setId(document.getId());
         desireEntry.setLabel((String) metadata.get("label"));
-        desireEntry.setDescription((String) metadata.get("description"));
+        // fromDesirePoint (raw Qdrant) stores description as Document text; Spring AI VectorStore keeps it in metadata
+        String description = (String) metadata.getOrDefault("description", document.getText());
+        desireEntry.setDescription(description);
         desireEntry.setReasoning((String) metadata.get("reasoning"));
         desireEntry.setIntensity((Double) metadata.get("intensity"));
         desireEntry.setOpinionId((String) metadata.get("opinionId"));
