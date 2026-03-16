@@ -12,9 +12,9 @@ public class CalendarToolConfig {
     public CalendarService calendarService() {
         CalendarService service = new CalendarService();
         if (service.isAvailable()) {
-            log.info("CalendarService initialisé (client_secrets.json trouvé).");
+            log.info("CalendarService initialisé (tokens OAuth valides).");
         } else {
-            log.warn("CalendarService désactivé : client_secrets.json absent. Outil calendrier non disponible.");
+            log.warn("CalendarService désactivé : client_secrets.json ou tokens OAuth absents/invalides.");
         }
         return service;
     }

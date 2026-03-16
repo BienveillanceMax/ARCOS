@@ -1,6 +1,7 @@
 package org.arcos.Tools.Actions;
 import org.arcos.Tools.CalendarTool.CalendarService;
 import com.google.api.services.calendar.model.Event;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -12,17 +13,18 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Component
+@Slf4j
 public class CalendarActions
 {
 
-    private static final Logger LOGGER = Logger.getLogger(CalendarActions.class.getName());
     private final CalendarService calendarService;
 
+    private static final String CALENDAR_UNAVAILABLE_MESSAGE =
+            "Calendrier non disponible : autorisation Google manquante.";
 
     @Autowired
     public CalendarActions(CalendarService calendarService) {
@@ -53,8 +55,11 @@ public class CalendarActions
 
     @Tool(name = "Ajouter_un_evenement_au_calendrier", description = "Ajoute_un_évenement_au_calendrier")
     public ActionResult AddCalendarEvent(String title, String description, String location, String startDateTimeStr, String endDateTimeStr) {
+        if (!calendarService.isAvailable()) {
+            log.warn("Ajout calendrier demandé mais service non disponible.");
+            return ActionResult.failure(CALENDAR_UNAVAILABLE_MESSAGE, null);
+        }
         try {
-
 
             // Validate and convert dates to ISO 8601 format
             LocalDateTime startDateTime = parseAndValidateDateTime(startDateTimeStr, "startDateTime");
@@ -69,26 +74,30 @@ public class CalendarActions
             String isoStartDateTime = startDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
             String isoEndDateTime = endDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
 
-            LOGGER.info("Parsed dates - Start: " + isoStartDateTime + ", End: " + isoEndDateTime);
+            log.info("Parsed dates - Start: {}, End: {}", isoStartDateTime, isoEndDateTime);
 
             Event createdEvent = calendarService.createEvent(title, description, startDateTime, endDateTime, location);
-            LOGGER.info("Event created: " + createdEvent.getHtmlLink());
+            log.info("Event created: {}", createdEvent.getHtmlLink());
             return ActionResult.success(
                     List.of(createdEvent.getSummary(), createdEvent.getDescription()),
                     "L'événement a été créé avec succès."
             );
 
         } catch (IllegalArgumentException e) {
-            LOGGER.warning("Invalid date format: " + e.getMessage());
+            log.warn("Invalid date format: {}", e.getMessage());
             return ActionResult.failure("Format de date invalide : " + e.getMessage(), e);
         } catch (Exception e) {
-            LOGGER.severe("Error creating event: " + e.getMessage());
+            log.error("Error creating event: {}", e.getMessage());
             return ActionResult.failure("Erreur lors de la création de l'événement : " + e.getMessage(), e);
         }
     }
 
     @Tool(name = "Lister_les_evenements_a_venir", description = "Liste les évenements à venir du calendrier de l'utilisateur")
     public ActionResult listCalendarEvents(int maxResults) {
+        if (!calendarService.isAvailable()) {
+            log.warn("Liste calendrier demandée mais service non disponible.");
+            return ActionResult.failure(CALENDAR_UNAVAILABLE_MESSAGE, null);
+        }
         try {
             List<Event> events = calendarService.listUpcomingEvents(maxResults);
             if (events.isEmpty()) {
@@ -108,9 +117,11 @@ public class CalendarActions
 
     @Tool(name = "Supprimer_un_evenement", description = "Supprime un évenement aujourd'hui")
     public ActionResult deleteCalendarEvent(String title) {
+        if (!calendarService.isAvailable()) {
+            log.warn("Suppression calendrier demandée mais service non disponible.");
+            return ActionResult.failure(CALENDAR_UNAVAILABLE_MESSAGE, null);
+        }
         try {
-            // We need to search for the event to get its ID.
-            // We will search for today's events. A better implementation would be to ask the user for a date.
             LocalDate today = LocalDate.now();
             LocalDateTime startOfDay = today.atStartOfDay();
             LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
@@ -135,7 +146,6 @@ public class CalendarActions
             return ActionResult.failure("Erreur lors de la suppression de l'événement : " + e.getMessage(), e);
         }
     }
-
 
 
 
@@ -172,7 +182,7 @@ public class CalendarActions
         for (DateTimeFormatter formatter : DATE_FORMATTERS) {
             try {
                 LocalDateTime parsedDateTime = LocalDateTime.parse(trimmedDateTime, formatter);
-                LOGGER.info("Converted " + fieldName + " from '" + trimmedDateTime + "' to ISO 8601: " +
+                log.info("Converted {} from '{}' to ISO 8601: {}", fieldName, trimmedDateTime,
                         parsedDateTime.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
                 return parsedDateTime;
             } catch (DateTimeParseException e) {

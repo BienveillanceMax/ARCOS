@@ -1,11 +1,12 @@
 package org.arcos.Tools.CalendarTool;
 
-import  com.google.api.client.auth.oauth2.Credential;
-import com.google.api.client.extensions.java6.auth.oauth2.AuthorizationCodeInstalledApp;
-import com.google.api.client.extensions.jetty.auth.oauth2.LocalServerReceiver;
+import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleAuthorizationCodeFlow;
 import com.google.api.client.googleapis.auth.oauth2.GoogleClientSecrets;
 import com.google.api.client.googleapis.javanet.GoogleNetHttpTransport;
+import com.google.api.client.http.HttpRequest;
+import com.google.api.client.http.HttpRequestInitializer;
+import com.google.api.client.http.HttpResponseException;
 import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.gson.GsonFactory;
@@ -16,6 +17,8 @@ import com.google.api.services.calendar.CalendarScopes;
 import com.google.api.services.calendar.model.Event;
 import com.google.api.services.calendar.model.EventDateTime;
 import com.google.api.services.calendar.model.Events;
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -26,26 +29,43 @@ import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 
+@Slf4j
 public class CalendarService {
 
     private static final String APPLICATION_NAME = "ARCOS AI Assistant";
     private static final JsonFactory JSON_FACTORY = GsonFactory.getDefaultInstance();
     private static final String TOKENS_DIRECTORY_PATH = "tokens";
-    // Mise à jour des scopes pour permettre l'écriture
     private static final List<String> SCOPES = Collections.singletonList(CalendarScopes.CALENDAR);
     private static final String CREDENTIALS_FILE_PATH = "/client_secrets.json";
 
-    private final boolean available;
+    private static final int CONNECT_TIMEOUT_MS = 5_000;
+    private static final int READ_TIMEOUT_MS = 10_000;
+
+    private volatile boolean available;
+    private volatile Calendar cachedClient;
 
     public CalendarService() {
-        this.available = CalendarService.class.getResourceAsStream(CREDENTIALS_FILE_PATH) != null;
+        // Phase 1: check client_secrets.json exists
+        if (CalendarService.class.getResourceAsStream(CREDENTIALS_FILE_PATH) == null) {
+            this.available = false;
+            return;
+        }
+
+        // Phase 2: validate OAuth tokens are present and refreshable
+        try {
+            this.cachedClient = buildCalendarClient();
+            this.available = true;
+        } catch (Exception e) {
+            log.warn("Calendrier désactivé : {}", e.getMessage());
+            this.available = false;
+        }
     }
 
     public boolean isAvailable() {
         return available;
     }
 
-    private Credential getCredentials() throws IOException, GeneralSecurityException {
+    private Credential loadCredentialNonBlocking() throws IOException, GeneralSecurityException {
         final NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
         InputStream in = CalendarService.class.getResourceAsStream(CREDENTIALS_FILE_PATH);
         if (in == null) {
@@ -58,143 +78,185 @@ public class CalendarService {
                 .setDataStoreFactory(new FileDataStoreFactory(new File(TOKENS_DIRECTORY_PATH)))
                 .setAccessType("offline")
                 .build();
-        LocalServerReceiver receiver = new LocalServerReceiver.Builder().setPort(8888).build();
-        return new AuthorizationCodeInstalledApp(flow, receiver).authorize("user");
+
+        // Load stored credential WITHOUT triggering browser flow
+        Credential credential = flow.loadCredential("user");
+        if (credential == null) {
+            throw new IOException("Aucun token OAuth stocké. Lancez l'autorisation initiale avec un navigateur.");
+        }
+
+        // Refresh if expired or about to expire
+        if (credential.getExpiresInSeconds() != null && credential.getExpiresInSeconds() <= 60) {
+            if (!credential.refreshToken()) {
+                throw new IOException("Impossible de rafraîchir le token OAuth. Ré-autorisez via navigateur.");
+            }
+        }
+
+        return credential;
     }
 
-    private Calendar getCalendarService() throws IOException, GeneralSecurityException {
+    private Calendar buildCalendarClient() throws IOException, GeneralSecurityException {
         final NetHttpTransport httpTransport = GoogleNetHttpTransport.newTrustedTransport();
-        Credential credential = getCredentials();
-        return new Calendar.Builder(httpTransport, JSON_FACTORY, credential)
+        Credential credential = loadCredentialNonBlocking();
+
+        HttpRequestInitializer timeoutInitializer = new HttpRequestInitializer() {
+            @Override
+            public void initialize(HttpRequest request) throws IOException {
+                credential.initialize(request);
+                request.setConnectTimeout(CONNECT_TIMEOUT_MS);
+                request.setReadTimeout(READ_TIMEOUT_MS);
+            }
+        };
+
+        return new Calendar.Builder(httpTransport, JSON_FACTORY, timeoutInitializer)
                 .setApplicationName(APPLICATION_NAME)
                 .build();
     }
 
-    public List<Event> listUpcomingEvents(int maxResults) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
+    private Calendar getCalendarService() throws IOException, GeneralSecurityException {
+        if (cachedClient != null) {
+            return cachedClient;
+        }
+        cachedClient = buildCalendarClient();
+        return cachedClient;
+    }
 
-        Events events = service.events().list("primary")
-                .setMaxResults(maxResults)
-                .setTimeMin(new DateTime(System.currentTimeMillis()))
-                .setOrderBy("startTime")
-                .setSingleEvents(true)
-                .execute();
-        return events.getItems();
+    /**
+     * Marque le service comme dégradé suite à une erreur d'authentification.
+     */
+    private void degradeOnAuthFailure(Exception e) {
+        log.error("Calendrier dégradé suite à une erreur d'authentification : {}", e.getMessage());
+        this.available = false;
+        this.cachedClient = null;
+    }
+
+    /**
+     * Vérifie si l'exception est liée à un problème d'authentification (401/403).
+     */
+    private boolean isAuthError(Exception e) {
+        if (e instanceof HttpResponseException httpEx) {
+            int code = httpEx.getStatusCode();
+            return code == 401 || code == 403;
+        }
+        return false;
+    }
+
+    public List<Event> listUpcomingEvents(int maxResults) throws IOException, GeneralSecurityException {
+        try {
+            Calendar service = getCalendarService();
+            Events events = service.events().list("primary")
+                    .setMaxResults(maxResults)
+                    .setTimeMin(new DateTime(System.currentTimeMillis()))
+                    .setOrderBy("startTime")
+                    .setSingleEvents(true)
+                    .execute();
+            return events.getItems();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
     }
 
     /**
      * Crée un nouvel événement dans le calendrier
-     * @param title Titre de l'événement
-     * @param description Description de l'événement
-     * @param startDateTime Date et heure de début
-     * @param endDateTime Date et heure de fin
-     * @param location Lieu de l'événement (optionnel)
-     * @return L'événement créé
      */
     public Event createEvent(String title, String description, LocalDateTime startDateTime,
                              LocalDateTime endDateTime, String location) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
+        try {
+            Calendar service = getCalendarService();
 
-        Event event = new Event()
-                .setSummary(title)
-                .setDescription(description)
-                .setLocation(location);
+            Event event = new Event()
+                    .setSummary(title)
+                    .setDescription(description)
+                    .setLocation(location);
 
-        // Configuration de la date/heure de début
-        DateTime startTime = new DateTime(startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-        EventDateTime start = new EventDateTime()
-                .setDateTime(startTime)
-                .setTimeZone(ZoneId.systemDefault().getId());
-        event.setStart(start);
-
-        // Configuration de la date/heure de fin
-        DateTime endTime = new DateTime(endDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-        EventDateTime end = new EventDateTime()
-                .setDateTime(endTime)
-                .setTimeZone(ZoneId.systemDefault().getId());
-        event.setEnd(end);
-
-        return service.events().insert("primary", event).execute();
-    }
-
-    /**
-     * Crée un événement toute la journée
-     * @param title Titre de l'événement
-     * @param description Description de l'événement
-     * @param date Date de l'événement
-     * @param location Lieu de l'événement (optionnel)
-     * @return L'événement créé
-     */
-    public Event createAllDayEvent(String title, String description, java.time.LocalDate date,
-                                   String location) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
-
-        Event event = new Event()
-                .setSummary(title)
-                .setDescription(description)
-                .setLocation(location);
-
-        // Pour un événement toute la journée, on utilise setDate au lieu de setDateTime
-        EventDateTime start = new EventDateTime()
-                .setDate(new DateTime(date.toString()));
-        event.setStart(start);
-
-        EventDateTime end = new EventDateTime()
-                .setDate(new DateTime(date.plusDays(1).toString()));
-        event.setEnd(end);
-
-        return service.events().insert("primary", event).execute();
-    }
-
-    /**
-     * Met à jour un événement existant
-     * @param eventId ID de l'événement à modifier
-     * @param title Nouveau titre
-     * @param description Nouvelle description
-     * @param startDateTime Nouvelle date/heure de début
-     * @param endDateTime Nouvelle date/heure de fin
-     * @param location Nouveau lieu
-     * @return L'événement mis à jour
-     */
-    public Event updateEvent(String eventId, String title, String description,
-                             LocalDateTime startDateTime, LocalDateTime endDateTime,
-                             String location) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
-
-        // Récupérer l'événement existant
-        Event event = service.events().get("primary", eventId).execute();
-
-        // Mettre à jour les propriétés
-        if (title != null) event.setSummary(title);
-        if (description != null) event.setDescription(description);
-        if (location != null) event.setLocation(location);
-
-        if (startDateTime != null) {
             DateTime startTime = new DateTime(startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
             EventDateTime start = new EventDateTime()
                     .setDateTime(startTime)
                     .setTimeZone(ZoneId.systemDefault().getId());
             event.setStart(start);
-        }
 
-        if (endDateTime != null) {
             DateTime endTime = new DateTime(endDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
             EventDateTime end = new EventDateTime()
                     .setDateTime(endTime)
                     .setTimeZone(ZoneId.systemDefault().getId());
             event.setEnd(end);
-        }
 
-        return service.events().update("primary", eventId, event).execute();
+            return service.events().insert("primary", event).execute();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
+    }
+
+    /**
+     * Crée un événement toute la journée
+     */
+    public Event createAllDayEvent(String title, String description, java.time.LocalDate date,
+                                   String location) throws IOException, GeneralSecurityException {
+        try {
+            Calendar service = getCalendarService();
+
+            Event event = new Event()
+                    .setSummary(title)
+                    .setDescription(description)
+                    .setLocation(location);
+
+            EventDateTime start = new EventDateTime()
+                    .setDate(new DateTime(date.toString()));
+            event.setStart(start);
+
+            EventDateTime end = new EventDateTime()
+                    .setDate(new DateTime(date.plusDays(1).toString()));
+            event.setEnd(end);
+
+            return service.events().insert("primary", event).execute();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
+    }
+
+    /**
+     * Met à jour un événement existant
+     */
+    public Event updateEvent(String eventId, String title, String description,
+                             LocalDateTime startDateTime, LocalDateTime endDateTime,
+                             String location) throws IOException, GeneralSecurityException {
+        try {
+            Calendar service = getCalendarService();
+
+            Event event = service.events().get("primary", eventId).execute();
+
+            if (title != null) event.setSummary(title);
+            if (description != null) event.setDescription(description);
+            if (location != null) event.setLocation(location);
+
+            if (startDateTime != null) {
+                DateTime startTime = new DateTime(startDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+                EventDateTime start = new EventDateTime()
+                        .setDateTime(startTime)
+                        .setTimeZone(ZoneId.systemDefault().getId());
+                event.setStart(start);
+            }
+
+            if (endDateTime != null) {
+                DateTime endTime = new DateTime(endDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+                EventDateTime end = new EventDateTime()
+                        .setDateTime(endTime)
+                        .setTimeZone(ZoneId.systemDefault().getId());
+                event.setEnd(end);
+            }
+
+            return service.events().update("primary", eventId, event).execute();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
     }
 
     /**
      * Met à jour partiellement un événement (seuls les champs non-null sont mis à jour)
-     * @param eventId ID de l'événement à modifier
-     * @param title Nouveau titre (null = pas de modification)
-     * @param description Nouvelle description (null = pas de modification)
-     * @param location Nouveau lieu (null = pas de modification)
-     * @return L'événement mis à jour
      */
     public Event updateEventPartial(String eventId, String title, String description,
                                     String location) throws IOException, GeneralSecurityException {
@@ -203,62 +265,72 @@ public class CalendarService {
 
     /**
      * Supprime un événement du calendrier
-     * @param eventId ID de l'événement à supprimer
      */
     public void deleteEvent(String eventId) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
-        service.events().delete("primary", eventId).execute();
+        try {
+            Calendar service = getCalendarService();
+            service.events().delete("primary", eventId).execute();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
     }
 
     /**
      * Récupère un événement spécifique par son ID
-     * @param eventId ID de l'événement
-     * @return L'événement trouvé
      */
     public Event getEvent(String eventId) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
-        return service.events().get("primary", eventId).execute();
+        try {
+            Calendar service = getCalendarService();
+            return service.events().get("primary", eventId).execute();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
     }
 
     /**
      * Recherche des événements par titre
-     * @param searchQuery Terme de recherche
-     * @param maxResults Nombre maximum de résultats
-     * @return Liste des événements trouvés
      */
     public List<Event> searchEvents(String searchQuery, int maxResults) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
+        try {
+            Calendar service = getCalendarService();
 
-        Events events = service.events().list("primary")
-                .setQ(searchQuery)
-                .setMaxResults(maxResults)
-                .setOrderBy("startTime")
-                .setSingleEvents(true)
-                .execute();
-        return events.getItems();
+            Events events = service.events().list("primary")
+                    .setQ(searchQuery)
+                    .setMaxResults(maxResults)
+                    .setOrderBy("startTime")
+                    .setSingleEvents(true)
+                    .execute();
+            return events.getItems();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
     }
 
     /**
      * Liste les événements dans une plage de dates
-     * @param startDate Date de début
-     * @param endDate Date de fin
-     * @param maxResults Nombre maximum de résultats
-     * @return Liste des événements dans la plage
      */
     public List<Event> listEventsBetweenDates(LocalDateTime startDate, LocalDateTime endDate,
                                               int maxResults) throws IOException, GeneralSecurityException {
-        Calendar service = getCalendarService();
+        try {
+            Calendar service = getCalendarService();
 
-        DateTime startTime = new DateTime(startDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
-        DateTime endTime = new DateTime(endDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+            DateTime startTime = new DateTime(startDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
+            DateTime endTime = new DateTime(endDate.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());
 
-        Events events = service.events().list("primary")
-                .setTimeMin(startTime)
-                .setTimeMax(endTime)
-                .setMaxResults(maxResults)
-                .setOrderBy("startTime")
-                .setSingleEvents(true)
-                .execute();
-        return events.getItems();
+            Events events = service.events().list("primary")
+                    .setTimeMin(startTime)
+                    .setTimeMax(endTime)
+                    .setMaxResults(maxResults)
+                    .setOrderBy("startTime")
+                    .setSingleEvents(true)
+                    .execute();
+            return events.getItems();
+        } catch (Exception e) {
+            if (isAuthError(e)) degradeOnAuthFailure(e);
+            throw e;
+        }
     }
 }

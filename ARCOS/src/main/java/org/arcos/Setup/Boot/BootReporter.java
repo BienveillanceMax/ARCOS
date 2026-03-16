@@ -4,6 +4,7 @@ import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Setup.Health.PiperHealthChecker;
 import org.arcos.Setup.Health.ServiceStatus;
+import org.arcos.Tools.CalendarTool.CalendarService;
 import org.arcos.Tools.SearchTool.BraveSearchService;
 import org.arcos.Setup.UI.BootPhaseRenderer;
 import org.arcos.Setup.UI.ScreenHolder;
@@ -35,6 +36,7 @@ public class BootReporter {
     private final PersonalityGreeting greeting;
     private final PersonalityProperties personalityProperties;
     private final BraveSearchService braveSearchService;
+    private final CalendarService calendarService;
     private final ApplicationContext applicationContext;
 
     @Value("${qdrant.host:localhost}")
@@ -53,11 +55,13 @@ public class BootReporter {
                         PersonalityGreeting greeting,
                         PersonalityProperties personalityProperties,
                         BraveSearchService braveSearchService,
+                        CalendarService calendarService,
                         ApplicationContext applicationContext) {
         this.registry = registry;
         this.greeting = greeting;
         this.personalityProperties = personalityProperties;
         this.braveSearchService = braveSearchService;
+        this.calendarService = calendarService;
         this.applicationContext = applicationContext;
     }
 
@@ -116,6 +120,15 @@ public class BootReporter {
         } else {
             registry.register("RECHERCHE WEB", ServiceStatus.OFFLINE,
                     "BRAVE_SEARCH_API_KEY absent", CATEGORY_TOOLS);
+        }
+
+        // Calendar
+        if (calendarService.isAvailable()) {
+            registry.register("CALENDRIER", ServiceStatus.ONLINE,
+                    "Google Calendar", CATEGORY_TOOLS);
+        } else {
+            registry.register("CALENDRIER", ServiceStatus.OFFLINE,
+                    "Tokens OAuth absents", CATEGORY_TOOLS);
         }
     }
 
