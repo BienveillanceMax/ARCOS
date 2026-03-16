@@ -3,21 +3,19 @@ package org.arcos.LLM.Client;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
-import org.arcos.Tools.Actions.CalendarActions;
-import org.arcos.Tools.Actions.MemoryActions;
-import org.arcos.Tools.Actions.PlannedActionActions;
-import org.arcos.Tools.Actions.PythonActions;
-import org.arcos.Tools.Actions.SearchActions;
-import org.arcos.Tools.Actions.WeatherActions;
-import org.arcos.Tools.Actions.WebPageActions;
+import org.arcos.Tools.Actions.*;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+
+import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * Tool-equipped chat orchestrator for user-facing conversations.
@@ -36,14 +34,8 @@ public class ChatOrchestrator {
             """;
 
     private final ChatClient chatClient;
-    private final CalendarActions calendarActions;
-    private final PythonActions pythonActions;
-    private final SearchActions searchActions;
-    private final PlannedActionActions plannedActionActions;
-    private final MemoryActions memoryActions;
-    private final WebPageActions webPageActions;
-    private final WeatherActions weatherActions;
     private final QuestionAnswerAdvisor questionAnswerAdvisor;
+    private final Object[] tools;
 
     public ChatOrchestrator(ChatClient.Builder chatClientBuilder,
                             CalendarActions calendarActions,
@@ -53,16 +45,15 @@ public class ChatOrchestrator {
                             MemoryActions memoryActions,
                             WebPageActions webPageActions,
                             WeatherActions weatherActions,
+                            @Nullable GdeltActions gdeltActions,
                             MemoryRepository memoryRepository,
                             @Value("${arcos.memory.advisor.top-k:3}") int memoryAdvisorTopK) {
         this.chatClient = chatClientBuilder.build();
-        this.calendarActions = calendarActions;
-        this.pythonActions = pythonActions;
-        this.searchActions = searchActions;
-        this.plannedActionActions = plannedActionActions;
-        this.memoryActions = memoryActions;
-        this.webPageActions = webPageActions;
-        this.weatherActions = weatherActions;
+
+        this.tools = Arrays.stream(new Object[]{
+                calendarActions, pythonActions, searchActions, plannedActionActions,
+                memoryActions, webPageActions, weatherActions, gdeltActions
+        }).filter(Objects::nonNull).toArray();
 
         this.questionAnswerAdvisor = QuestionAnswerAdvisor.builder(memoryRepository.getVectorStore())
                 .searchRequest(SearchRequest.builder().topK(memoryAdvisorTopK).build())
@@ -74,7 +65,7 @@ public class ChatOrchestrator {
     public String generateChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .advisors(questionAnswerAdvisor)
-                .tools(calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions)
+                .tools(tools)
                 .call()
                 .content();
     }
@@ -83,7 +74,7 @@ public class ChatOrchestrator {
     public Flux<String> generateStreamingChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .advisors(questionAnswerAdvisor)
-                .tools(calendarActions, pythonActions, searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions)
+                .tools(tools)
                 .stream()
                 .content();
     }
