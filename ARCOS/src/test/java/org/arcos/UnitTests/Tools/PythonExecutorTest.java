@@ -4,6 +4,10 @@ import org.arcos.Tools.PythonTool.PythonExecutor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -102,8 +106,7 @@ class PythonExecutorTest {
 
     @Test
     void execute_whenSandboxUnavailable_shouldReturnFailure() {
-        // Given — on a real CI/dev machine bwrap may or may not be present
-        // We test the error message format regardless
+        // Given
         PythonExecutor testExecutor = new PythonExecutor() {
             @Override
             public boolean isSandboxAvailable() {
@@ -118,5 +121,79 @@ class PythonExecutorTest {
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getExitCode()).isEqualTo(-1);
         assertThat(result.getStderr()).contains("bubblewrap");
+    }
+
+    // ===== readOutput =====
+
+    @Test
+    void readOutput_smallOutput_shouldReturnFullContent() throws IOException {
+        // Given
+        String content = "line1\nline2\nline3\n";
+        InputStream stream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+        // When
+        String result = executor.readOutput(stream, 4096);
+
+        // Then
+        assertThat(result).isEqualTo("line1\nline2\nline3\n");
+    }
+
+    @Test
+    void readOutput_emptyOutput_shouldReturnEmptyString() throws IOException {
+        // Given
+        InputStream stream = new ByteArrayInputStream(new byte[0]);
+
+        // When
+        String result = executor.readOutput(stream, 4096);
+
+        // Then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void readOutput_exceedsMaxBytes_shouldTruncateWithMessage() throws IOException {
+        // Given — create output larger than 50 bytes limit
+        StringBuilder largeContent = new StringBuilder();
+        for (int i = 0; i < 20; i++) {
+            largeContent.append("line-").append(i).append("-padding\n");
+        }
+        InputStream stream = new ByteArrayInputStream(largeContent.toString().getBytes(StandardCharsets.UTF_8));
+
+        // When
+        String result = executor.readOutput(stream, 50);
+
+        // Then
+        assertThat(result).contains("[sortie tronquée");
+        // The content before truncation marker should be <= 50 bytes
+        String beforeMarker = result.substring(0, result.indexOf("\n[sortie"));
+        assertThat(beforeMarker.getBytes(StandardCharsets.UTF_8).length).isLessThanOrEqualTo(50);
+    }
+
+    @Test
+    void readOutput_exactlyAtLimit_shouldNotTruncate() throws IOException {
+        // Given — exactly 10 bytes: "abcdefgh\n" (9 chars + readLine strips \n, appends \n = 10 bytes counted)
+        String content = "abcdefgh\n";
+        InputStream stream = new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8));
+
+        // When
+        String result = executor.readOutput(stream, 4096);
+
+        // Then
+        assertThat(result).doesNotContain("[sortie tronquée");
+        assertThat(result).isEqualTo("abcdefgh\n");
+    }
+
+    // ===== isSandboxAvailable caching =====
+
+    @Test
+    void isSandboxAvailable_shouldCacheResult() {
+        // Given — call twice
+        boolean first = executor.isSandboxAvailable();
+
+        // When
+        boolean second = executor.isSandboxAvailable();
+
+        // Then — both calls return same value (cached, not re-evaluated)
+        assertThat(second).isEqualTo(first);
     }
 }

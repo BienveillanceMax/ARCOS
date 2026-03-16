@@ -15,8 +15,8 @@ public class PythonActions
     private final PythonExecutor pythonExecutor;
     private final CentralFeedBackHandler centralFeedBackHandler;
 
-    public PythonActions(CentralFeedBackHandler centralFeedBackHandler) {
-        this.pythonExecutor = new PythonExecutor();
+    public PythonActions(PythonExecutor pythonExecutor, CentralFeedBackHandler centralFeedBackHandler) {
+        this.pythonExecutor = pythonExecutor;
         this.centralFeedBackHandler = centralFeedBackHandler;
     }
 

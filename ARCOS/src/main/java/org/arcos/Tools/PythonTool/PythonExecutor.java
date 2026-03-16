@@ -5,6 +5,7 @@ import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,18 +37,22 @@ public class PythonExecutor {
     private static final int TIMEOUT_SECONDS = 30;
     private static final int MAX_OUTPUT_BYTES = 4096;
 
-    private Boolean sandboxAvailable;
+    private volatile Boolean sandboxAvailable;
 
     public boolean isSandboxAvailable() {
         if (sandboxAvailable == null) {
-            try {
-                Process check = new ProcessBuilder("which", "bwrap").start();
-                sandboxAvailable = check.waitFor(5, TimeUnit.SECONDS) && check.exitValue() == 0;
-            } catch (IOException | InterruptedException e) {
-                sandboxAvailable = false;
-            }
-            if (!sandboxAvailable) {
-                log.warn("bubblewrap (bwrap) not found — Python tool disabled");
+            synchronized (this) {
+                if (sandboxAvailable == null) {
+                    try {
+                        Process check = new ProcessBuilder("which", "bwrap").start();
+                        sandboxAvailable = check.waitFor(5, TimeUnit.SECONDS) && check.exitValue() == 0;
+                    } catch (IOException | InterruptedException e) {
+                        sandboxAvailable = false;
+                    }
+                    if (!sandboxAvailable) {
+                        log.warn("bubblewrap (bwrap) not found — Python tool disabled");
+                    }
+                }
             }
         }
         return sandboxAvailable;
@@ -69,13 +74,15 @@ public class PythonExecutor {
             pb.redirectErrorStream(true);
             process = pb.start();
 
+            // Drain output BEFORE waitFor to prevent pipe buffer deadlock
+            String output = readOutput(process.getInputStream(), MAX_OUTPUT_BYTES);
+
             boolean finished = process.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             if (!finished) {
                 process.destroyForcibly();
                 return new ExecutionResult(-1, "", "Timeout après " + TIMEOUT_SECONDS + " secondes.");
             }
 
-            String output = readOutput(process, MAX_OUTPUT_BYTES);
             return new ExecutionResult(process.exitValue(), output, "");
 
         } catch (IOException | InterruptedException e) {
@@ -128,12 +135,12 @@ public class PythonExecutor {
         return cmd;
     }
 
-    private String readOutput(Process process, int maxBytes) throws IOException {
+    public String readOutput(InputStream inputStream, int maxBytes) throws IOException {
         StringBuilder output = new StringBuilder();
         int totalBytes = 0;
         boolean truncated = false;
 
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 int lineBytes = line.length() + 1;
