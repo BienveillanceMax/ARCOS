@@ -26,7 +26,9 @@ RUN apt-get update && \
         libpulse0 \
         libsndfile1 \
         bluez \
-        bluez-tools && \
+        bluez-tools \
+        python3 \
+        bubblewrap && \
     rm -rf /var/lib/apt/lists/*
 
 # Create user matching host

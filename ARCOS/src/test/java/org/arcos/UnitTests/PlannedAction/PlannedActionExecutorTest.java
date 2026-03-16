@@ -169,7 +169,7 @@ class PlannedActionExecutorTest {
                 1, "Chercher_sur_Internet", Map.of("query", "actualités"), "actus", "Search news"
         );
         ReWOOPlan.ReWOOStep step2 = new ReWOOPlan.ReWOOStep(
-                2, "Python_Execution", Map.of("code", "$actus"), "processed", "Process results"
+                2, "Executer_du_code", Map.of("code", "$actus"), "processed", "Process results"
         );
         entry.setExecutionPlan(new ReWOOPlan(List.of(step1, step2)));
 

@@ -235,7 +235,7 @@ public class PromptBuilder {
         2. Lister_les_evenements_a_venir — maxResults:int
         3. Ajouter_un_evenement_au_calendrier — title, description, location, startDateTimeStr, endDateTimeStr:String
         4. Supprimer_un_evenement — title:String (événement du jour)
-        5. Python_Execution — code:String
+        5. Executer_du_code — code:String
         6. Chercher_dans_ma_memoire — query:String, type:String (SOUVENIR/OPINION/DESIR)
         7. Lire_une_page_web — url:String
         8. Consulter_la_meteo — city:String?, forecastDays:int=3

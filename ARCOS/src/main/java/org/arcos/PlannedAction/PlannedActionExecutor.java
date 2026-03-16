@@ -72,7 +72,7 @@ public class PlannedActionExecutor {
             return calendarActions.deleteCalendarEvent(title, dateStr);
         });
 
-        toolRegistry.put("Python_Execution", params -> {
+        toolRegistry.put("Executer_du_code", params -> {
             String code = (String) params.get("code");
             return pythonActions.executePythonCode(code);
         });
