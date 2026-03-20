@@ -44,7 +44,7 @@ class TreeOperationServiceTest {
         treeService = new PersonaTreeService(schemaLoader, repository, properties);
         treeService.initialize();
 
-        operationService = new TreeOperationService(treeService, schemaLoader, properties);
+        operationService = new TreeOperationService(treeService, schemaLoader, properties, null);
     }
 
     // ========== Parsing Tests ==========

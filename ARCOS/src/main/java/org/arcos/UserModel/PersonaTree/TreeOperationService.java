@@ -1,6 +1,8 @@
 package org.arcos.UserModel.PersonaTree;
 
+import jakarta.annotation.Nullable;
 import lombok.extern.slf4j.Slf4j;
+import org.arcos.UserModel.GdeltThemeIndex.GdeltThemeIndexService;
 import org.arcos.UserModel.UserModelProperties;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,8 @@ public class TreeOperationService {
     private final PersonaTreeService treeService;
     private final PersonaTreeSchemaLoader schemaLoader;
     private final UserModelProperties properties;
+    @Nullable
+    private final GdeltThemeIndexService gdeltThemeIndexService;
 
     // Case-insensitive regex patterns
     private static final Pattern ADD_PATTERN = Pattern.compile(
@@ -29,10 +33,12 @@ public class TreeOperationService {
 
     public TreeOperationService(PersonaTreeService treeService,
                                 PersonaTreeSchemaLoader schemaLoader,
-                                UserModelProperties properties) {
+                                UserModelProperties properties,
+                                @Nullable GdeltThemeIndexService gdeltThemeIndexService) {
         this.treeService = treeService;
         this.schemaLoader = schemaLoader;
         this.properties = properties;
+        this.gdeltThemeIndexService = gdeltThemeIndexService;
     }
 
     /**
@@ -164,6 +170,7 @@ public class TreeOperationService {
                         value = value.substring(0, properties.getLeafMaxChars());
                     }
                     treeService.setLeafValue(operation.path(), value);
+                    notifyGdeltIndex(operation.path(), value, operation.type());
                     return new TreeOperationResult(operation, true, null);
                 }
                 case DELETE -> {
@@ -172,6 +179,7 @@ public class TreeOperationService {
                                 "Invalid or non-leaf path: " + operation.path());
                     }
                     treeService.clearLeafValue(operation.path());
+                    notifyGdeltIndex(operation.path(), null, operation.type());
                     return new TreeOperationResult(operation, true, null);
                 }
                 case NO_OP -> {
@@ -186,6 +194,15 @@ public class TreeOperationService {
         } catch (Exception e) {
             log.error("Error applying operation {}: {}", operation, e.getMessage(), e);
             return new TreeOperationResult(operation, false, e.getMessage());
+        }
+    }
+
+    private void notifyGdeltIndex(String path, String value, TreeOperationType type) {
+        if (gdeltThemeIndexService == null) return;
+        try {
+            gdeltThemeIndexService.onLeafMutated(path, value, type);
+        } catch (Exception e) {
+            log.warn("GDELT theme index notification failed for {}: {}", path, e.getMessage());
         }
     }
 }

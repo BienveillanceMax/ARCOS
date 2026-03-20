@@ -1,21 +1,25 @@
 package org.arcos.Tools.GdeltTool;
 
 import lombok.extern.slf4j.Slf4j;
-import org.arcos.UserModel.PersonaTree.PersonaTreeService;
+import org.arcos.UserModel.GdeltThemeIndex.GdeltKeyword;
+import org.arcos.UserModel.GdeltThemeIndex.GdeltThemeIndexGate;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @ConditionalOnProperty(name = "arcos.gdelt.enabled", havingValue = "true", matchIfMissing = true)
 public class GdeltAnalysisService {
 
-    private final PersonaTreeService personaTreeService;
+    private final GdeltThemeIndexGate themeIndexGate;
     private final GdeltProperties properties;
 
-    public GdeltAnalysisService(PersonaTreeService personaTreeService,
+    public GdeltAnalysisService(GdeltThemeIndexGate themeIndexGate,
                                 GdeltProperties properties) {
-        this.personaTreeService = personaTreeService;
+        this.themeIndexGate = themeIndexGate;
         this.properties = properties;
     }
 
@@ -23,10 +27,25 @@ public class GdeltAnalysisService {
      * Mode briefing : utilise le UserModel pour determiner les sujets pertinents.
      */
     public String generateBriefing() {
-        int leafCount = personaTreeService.getNonEmptyLeafCount();
-        log.info("Briefing requested — {} user profile leaves available", leafCount);
-        return "Le service d'analyse GDELT n'est pas encore implemente. "
-             + leafCount + " elements du profil utilisateur disponibles pour le briefing.";
+        List<GdeltKeyword> keywords = themeIndexGate.getAllKeywords();
+
+        if (keywords.isEmpty()) {
+            log.info("Briefing requested but no GDELT keywords indexed yet");
+            return "Aucun centre d'interet indexe pour le briefing. "
+                 + "Le profil utilisateur ne contient pas encore assez d'informations "
+                 + "sur les centres d'interet, croyances ou engagements.";
+        }
+
+        log.info("Briefing requested — {} GDELT keywords available from {} indexed leaves",
+                keywords.size(), themeIndexGate.getIndexedLeafCount());
+
+        String keywordList = keywords.stream()
+                .map(k -> k.language().name() + ":" + k.term())
+                .collect(Collectors.joining(", "));
+
+        // TODO: Phase suivante — utiliser ces keywords pour appeler l'API GDELT DOC 2.0
+        return "Mots-cles d'interet utilisateur indexes : " + keywordList
+             + ". L'appel a l'API GDELT DOC 2.0 n'est pas encore implemente.";
     }
 
     /**
