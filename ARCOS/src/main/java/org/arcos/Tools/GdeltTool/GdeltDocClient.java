@@ -24,7 +24,7 @@ public class GdeltDocClient {
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final GdeltProperties properties;
-    private long lastCallTime = 0;
+    private volatile long lastCallTime = 0;
 
     @Autowired
     public GdeltDocClient(HttpClient gdeltHttpClient, GdeltProperties properties) {
@@ -44,7 +44,6 @@ public class GdeltDocClient {
         respectRateLimit();
         String url = buildUrl(query, "artlist", timespan, maxRecords, sort);
         String body = executeRequest(url);
-        lastCallTime = System.currentTimeMillis(); // track response time, not request time
         if (body == null || body.isBlank()) {
             return new ArtlistResponse(List.of());
         }
@@ -60,7 +59,6 @@ public class GdeltDocClient {
         respectRateLimit();
         String url = buildUrl(query, mode, timespan, 0, null);
         String body = executeRequest(url);
-        lastCallTime = System.currentTimeMillis(); // track response time, not request time
         if (body == null || body.isBlank()) {
             return new TimelineResponse(List.of());
         }
@@ -116,19 +114,21 @@ public class GdeltDocClient {
         }
     }
 
-    private void respectRateLimit() {
+    private synchronized void respectRateLimit() {
         long now = System.currentTimeMillis();
         long elapsed = now - lastCallTime;
         long rateLimitMs = properties.getRateLimitMs();
         if (lastCallTime > 0 && elapsed < rateLimitMs) {
             try {
                 long sleepTime = rateLimitMs - elapsed;
-                log.debug("Rate limiting: sleeping {}ms", sleepTime);
+                log.debug("GDELT rate limiting: sleeping {}ms", sleepTime);
                 Thread.sleep(sleepTime);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         }
+        // Update timestamp immediately to block concurrent callers
+        lastCallTime = System.currentTimeMillis();
     }
 
     // --- Response DTOs ---

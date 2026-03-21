@@ -190,16 +190,16 @@ public class DesireService
         String description = (String) metadata.getOrDefault("description", document.getText());
         desireEntry.setDescription(description);
         desireEntry.setReasoning((String) metadata.get("reasoning"));
-        desireEntry.setIntensity((Double) metadata.get("intensity"));
+        desireEntry.setIntensity(((Number) metadata.get("intensity")).doubleValue());
         desireEntry.setOpinionId((String) metadata.get("opinionId"));
         desireEntry.setStatus(DesireEntry.Status.valueOf((String) metadata.get("status")));
         desireEntry.setCreatedAt(LocalDateTime.parse((String) metadata.get("createdAt"), TIMESTAMP_FORMATTER));
         desireEntry.setLastUpdated(LocalDateTime.parse((String) metadata.get("lastUpdated"), TIMESTAMP_FORMATTER));
-        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
-        if (embeddingDouble != null) {
-            float[] embeddingFloat = new float[embeddingDouble.size()];
-            for (int i = 0; i < embeddingDouble.size(); i++) {
-                embeddingFloat[i] = embeddingDouble.get(i).floatValue();
+        List<?> embeddingRaw = (List<?>) metadata.get("embedding");
+        if (embeddingRaw != null) {
+            float[] embeddingFloat = new float[embeddingRaw.size()];
+            for (int i = 0; i < embeddingRaw.size(); i++) {
+                embeddingFloat[i] = ((Number) embeddingRaw.get(i)).floatValue();
             }
             desireEntry.setEmbedding(embeddingFloat);
         }

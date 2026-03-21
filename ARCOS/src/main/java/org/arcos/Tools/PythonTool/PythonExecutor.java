@@ -70,6 +70,7 @@ public class PythonExecutor {
             Files.writeString(scriptFile, code);
 
             List<String> command = buildSandboxCommand(scriptFile);
+            log.debug("Python sandbox command: {}", String.join(" ", command));
             ProcessBuilder pb = new ProcessBuilder(command);
             pb.redirectErrorStream(true);
             process = pb.start();
@@ -83,7 +84,11 @@ public class PythonExecutor {
                 return new ExecutionResult(-1, "", "Timeout après " + TIMEOUT_SECONDS + " secondes.");
             }
 
-            return new ExecutionResult(process.exitValue(), output, "");
+            int exitCode = process.exitValue();
+            if (exitCode != 0) {
+                log.warn("Python execution failed with exit code {}: {}", exitCode, output.substring(0, Math.min(200, output.length())));
+            }
+            return new ExecutionResult(exitCode, output, "");
 
         } catch (IOException | InterruptedException e) {
             if (process != null) process.destroyForcibly();
@@ -124,7 +129,10 @@ public class PythonExecutor {
         // Isolation
         cmd.add("--unshare-net");
         cmd.add("--unshare-pid");
-        cmd.add("--unshare-user");
+        // --unshare-user can fail in Docker privileged containers; try without if needed
+        if (canUnshareUser()) {
+            cmd.add("--unshare-user");
+        }
 
         // Bind-mount script read-only
         cmd.addAll(List.of("--ro-bind", scriptFile.toAbsolutePath().toString(), "/tmp/script.py"));
@@ -133,6 +141,27 @@ public class PythonExecutor {
         cmd.addAll(List.of("python3", "/tmp/script.py"));
 
         return cmd;
+    }
+
+    private volatile Boolean unshareUserSupported;
+
+    private boolean canUnshareUser() {
+        if (unshareUserSupported == null) {
+            synchronized (this) {
+                if (unshareUserSupported == null) {
+                    try {
+                        Process test = new ProcessBuilder("bwrap", "--unshare-user", "--ro-bind", "/", "/", "true").start();
+                        unshareUserSupported = test.waitFor(5, TimeUnit.SECONDS) && test.exitValue() == 0;
+                    } catch (IOException | InterruptedException e) {
+                        unshareUserSupported = false;
+                    }
+                    if (!unshareUserSupported) {
+                        log.info("bwrap --unshare-user not supported in this environment, skipping user namespace isolation");
+                    }
+                }
+            }
+        }
+        return unshareUserSupported;
     }
 
     public String readOutput(InputStream inputStream, int maxBytes) throws IOException {

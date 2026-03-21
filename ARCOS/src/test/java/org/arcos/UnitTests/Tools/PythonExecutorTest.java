@@ -34,7 +34,8 @@ class PythonExecutorTest {
 
         // Then
         assertThat(cmd.get(0)).isEqualTo("bwrap");
-        assertThat(cmd).contains("--unshare-net", "--unshare-pid", "--unshare-user");
+        assertThat(cmd).contains("--unshare-net", "--unshare-pid");
+        // --unshare-user is conditional on environment support
     }
 
     @Test
