@@ -64,8 +64,6 @@ class GdeltThemeIndexEndToEndTest {
         PersonaTreeService treeService = new PersonaTreeService(schemaLoader, treeRepository, userModelProperties);
         treeService.initialize();
 
-        PersonaTreeGate personaTreeGate = new PersonaTreeGate(treeService, null, schemaLoader);
-
         GdeltThemeIndexProperties gdeltProperties = new GdeltThemeIndexProperties();
         gdeltProperties.setPath(tempDir.resolve("gdelt-index.json").toString());
         gdeltProperties.setMaxKeywordsPerLeaf(5);
@@ -76,7 +74,7 @@ class GdeltThemeIndexEndToEndTest {
                 ollamaChatModel, gdeltProperties, userContextFormatter);
 
         GdeltThemeIndexService gdeltThemeIndexService = new GdeltThemeIndexService(
-                gdeltRepository, extractor, gdeltProperties, personaTreeGate);
+                gdeltRepository, extractor, gdeltProperties, treeService);
 
         treeOperationService = new TreeOperationService(
                 treeService, schemaLoader, userModelProperties, gdeltThemeIndexService);

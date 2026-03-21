@@ -1,10 +1,11 @@
 package org.arcos.UserModel.GdeltThemeIndex;
 
-import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.arcos.UserModel.PersonaTree.PersonaTreeGate;
+import org.arcos.UserModel.PersonaTree.PersonaTreeService;
 import org.arcos.UserModel.PersonaTree.TreeOperationType;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
@@ -23,27 +24,27 @@ public class GdeltThemeIndexService {
     private final GdeltThemeIndexRepository repository;
     private final GdeltThemeExtractor extractor;
     private final GdeltThemeIndexProperties properties;
-    private final PersonaTreeGate personaTreeGate;
+    private final PersonaTreeService personaTreeService;
 
     private ConcurrentHashMap<String, GdeltLeafThemes> index;
 
     public GdeltThemeIndexService(GdeltThemeIndexRepository repository,
                                   GdeltThemeExtractor extractor,
                                   GdeltThemeIndexProperties properties,
-                                  PersonaTreeGate personaTreeGate) {
+                                  PersonaTreeService personaTreeService) {
         this.repository = repository;
         this.extractor = extractor;
         this.properties = properties;
-        this.personaTreeGate = personaTreeGate;
+        this.personaTreeService = personaTreeService;
         this.index = new ConcurrentHashMap<>();
     }
 
-    @PostConstruct
+    @EventListener(ApplicationReadyEvent.class)
     public void reconcile() {
         Path indexPath = Paths.get(properties.getPath());
         this.index = repository.load(indexPath);
 
-        Map<String, String> currentLeaves = personaTreeGate.getNonEmptyLeaves();
+        Map<String, String> currentLeaves = personaTreeService.getNonEmptyLeaves();
         List<String> toExtract = new ArrayList<>();
         List<String> toRemove = new ArrayList<>();
 

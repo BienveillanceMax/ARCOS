@@ -1,7 +1,7 @@
 package org.arcos.UnitTests.UserModel.GdeltThemeIndex;
 
 import org.arcos.UserModel.GdeltThemeIndex.*;
-import org.arcos.UserModel.PersonaTree.PersonaTreeGate;
+import org.arcos.UserModel.PersonaTree.PersonaTreeService;
 import org.arcos.UserModel.PersonaTree.TreeOperationType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -32,7 +32,7 @@ class GdeltThemeIndexServiceTest {
     private GdeltThemeExtractor extractor;
 
     @Mock
-    private PersonaTreeGate personaTreeGate;
+    private PersonaTreeService personaTreeService;
 
     @TempDir
     Path tempDir;
@@ -44,7 +44,7 @@ class GdeltThemeIndexServiceTest {
     void setUp() {
         properties = new GdeltThemeIndexProperties();
         properties.setPath(tempDir.resolve("index.json").toString());
-        service = new GdeltThemeIndexService(repository, extractor, properties, personaTreeGate);
+        service = new GdeltThemeIndexService(repository, extractor, properties, personaTreeService);
     }
 
     // ========== isGdeltRelevantPath ==========
@@ -224,7 +224,7 @@ class GdeltThemeIndexServiceTest {
         Map<String, String> leaves = new LinkedHashMap<>();
         leaves.put("4_Identity_Characteristics.Life_Beliefs.Political_Stance", "écologie");
         leaves.put("1_Biological_Characteristics.Physical_Appearance.Hair.Scalp_Hair", "brun"); // irrelevant
-        when(personaTreeGate.getNonEmptyLeaves()).thenReturn(leaves);
+        when(personaTreeService.getNonEmptyLeaves()).thenReturn(leaves);
         when(repository.load(any())).thenReturn(new ConcurrentHashMap<>());
         when(extractor.extract(eq("4_Identity_Characteristics.Life_Beliefs.Political_Stance"), eq("écologie")))
                 .thenReturn(List.of(new GdeltKeyword("écologie", KeywordLanguage.FR)));
@@ -250,7 +250,7 @@ class GdeltThemeIndexServiceTest {
                 List.of(new GdeltKeyword("old", KeywordLanguage.FR)), Instant.now()));
 
         when(repository.load(any())).thenReturn(existingIndex);
-        when(personaTreeGate.getNonEmptyLeaves()).thenReturn(Map.of(path, newValue));
+        when(personaTreeService.getNonEmptyLeaves()).thenReturn(Map.of(path, newValue));
         when(extractor.extract(path, newValue))
                 .thenReturn(List.of(new GdeltKeyword("new", KeywordLanguage.FR)));
 
@@ -270,7 +270,7 @@ class GdeltThemeIndexServiceTest {
                 List.of(new GdeltKeyword("kw", KeywordLanguage.FR)), Instant.now()));
 
         when(repository.load(any())).thenReturn(existingIndex);
-        when(personaTreeGate.getNonEmptyLeaves()).thenReturn(Map.of()); // leaf gone
+        when(personaTreeService.getNonEmptyLeaves()).thenReturn(Map.of()); // leaf gone
 
         // When
         service.reconcile();
@@ -291,7 +291,7 @@ class GdeltThemeIndexServiceTest {
                 List.of(new GdeltKeyword("écologie", KeywordLanguage.FR)), Instant.now()));
 
         when(repository.load(any())).thenReturn(existingIndex);
-        when(personaTreeGate.getNonEmptyLeaves()).thenReturn(Map.of(path, value));
+        when(personaTreeService.getNonEmptyLeaves()).thenReturn(Map.of(path, value));
 
         // When
         service.reconcile();
@@ -306,7 +306,7 @@ class GdeltThemeIndexServiceTest {
         // Given
         String path = "5_Behavioral_Characteristics.Interests_and_Skills.Interests_and_Hobbies";
         when(repository.load(any())).thenReturn(new ConcurrentHashMap<>());
-        when(personaTreeGate.getNonEmptyLeaves()).thenReturn(Map.of(path, "programmation"));
+        when(personaTreeService.getNonEmptyLeaves()).thenReturn(Map.of(path, "programmation"));
         when(extractor.extract(path, "programmation")).thenReturn(List.of()); // failed
 
         // When
