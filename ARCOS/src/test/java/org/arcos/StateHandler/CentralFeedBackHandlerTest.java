@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.times;
 
 public class CentralFeedBackHandlerTest {
@@ -36,10 +37,11 @@ public class CentralFeedBackHandlerTest {
     }
 
     @Test
-    public void testWakeUpShortEvent() {
+    public void testWakeUpShortEvent_DoesNotPlayAudio() {
+        // WAKEUP_SHORT audio cue is handled synchronously by WakeWordProducer to avoid mic bleed
         FeedBackEvent event = new FeedBackEvent(UXEventType.WAKEUP_SHORT);
         centralFeedBackHandler.handleFeedBack(event);
-        verify(audioCueEngine, times(1)).play("wakeup_soft.wav");
+        verifyNoInteractions(audioCueEngine);
     }
 
     @Test

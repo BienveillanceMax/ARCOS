@@ -2,6 +2,7 @@ package org.arcos.UnitTests.Producers;
 
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
+import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Producers.WakeWordProducer;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,9 @@ class WakeWordProducerTest {
 
     @Mock
     private CentralFeedBackHandler centralFeedBackHandler;
+
+    @Mock
+    private AudioCueFeedbackHandler audioCueFeedbackHandler;
 
     private AudioProperties defaultAudioProperties() {
         return new AudioProperties();
@@ -82,7 +86,7 @@ class WakeWordProducerTest {
     private WakeWordProducer buildProducerViaDegradedPath() {
         WakeWordProducer[] holder = new WakeWordProducer[1];
         assertThatCode(() -> {
-            holder[0] = new WakeWordProducer(eventQueue, "http://localhost:9000", centralFeedBackHandler, defaultAudioProperties());
+            holder[0] = new WakeWordProducer(eventQueue, "http://localhost:9000", centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties());
         }).doesNotThrowAnyException();
         return holder[0];
     }

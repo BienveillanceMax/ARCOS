@@ -17,6 +17,15 @@ public class AudioCueEngine {
         new Thread(() -> streamSound(soundIdentifier)).start();
     }
 
+    /**
+     * Plays a sound synchronously (blocking until playback finishes).
+     * Used by WakeWordProducer to ensure the wake-up cue completes before recording starts,
+     * preventing the cue from bleeding into the microphone capture.
+     */
+    public void playSync(String soundIdentifier) {
+        streamSound(soundIdentifier);
+    }
+
     private void streamSound(String soundIdentifier) {
         try {
             // 1. Chargement et Conversion Standard (44.1kHz, 16-bit)

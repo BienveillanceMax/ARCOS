@@ -21,6 +21,14 @@ public class AudioCueFeedbackHandler
         audioCueEngine.play("wakeup_soft.wav");
     }
 
+    /**
+     * Plays the wake-up cue synchronously (blocks until done).
+     * Called by WakeWordProducer to avoid mic bleed from the speaker cue.
+     */
+    public void playWakeUpSoundSoftSync() {
+        audioCueEngine.playSync("wakeup_soft.wav");
+    }
+
     //When the LLM starts processing a user query, a sound signals "heard, processing"
     public void playThinkingStartSound() {
         audioCueEngine.play("thinking_start.wav");

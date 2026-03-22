@@ -24,7 +24,7 @@ public class CentralFeedBackHandler
                 audioCueHandler.playArcosStart();
                 break;
             case WAKEUP_SHORT:
-                audioCueHandler.playWakeUpSoundSoft();
+                // Audio cue handled synchronously by WakeWordProducer to avoid mic bleed
                 break;
             case THINKING_START:
                 audioCueHandler.playThinkingStartSound();

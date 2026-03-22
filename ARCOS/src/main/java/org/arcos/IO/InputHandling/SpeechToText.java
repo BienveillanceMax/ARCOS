@@ -9,6 +9,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
@@ -167,9 +168,31 @@ public class SpeechToText {
         fos.write(header, 0, 44);
     }
 
+    private static final List<String> HALLUCINATION_PATTERNS = List.of(
+            "sous-titres",
+            "sous-titre",
+            "amara.org",
+            "merci d'avoir regardé",
+            "abonnez-vous",
+            "n'hésitez pas à",
+            "likez cette vidéo",
+            "s'il vous plaît",
+            "merci pour votre attention"
+    );
+
     private String cleanTranscript(String transcript) {
         if (transcript == null) return null;
-        return transcript.replaceAll("\\[.*?\\]", "").trim();
+        // Strip Whisper annotation tags like [MUSIC], [SILENCE]
+        String cleaned = transcript.replaceAll("\\[.*?\\]", "").trim();
+        // Filter known French Whisper hallucinations
+        String lower = cleaned.toLowerCase();
+        for (String pattern : HALLUCINATION_PATTERNS) {
+            if (lower.contains(pattern)) {
+                log.debug("Filtered Whisper hallucination: '{}'", cleaned);
+                return "";
+            }
+        }
+        return cleaned;
     }
 
     public void reset() {

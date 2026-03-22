@@ -10,6 +10,7 @@ import org.arcos.IO.InputHandling.JavaSoundMicrophoneSource;
 import org.arcos.IO.InputHandling.MicrophoneSource;
 import org.arcos.IO.InputHandling.PipeWireMicrophoneSource;
 import org.arcos.IO.InputHandling.SpeechToText;
+import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
@@ -44,6 +45,7 @@ public class WakeWordProducer implements Runnable {
     private MicrophoneSource micSource;
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
+    private final AudioCueFeedbackHandler audioCueFeedbackHandler;
     private final AudioProperties audioProperties;
     private final String fasterWhisperUrl;
     private volatile Thread wakeWordThread;
@@ -53,6 +55,28 @@ public class WakeWordProducer implements Runnable {
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
     private int silenceThreshold;
+
+    /**
+     * 21-tap low-pass FIR filter (Hamming window, fc=7200Hz at 44100Hz).
+     * Provides ~44dB stopband attenuation to prevent aliasing when downsampling to 16kHz.
+     * Only active on the JavaSound fallback path (PipeWire captures at 16kHz natively).
+     */
+    private static final double[] LP_FILTER;
+    static {
+        int N = 21;
+        double fc = 7200.0 / 44100.0;
+        LP_FILTER = new double[N];
+        double sum = 0;
+        int M = N / 2;
+        for (int i = 0; i < N; i++) {
+            double n = i - M;
+            double sinc = (n == 0) ? 2 * Math.PI * fc : Math.sin(2 * Math.PI * fc * n) / (Math.PI * n);
+            double hamming = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (N - 1));
+            LP_FILTER[i] = sinc * hamming;
+            sum += LP_FILTER[i];
+        }
+        for (int i = 0; i < N; i++) LP_FILTER[i] /= sum;
+    }
 
     private volatile boolean suspended = false;
     private volatile boolean needsDrain = false;
@@ -92,8 +116,11 @@ public class WakeWordProducer implements Runnable {
 
     @Autowired
     public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl,
-                            CentralFeedBackHandler centralFeedBackHandler, AudioProperties audioProperties) {
+                            CentralFeedBackHandler centralFeedBackHandler,
+                            AudioCueFeedbackHandler audioCueFeedbackHandler,
+                            AudioProperties audioProperties) {
         this.centralFeedBackHandler = centralFeedBackHandler;
+        this.audioCueFeedbackHandler = audioCueFeedbackHandler;
         this.eventQueue = eventQueue;
         this.audioProperties = audioProperties;
         this.fasterWhisperUrl = fasterWhisperUrl;
@@ -301,6 +328,7 @@ public class WakeWordProducer implements Runnable {
                                 LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss")),
                                 keywords[result]);
                         centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.WAKEUP_SHORT));
+                        audioCueFeedbackHandler.playWakeUpSoundSoftSync(); // blocks until cue finishes — prevents mic bleed
 
                         // Switch to transcription mode
                         String transcription = recordAndTranscribe();
@@ -330,11 +358,17 @@ public class WakeWordProducer implements Runnable {
 
     private void downsample(short[] input, int inputLength, short[] output, int outputLength) {
         double ratio = (double) inputLength / outputLength;
+        int halfTaps = LP_FILTER.length / 2;
         for (int i = 0; i < outputLength; i++) {
-            int index = (int) (i * ratio);
-            if (index < inputLength) {
-                output[i] = input[index];
+            int center = (int) (i * ratio);
+            double acc = 0;
+            for (int t = 0; t < LP_FILTER.length; t++) {
+                int idx = center - halfTaps + t;
+                if (idx >= 0 && idx < inputLength) {
+                    acc += input[idx] * LP_FILTER[t];
+                }
             }
+            output[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(acc)));
         }
     }
 
@@ -353,6 +387,11 @@ public class WakeWordProducer implements Runnable {
 
         byte[] micBuffer = new byte[micFrameSize];
         byte[] whisperBuffer = new byte[whisperFrameSize];
+
+        // Pre-buffer: ring buffer of recent frames to preserve speech onset
+        final int PRE_BUFFER_FRAMES = 4; // ~200ms at 50ms/frame
+        byte[][] preBuffer = new byte[PRE_BUFFER_FRAMES][];
+        int preBufferIndex = 0;
 
         long lastSoundTime = System.currentTimeMillis();
         long recordingStartTime = System.currentTimeMillis();
@@ -383,6 +422,12 @@ public class WakeWordProducer implements Runnable {
                         System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, whisperFrameSize));
                     }
 
+                    // Store frame in ring buffer before silence check (only while waiting for speech)
+                    if (!hasDetectedSpeech) {
+                        preBuffer[preBufferIndex % PRE_BUFFER_FRAMES] = whisperBuffer.clone();
+                        preBufferIndex++;
+                    }
+
                     // Check for silence
                     boolean isSilent = isSilence(whisperBuffer);
 
@@ -391,6 +436,14 @@ public class WakeWordProducer implements Runnable {
                         if (!hasDetectedSpeech) {
                             hasDetectedSpeech = true;
                             log.info("Speech detected, recording...");
+                            // Flush pre-buffer: send prior frames that contain the speech onset
+                            int oldest = Math.max(0, preBufferIndex - PRE_BUFFER_FRAMES);
+                            for (int j = oldest; j < preBufferIndex - 1; j++) {
+                                byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
+                                if (frame != null) {
+                                    speechToText.processAudio(frame);
+                                }
+                            }
                         }
                     }
 
@@ -509,6 +562,11 @@ public class WakeWordProducer implements Runnable {
         byte[] micBuffer = new byte[micFrameSize];
         byte[] whisperBuffer = new byte[whisperFrameSize];
 
+        // Pre-buffer: ring buffer of recent frames to preserve speech onset
+        final int PRE_BUFFER_FRAMES = 4; // ~200ms at 50ms/frame
+        byte[][] preBuffer = new byte[PRE_BUFFER_FRAMES][];
+        int preBufferIndex = 0;
+
         long lastSoundTime = System.currentTimeMillis();
         long recordingStartTime = System.currentTimeMillis();
         boolean hasDetectedSpeech = false;
@@ -538,6 +596,12 @@ public class WakeWordProducer implements Runnable {
                         System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, whisperFrameSize));
                     }
 
+                    // Store frame in ring buffer before silence check (only while waiting for speech)
+                    if (!hasDetectedSpeech) {
+                        preBuffer[preBufferIndex % PRE_BUFFER_FRAMES] = whisperBuffer.clone();
+                        preBufferIndex++;
+                    }
+
                     boolean isSilent = isSilence(whisperBuffer);
 
                     if (!isSilent) {
@@ -545,6 +609,14 @@ public class WakeWordProducer implements Runnable {
                         if (!hasDetectedSpeech) {
                             hasDetectedSpeech = true;
                             log.info("[CONVERSATION] Parole détectée, enregistrement...");
+                            // Flush pre-buffer: send prior frames that contain the speech onset
+                            int oldest = Math.max(0, preBufferIndex - PRE_BUFFER_FRAMES);
+                            for (int j = oldest; j < preBufferIndex - 1; j++) {
+                                byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
+                                if (frame != null) {
+                                    speechToText.processAudio(frame);
+                                }
+                            }
                         }
                     }
 
