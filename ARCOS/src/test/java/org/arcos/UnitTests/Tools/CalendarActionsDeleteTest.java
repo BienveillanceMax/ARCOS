@@ -1,11 +1,9 @@
 package org.arcos.UnitTests.Tools;
 
-import com.google.api.client.util.DateTime;
-import com.google.api.services.calendar.model.Event;
-import com.google.api.services.calendar.model.EventDateTime;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.CalendarActions;
-import org.arcos.Tools.CalendarTool.CalendarService;
+import org.arcos.Tools.CalendarTool.CalDavCalendarService;
+import org.arcos.Tools.CalendarTool.model.CalendarEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,7 +13,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.Collections;
 import java.util.List;
 
@@ -27,7 +24,7 @@ import static org.mockito.Mockito.*;
 class CalendarActionsDeleteTest {
 
     @Mock
-    private CalendarService calendarService;
+    private CalDavCalendarService calendarService;
 
     private CalendarActions calendarActions;
 
@@ -36,34 +33,33 @@ class CalendarActionsDeleteTest {
         calendarActions = new CalendarActions(calendarService);
     }
 
-    // --- Helper to build a Google Calendar Event ---
+    // --- Helper to build a CalendarEvent ---
 
-    private Event makeTimedEvent(String id, String summary, LocalDate date, int hour, int minute) {
-        long epochMillis = date.atTime(hour, minute)
-                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        Event event = new Event();
-        event.setId(id);
-        event.setSummary(summary);
-        event.setStart(new EventDateTime().setDateTime(new DateTime(epochMillis)));
-        return event;
+    private CalendarEvent makeTimedEvent(String id, String summary, LocalDate date, int hour, int minute) {
+        return CalendarEvent.builder()
+                .id(id)
+                .title(summary)
+                .startDateTime(date.atTime(hour, minute))
+                .allDay(false)
+                .build();
     }
 
-    private Event makeAllDayEvent(String id, String summary, LocalDate date) {
-        Event event = new Event();
-        event.setId(id);
-        event.setSummary(summary);
-        event.setStart(new EventDateTime().setDate(new DateTime(date.toString())));
-        return event;
+    private CalendarEvent makeAllDayEvent(String id, String summary, LocalDate date) {
+        return CalendarEvent.builder()
+                .id(id)
+                .title(summary)
+                .startDateTime(date.atStartOfDay())
+                .allDay(true)
+                .build();
     }
 
-    private Event makeNullSummaryEvent(String id, LocalDate date, int hour, int minute) {
-        long epochMillis = date.atTime(hour, minute)
-                .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-        Event event = new Event();
-        event.setId(id);
-        event.setSummary(null);
-        event.setStart(new EventDateTime().setDateTime(new DateTime(epochMillis)));
-        return event;
+    private CalendarEvent makeNullSummaryEvent(String id, LocalDate date, int hour, int minute) {
+        return CalendarEvent.builder()
+                .id(id)
+                .title(null)
+                .startDateTime(date.atTime(hour, minute))
+                .allDay(false)
+                .build();
     }
 
     // ==================== Service unavailable ====================
@@ -78,7 +74,7 @@ class CalendarActionsDeleteTest {
 
         // Then
         assertThat(result.isSuccess()).isFalse();
-        assertThat(result.getMessage()).contains("autorisation Google");
+        assertThat(result.getMessage()).contains("Radicale");
     }
 
     // ==================== Exact title match (backward compat) ====================
@@ -88,7 +84,7 @@ class CalendarActionsDeleteTest {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate today = LocalDate.now();
-        Event event = makeTimedEvent("ev1", "Réunion d'équipe", today, 10, 0);
+        CalendarEvent event = makeTimedEvent("ev1", "Réunion d'équipe", today, 10, 0);
         when(calendarService.searchEvents("Réunion d'équipe", 20)).thenReturn(List.of(event));
 
         // When
@@ -107,7 +103,7 @@ class CalendarActionsDeleteTest {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate today = LocalDate.now();
-        Event event = makeTimedEvent("ev2", "Réunion d'équipe hebdomadaire", today, 10, 0);
+        CalendarEvent event = makeTimedEvent("ev2", "Réunion d'équipe hebdomadaire", today, 10, 0);
         when(calendarService.searchEvents("réunion", 20)).thenReturn(List.of(event));
 
         // When
@@ -123,7 +119,7 @@ class CalendarActionsDeleteTest {
     void delete_CaseInsensitiveMatch_ShouldFindAndDelete() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = makeTimedEvent("ev3", "DÉJEUNER IMPORTANT", LocalDate.now(), 12, 30);
+        CalendarEvent event = makeTimedEvent("ev3", "DÉJEUNER IMPORTANT", LocalDate.now(), 12, 30);
         when(calendarService.searchEvents("déjeuner", 20)).thenReturn(List.of(event));
 
         // When
@@ -142,8 +138,8 @@ class CalendarActionsDeleteTest {
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate tomorrow = LocalDate.now().plusDays(1);
         LocalDate dayAfter = LocalDate.now().plusDays(2);
-        Event tomorrowEvent = makeTimedEvent("ev4", "Réunion demain", tomorrow, 14, 0);
-        Event dayAfterEvent = makeTimedEvent("ev5", "Réunion après-demain", dayAfter, 14, 0);
+        CalendarEvent tomorrowEvent = makeTimedEvent("ev4", "Réunion demain", tomorrow, 14, 0);
+        CalendarEvent dayAfterEvent = makeTimedEvent("ev5", "Réunion après-demain", dayAfter, 14, 0);
         when(calendarService.searchEvents("Réunion", 20)).thenReturn(List.of(tomorrowEvent, dayAfterEvent));
 
         // When
@@ -162,10 +158,10 @@ class CalendarActionsDeleteTest {
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate targetDate = LocalDate.of(2026, 3, 20);
         // searchEvents returns events on a different date
-        Event wrongDateEvent = makeTimedEvent("ev6", "Réunion", LocalDate.of(2026, 3, 21), 10, 0);
+        CalendarEvent wrongDateEvent = makeTimedEvent("ev6", "Réunion", LocalDate.of(2026, 3, 21), 10, 0);
         when(calendarService.searchEvents("standup", 20)).thenReturn(List.of(wrongDateEvent));
         // Fallback: listEventsBetweenDates returns events for that day
-        Event dayEvent = makeTimedEvent("ev7", "Déjeuner client", targetDate, 12, 30);
+        CalendarEvent dayEvent = makeTimedEvent("ev7", "Déjeuner client", targetDate, 12, 30);
         when(calendarService.listEventsBetweenDates(
                 eq(targetDate.atStartOfDay()), eq(targetDate.atTime(LocalTime.MAX)), eq(20)))
                 .thenReturn(List.of(dayEvent));
@@ -203,7 +199,7 @@ class CalendarActionsDeleteTest {
     void delete_NoDate_ShouldSearchWithoutDateFilter() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event futureEvent = makeTimedEvent("ev8", "Dentiste", LocalDate.now().plusDays(5), 9, 0);
+        CalendarEvent futureEvent = makeTimedEvent("ev8", "Dentiste", LocalDate.now().plusDays(5), 9, 0);
         when(calendarService.searchEvents("Dentiste", 20)).thenReturn(List.of(futureEvent));
 
         // When
@@ -218,7 +214,7 @@ class CalendarActionsDeleteTest {
     void delete_EmptyDateStr_ShouldSearchWithoutDateFilter() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = makeTimedEvent("ev9", "Yoga", LocalDate.now().plusDays(2), 18, 0);
+        CalendarEvent event = makeTimedEvent("ev9", "Yoga", LocalDate.now().plusDays(2), 18, 0);
         when(calendarService.searchEvents("Yoga", 20)).thenReturn(List.of(event));
 
         // When
@@ -250,8 +246,8 @@ class CalendarActionsDeleteTest {
     void delete_EventWithNullSummary_ShouldNotThrowNPE() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event nullSummaryEvent = makeNullSummaryEvent("ev10", LocalDate.now(), 10, 0);
-        Event validEvent = makeTimedEvent("ev11", "Ma réunion", LocalDate.now(), 11, 0);
+        CalendarEvent nullSummaryEvent = makeNullSummaryEvent("ev10", LocalDate.now(), 10, 0);
+        CalendarEvent validEvent = makeTimedEvent("ev11", "Ma réunion", LocalDate.now(), 11, 0);
         when(calendarService.searchEvents("réunion", 20)).thenReturn(List.of(nullSummaryEvent, validEvent));
 
         // When
@@ -266,7 +262,7 @@ class CalendarActionsDeleteTest {
     void delete_OnlyNullSummaryEvents_ShouldReturnFailureNotNPE() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event nullSummaryEvent = makeNullSummaryEvent("ev12", LocalDate.now(), 10, 0);
+        CalendarEvent nullSummaryEvent = makeNullSummaryEvent("ev12", LocalDate.now(), 10, 0);
         when(calendarService.searchEvents("test", 20)).thenReturn(List.of(nullSummaryEvent));
 
         // When
@@ -284,7 +280,7 @@ class CalendarActionsDeleteTest {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate targetDate = LocalDate.of(2026, 3, 20);
-        Event allDayEvent = makeAllDayEvent("ev13", "Vacances", targetDate);
+        CalendarEvent allDayEvent = makeAllDayEvent("ev13", "Vacances", targetDate);
         when(calendarService.searchEvents("Vacances", 20)).thenReturn(List.of(allDayEvent));
 
         // When
@@ -301,7 +297,7 @@ class CalendarActionsDeleteTest {
     void delete_InvalidDateFormat_ShouldFallbackToNoDateFilter() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = makeTimedEvent("ev14", "Cours", LocalDate.now(), 16, 0);
+        CalendarEvent event = makeTimedEvent("ev14", "Cours", LocalDate.now(), 16, 0);
         when(calendarService.searchEvents("Cours", 20)).thenReturn(List.of(event));
 
         // When
@@ -320,8 +316,8 @@ class CalendarActionsDeleteTest {
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate targetDate = LocalDate.of(2026, 3, 17);
         when(calendarService.searchEvents("xyz", 20)).thenReturn(Collections.emptyList());
-        Event event1 = makeTimedEvent("ev15", "Réunion d'équipe hebdomadaire", targetDate, 10, 0);
-        Event event2 = makeTimedEvent("ev16", "Déjeuner", targetDate, 12, 30);
+        CalendarEvent event1 = makeTimedEvent("ev15", "Réunion d'équipe hebdomadaire", targetDate, 10, 0);
+        CalendarEvent event2 = makeTimedEvent("ev16", "Déjeuner", targetDate, 12, 30);
         when(calendarService.listEventsBetweenDates(any(), any(), eq(20)))
                 .thenReturn(List.of(event1, event2));
 
@@ -342,7 +338,7 @@ class CalendarActionsDeleteTest {
         when(calendarService.isAvailable()).thenReturn(true);
         LocalDate targetDate = LocalDate.of(2026, 3, 17);
         when(calendarService.searchEvents("xyz", 20)).thenReturn(Collections.emptyList());
-        Event nullEvent = makeNullSummaryEvent("ev17", targetDate, 14, 0);
+        CalendarEvent nullEvent = makeNullSummaryEvent("ev17", targetDate, 14, 0);
         when(calendarService.listEventsBetweenDates(any(), any(), eq(20)))
                 .thenReturn(List.of(nullEvent));
 
@@ -377,7 +373,7 @@ class CalendarActionsDeleteTest {
     void delete_ShouldReturnActualEventTitle_NotSearchTerm() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = makeTimedEvent("ev18", "Réunion d'équipe hebdomadaire", LocalDate.now(), 10, 0);
+        CalendarEvent event = makeTimedEvent("ev18", "Réunion d'équipe hebdomadaire", LocalDate.now(), 10, 0);
         when(calendarService.searchEvents("réunion", 20)).thenReturn(List.of(event));
 
         // When

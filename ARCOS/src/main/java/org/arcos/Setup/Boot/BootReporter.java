@@ -4,7 +4,7 @@ import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Setup.Health.PiperHealthChecker;
 import org.arcos.Setup.Health.ServiceStatus;
-import org.arcos.Tools.CalendarTool.CalendarService;
+import org.arcos.Tools.CalendarTool.CalDavCalendarService;
 import org.arcos.Tools.SearchTool.BraveSearchService;
 import org.arcos.Setup.UI.BootPhaseRenderer;
 import org.arcos.Setup.UI.ScreenHolder;
@@ -18,6 +18,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Déclenche l'affichage du rapport de boot après démarrage complet de Spring.
@@ -36,7 +37,7 @@ public class BootReporter {
     private final PersonalityGreeting greeting;
     private final PersonalityProperties personalityProperties;
     private final BraveSearchService braveSearchService;
-    private final CalendarService calendarService;
+    private final CalDavCalendarService calendarService;
     private final ApplicationContext applicationContext;
 
     @Value("${qdrant.host:localhost}")
@@ -55,7 +56,7 @@ public class BootReporter {
                         PersonalityGreeting greeting,
                         PersonalityProperties personalityProperties,
                         BraveSearchService braveSearchService,
-                        CalendarService calendarService,
+                        CalDavCalendarService calendarService,
                         ApplicationContext applicationContext) {
         this.registry = registry;
         this.greeting = greeting;
@@ -122,14 +123,19 @@ public class BootReporter {
                     "BRAVE_SEARCH_API_KEY absent", CATEGORY_TOOLS);
         }
 
-        // Calendar
+        // Calendar (Radicale CalDAV)
         if (calendarService.isAvailable()) {
             registry.register("CALENDRIER", ServiceStatus.ONLINE,
-                    "Google Calendar", CATEGORY_TOOLS);
+                    "Radicale (localhost:5232)", CATEGORY_TOOLS);
         } else {
             registry.register("CALENDRIER", ServiceStatus.OFFLINE,
-                    "Tokens OAuth absents", CATEGORY_TOOLS);
+                    "Radicale non disponible", CATEGORY_TOOLS);
         }
+
+        // Tailscale (VPN mesh pour accès distant)
+        ServiceStatusEntry tailscaleStatus = checkTailscaleStatus();
+        registry.register(tailscaleStatus.getName(), tailscaleStatus.getStatus(),
+                tailscaleStatus.getDetail(), CATEGORY_TOOLS);
     }
 
     private boolean hasBeanOfType(Class<?> type) {
@@ -137,6 +143,31 @@ public class BootReporter {
             return !applicationContext.getBeansOfType(type).isEmpty();
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    private ServiceStatusEntry checkTailscaleStatus() {
+        try {
+            ProcessBuilder pb = new ProcessBuilder("tailscale", "ip", "-4");
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+            String output = new String(process.getInputStream().readAllBytes()).trim();
+            boolean finished = process.waitFor(5, TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                return new ServiceStatusEntry("TAILSCALE", ServiceStatus.OFFLINE,
+                        "timeout", CATEGORY_TOOLS);
+            }
+            int exitCode = process.exitValue();
+            if (exitCode == 0 && !output.isBlank()) {
+                return new ServiceStatusEntry("TAILSCALE", ServiceStatus.ONLINE,
+                        output, CATEGORY_TOOLS);
+            }
+            return new ServiceStatusEntry("TAILSCALE", ServiceStatus.OFFLINE,
+                    "non connecté", CATEGORY_TOOLS);
+        } catch (Exception e) {
+            return new ServiceStatusEntry("TAILSCALE", ServiceStatus.OFFLINE,
+                    "non installé", CATEGORY_TOOLS);
         }
     }
 

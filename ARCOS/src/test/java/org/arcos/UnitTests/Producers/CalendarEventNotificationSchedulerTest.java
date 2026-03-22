@@ -2,7 +2,7 @@ package org.arcos.UnitTests.Producers;
 
 import org.arcos.EventBus.EventQueue;
 import org.arcos.Producers.CalendarEventNotificationScheduler;
-import org.arcos.Tools.CalendarTool.CalendarService;
+import org.arcos.Tools.CalendarTool.CalDavCalendarService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -18,7 +18,7 @@ import static org.mockito.Mockito.*;
 class CalendarEventNotificationSchedulerTest {
 
     @Mock
-    private CalendarService calendarService;
+    private CalDavCalendarService calendarService;
 
     @Mock
     private EventQueue eventQueue;

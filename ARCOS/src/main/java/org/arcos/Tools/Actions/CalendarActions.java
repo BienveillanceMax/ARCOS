@@ -1,16 +1,14 @@
 package org.arcos.Tools.Actions;
-import org.arcos.Tools.CalendarTool.CalendarService;
-import com.google.api.services.calendar.model.Event;
+import org.arcos.Tools.CalendarTool.CalDavCalendarService;
+import org.arcos.Tools.CalendarTool.model.CalendarEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Arrays;
@@ -23,15 +21,15 @@ import java.util.stream.Collectors;
 public class CalendarActions
 {
 
-    private final CalendarService calendarService;
+    private final CalDavCalendarService calendarService;
 
     private static final String CALENDAR_UNAVAILABLE_MESSAGE =
-            "Calendrier non disponible : autorisation Google manquante.";
+            "Calendrier non disponible : serveur Radicale inaccessible.";
     private static final DateTimeFormatter FRENCH_DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
     private static final DateTimeFormatter FRENCH_TIME_FORMAT = DateTimeFormatter.ofPattern("HH'h'mm");
 
     @Autowired
-    public CalendarActions(CalendarService calendarService) {
+    public CalendarActions(CalDavCalendarService calendarService) {
         this.calendarService = calendarService;
     }
 
@@ -80,10 +78,10 @@ public class CalendarActions
 
             log.info("Parsed dates - Start: {}, End: {}", isoStartDateTime, isoEndDateTime);
 
-            Event createdEvent = calendarService.createEvent(title, description, startDateTime, endDateTime, location);
-            log.info("Event created: {}", createdEvent.getHtmlLink());
+            CalendarEvent createdEvent = calendarService.createEvent(title, description, startDateTime, endDateTime, location);
+            log.info("Event created: {}", createdEvent.getId());
             return ActionResult.success(
-                    List.of(createdEvent.getSummary(), createdEvent.getDescription()),
+                    List.of(createdEvent.getTitle(), createdEvent.getDescription()),
                     "L'événement a été créé avec succès."
             );
 
@@ -103,14 +101,16 @@ public class CalendarActions
             return ActionResult.failure(CALENDAR_UNAVAILABLE_MESSAGE, null);
         }
         try {
-            List<Event> events = calendarService.listUpcomingEvents(maxResults);
+            List<CalendarEvent> events = calendarService.listUpcomingEvents(maxResults);
             if (events.isEmpty()) {
                 return ActionResult.successWithMessage("Aucun événement à venir trouvé.");
             }
             List<String> eventSummaries = events.stream()
                     .map(event -> {
-                        String start = event.getStart().getDateTime() != null ? event.getStart().getDateTime().toString() : event.getStart().getDate().toString();
-                        return String.format("%s (%s)", event.getSummary(), start);
+                        String start = event.getStartDateTime() != null
+                                ? event.getStartDateTime().toString()
+                                : "journée";
+                        return String.format("%s (%s)", event.getTitle(), start);
                     })
                     .collect(Collectors.toList());
             return ActionResult.success(eventSummaries, "Voici les prochains événements de votre calendrier.");
@@ -128,11 +128,11 @@ public class CalendarActions
         try {
             LocalDate targetDate = parseOptionalDate(dateStr);
 
-            // Use Google's server-side fuzzy search first
-            List<Event> searchResults = calendarService.searchEvents(title, 20);
+            // Search events by title (client-side fuzzy search)
+            List<CalendarEvent> searchResults = calendarService.searchEvents(title, 20);
 
             // Filter by target date if provided
-            List<Event> candidates;
+            List<CalendarEvent> candidates;
             if (targetDate != null) {
                 candidates = searchResults.stream()
                         .filter(event -> matchesDate(event, targetDate))
@@ -141,16 +141,16 @@ public class CalendarActions
                 candidates = searchResults;
             }
 
-            // Find best match: case-insensitive contains on summary
+            // Find best match: case-insensitive contains on title
             String lowerTitle = title.toLowerCase();
-            Event eventToDelete = candidates.stream()
-                    .filter(event -> event.getSummary() != null
-                            && event.getSummary().toLowerCase().contains(lowerTitle))
+            CalendarEvent eventToDelete = candidates.stream()
+                    .filter(event -> event.getTitle() != null
+                            && event.getTitle().toLowerCase().contains(lowerTitle))
                     .findFirst()
                     .orElse(null);
 
             if (eventToDelete != null) {
-                String deletedTitle = eventToDelete.getSummary();
+                String deletedTitle = eventToDelete.getTitle();
                 calendarService.deleteEvent(eventToDelete.getId());
                 return ActionResult.successWithMessage("L'événement '" + deletedTitle + "' a été supprimé avec succès.");
             }
@@ -174,29 +174,22 @@ public class CalendarActions
         }
     }
 
-    private boolean matchesDate(Event event, LocalDate date) {
-        if (event.getStart() == null) return false;
-        if (event.getStart().getDateTime() != null) {
-            long epochMillis = event.getStart().getDateTime().getValue();
-            LocalDate eventDate = Instant.ofEpochMilli(epochMillis)
-                    .atZone(ZoneId.systemDefault()).toLocalDate();
-            return eventDate.equals(date);
+    private boolean matchesDate(CalendarEvent event, LocalDate date) {
+        if (event.getStartDateTime() == null) return false;
+        if (event.isAllDay()) {
+            return event.getStartDateTime().toLocalDate().equals(date);
         }
-        if (event.getStart().getDate() != null) {
-            String dateValue = event.getStart().getDate().toStringRfc3339();
-            return dateValue.equals(date.toString());
-        }
-        return false;
+        return event.getStartDateTime().toLocalDate().equals(date);
     }
 
-    private ActionResult buildNoMatchMessage(String title, LocalDate targetDate, List<Event> searchResults) {
+    private ActionResult buildNoMatchMessage(String title, LocalDate targetDate, List<CalendarEvent> searchResults) {
         try {
             if (targetDate == null) {
                 return ActionResult.failure(
                         "Aucun événement correspondant à '" + title + "' trouvé.", null);
             }
             // Reuse already-fetched results filtered by date instead of an extra API call
-            List<Event> dayEvents = searchResults.stream()
+            List<CalendarEvent> dayEvents = searchResults.stream()
                     .filter(event -> matchesDate(event, targetDate))
                     .collect(Collectors.toList());
 
@@ -214,11 +207,9 @@ public class CalendarActions
             }
             String eventList = dayEvents.stream()
                     .map(e -> {
-                        String summary = e.getSummary() != null ? e.getSummary() : "(sans titre)";
-                        String time = e.getStart().getDateTime() != null
-                                ? Instant.ofEpochMilli(e.getStart().getDateTime().getValue())
-                                    .atZone(ZoneId.systemDefault())
-                                    .format(FRENCH_TIME_FORMAT)
+                        String summary = e.getTitle() != null ? e.getTitle() : "(sans titre)";
+                        String time = !e.isAllDay() && e.getStartDateTime() != null
+                                ? e.getStartDateTime().format(FRENCH_TIME_FORMAT)
                                 : "journée";
                         return "'" + summary + " (" + time + ")'";
                     })

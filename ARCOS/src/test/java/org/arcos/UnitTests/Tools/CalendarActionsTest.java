@@ -1,11 +1,9 @@
 package org.arcos.UnitTests.Tools;
 
-import com.google.api.client.util.DateTime;
-import com.google.api.services.calendar.model.Event;
-import com.google.api.services.calendar.model.EventDateTime;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.CalendarActions;
-import org.arcos.Tools.CalendarTool.CalendarService;
+import org.arcos.Tools.CalendarTool.CalDavCalendarService;
+import org.arcos.Tools.CalendarTool.model.CalendarEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +21,7 @@ import static org.mockito.Mockito.*;
 class CalendarActionsTest {
 
     @Mock
-    private CalendarService calendarService;
+    private CalDavCalendarService calendarService;
 
     private CalendarActions calendarActions;
 
@@ -80,7 +78,11 @@ class CalendarActionsTest {
     void addCalendarEvent_WithValidIsoDateTime_ShouldCreateEvent() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event mockEvent = createMockEvent("Meeting", "Desc", "https://link");
+        CalendarEvent mockEvent = CalendarEvent.builder()
+                .id("uid-123")
+                .title("Meeting")
+                .description("Desc")
+                .build();
         when(calendarService.createEvent(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(mockEvent);
 
@@ -140,7 +142,11 @@ class CalendarActionsTest {
     void addCalendarEvent_WithFrenchDateFormat_ShouldParseAndCreate() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event mockEvent = createMockEvent("RDV", "Desc", "https://link");
+        CalendarEvent mockEvent = CalendarEvent.builder()
+                .id("uid-456")
+                .title("RDV")
+                .description("Desc")
+                .build();
         when(calendarService.createEvent(anyString(), anyString(), any(), any(), anyString()))
                 .thenReturn(mockEvent);
 
@@ -187,11 +193,10 @@ class CalendarActionsTest {
     void listCalendarEvents_WithEvents_ShouldReturnFormattedList() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = new Event();
-        event.setSummary("Réunion");
-        EventDateTime start = new EventDateTime();
-        start.setDateTime(new DateTime("2026-04-01T10:00:00+02:00"));
-        event.setStart(start);
+        CalendarEvent event = CalendarEvent.builder()
+                .title("Réunion")
+                .startDateTime(java.time.LocalDateTime.of(2026, 4, 1, 10, 0))
+                .build();
         when(calendarService.listUpcomingEvents(5)).thenReturn(List.of(event));
 
         // When
@@ -208,9 +213,10 @@ class CalendarActionsTest {
     void deleteCalendarEvent_WithMatchingTitle_ShouldDeleteEvent() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = new Event();
-        event.setId("event-123");
-        event.setSummary("Réunion équipe");
+        CalendarEvent event = CalendarEvent.builder()
+                .id("event-123")
+                .title("Réunion équipe")
+                .build();
         when(calendarService.searchEvents("Réunion", 20)).thenReturn(List.of(event));
 
         // When
@@ -240,9 +246,10 @@ class CalendarActionsTest {
     void deleteCalendarEvent_WithInvalidDateFilter_ShouldSearchWithoutDateFilter() throws Exception {
         // Given
         when(calendarService.isAvailable()).thenReturn(true);
-        Event event = new Event();
-        event.setId("event-456");
-        event.setSummary("Meeting");
+        CalendarEvent event = CalendarEvent.builder()
+                .id("event-456")
+                .title("Meeting")
+                .build();
         when(calendarService.searchEvents("Meeting", 20)).thenReturn(List.of(event));
 
         // When
@@ -251,13 +258,5 @@ class CalendarActionsTest {
         // Then
         assertThat(result.isSuccess()).isTrue();
         verify(calendarService).deleteEvent("event-456");
-    }
-
-    private Event createMockEvent(String summary, String description, String htmlLink) {
-        Event event = new Event();
-        event.setSummary(summary);
-        event.setDescription(description);
-        event.setHtmlLink(htmlLink);
-        return event;
     }
 }

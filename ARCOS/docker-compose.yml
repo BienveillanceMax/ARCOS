@@ -59,6 +59,23 @@ services:
     entrypoint: ["/bin/sh", "-c", "ollama pull pierrewagniart/memlistener:q4_k_m"]
     restart: "no"
 
+  radicale:
+    image: tomsquest/docker-radicale:latest
+    container_name: radicale
+    ports:
+      - "5232:5232"
+    volumes:
+      - radicale_data:/data
+    environment:
+      - TAKE_FILE_OWNERSHIP=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5232/.web"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
   arcos-app:
     build:
       context: .
@@ -93,7 +110,6 @@ services:
       - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${UID:-1000}/bus
 
     volumes:
-      - ./src/main/resources/client_secrets.json:/app/src/main/resources/client_secrets.json:ro
       - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
 
       # D-Bus - CRITIQUE pour Bluetooth
@@ -121,3 +137,4 @@ services:
 volumes:
   qdrant_storage:
   ollama_data:
+  radicale_data:

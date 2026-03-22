@@ -16,7 +16,7 @@ import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.UserModel.DfsNavigator.DfsNavigatorService;
 import org.arcos.UserModel.DfsNavigator.DfsResult;
 import org.arcos.UserModel.DfsNavigator.UserContextFormatter;
-import com.google.api.services.calendar.model.Event;
+import org.arcos.Tools.CalendarTool.model.CalendarEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -74,8 +74,7 @@ public class PromptBuilder {
 
         appendOpinionContext(system, opinion, intensity);
         system.append(getValueProfile());
-        appendDesireInstructions(system);
-        appendDesireConsiderations(system, opinion);
+        appendDesireInstructions(system, opinion);
 
         return new Prompt(new SystemMessage(system.toString()));
     }
@@ -94,7 +93,7 @@ public class PromptBuilder {
     }
 
     public Prompt buildSchedulerAlertPrompt(Object payload) {
-        Event event = (Event) payload;
+        CalendarEvent event = (CalendarEvent) payload;
 
         String templateText = """
         {valueProfile}
@@ -112,37 +111,11 @@ public class PromptBuilder {
 
         Map<String, Object> model = new HashMap<>();
         model.put("valueProfile", getValueProfile());
-        model.put("summary", event.getSummary());
+        model.put("summary", event.getTitle());
         model.put("description", event.getDescription() != null ? "- Description: " + event.getDescription() : "");
         model.put("location", event.getLocation() != null ? "- Lieu: " + event.getLocation() : "");
-        model.put("startTime", event.getOriginalStartTime() != null ? "- Début: " + event.getOriginalStartTime() : "");
-        model.put("endTime", event.getEnd() != null ? "- Fin: " + event.getEnd() : "");
-
-        return new PromptTemplate(templateText).create(model);
-    }
-
-    public Prompt buildCanonicalizationPrompt(String narrative, String subject) {
-        String templateText = """
-        Transforme opinion en phrase Canonique Standardisée.
-
-        Opinion: "{narrative}" | Sujet: "{subject}"
-
-        Règles:
-        1. Format: Sujet + Verbe état/sentiment + Objet + Contexte?
-        2. Première personne singulier, présent indicatif, phrase simple
-        3. Réduire variance syntaxique (recherche vectorielle)
-        4. Affirmation directe (pas "Je pense que")
-
-        Exemples:
-        - "La pluie c'est nul" → "Je n'aime pas la pluie."
-        - "J'adore quand il fait beau" → "J'aime le beau temps."
-
-        Réponse (phrase canonique uniquement):
-        """;
-
-        Map<String, Object> model = new HashMap<>();
-        model.put("narrative", narrative);
-        model.put("subject", subject);
+        model.put("startTime", event.getStartDateTime() != null ? "- Début: " + event.getStartDateTime() : "");
+        model.put("endTime", event.getEndDateTime() != null ? "- Fin: " + event.getEndDateTime() : "");
 
         return new PromptTemplate(templateText).create(model);
     }
@@ -162,9 +135,6 @@ public class PromptBuilder {
         system.append("- ").append(desire.getLabel()).append("\n");
         if (desire.getDescription() != null && !desire.getDescription().isBlank()) {
             system.append("- ").append(desire.getDescription()).append("\n");
-        }
-        if (desire.getReasoning() != null && !desire.getReasoning().isBlank()) {
-            system.append("- Raisonnement: ").append(desire.getReasoning()).append("\n");
         }
 
         if (!memories.isEmpty()) {
@@ -366,22 +336,20 @@ public class PromptBuilder {
 
         Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
         if (!strongValues.isEmpty()) {
-            prompt.append("Valeurs dominantes (>70%): ");
-            List<String> parts = new ArrayList<>();
-            strongValues.forEach((value, score) ->
-                    parts.add(value.getLabel() + " (" + String.format("%.1f", score) + ")")
-            );
-            prompt.append(String.join(", ", parts)).append("\n");
+            prompt.append("Valeurs dominantes: ");
+            prompt.append(strongValues.keySet().stream()
+                    .map(v -> v.getLabel() + " (" + v.getDescription() + ")")
+                    .collect(Collectors.joining(", ")));
+            prompt.append("\n");
         }
 
         Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
         if (!suppressedValues.isEmpty()) {
-            prompt.append("Valeurs faibles (<30%): ");
-            List<String> parts = new ArrayList<>();
-            suppressedValues.forEach((value, score) ->
-                    parts.add(value.getLabel() + " (" + String.format("%.1f", score) + ")")
-            );
-            prompt.append(String.join(", ", parts)).append("\n");
+            prompt.append("Valeurs faibles: ");
+            prompt.append(suppressedValues.keySet().stream()
+                    .map(v -> v.getLabel() + " (" + v.getDescription() + ")")
+                    .collect(Collectors.joining(", ")));
+            prompt.append("\n");
         }
         return prompt.toString();
     }
@@ -389,59 +357,44 @@ public class PromptBuilder {
     private void appendValuesAnalysis(StringBuilder prompt) {
         Map<ValueSchwartz, Double> strongValues = valueProfile.getStrongValues();
         Map<ValueSchwartz, Double> suppressedValues = valueProfile.getSuppressedValues();
-        Map<ValueSchwartz, List<ValueSchwartz>> conflicts = new HashMap<>();
         EnumMap<DimensionSchwartz, Double> dimensionAverages = valueProfile.averageByDimension();
 
+        prompt.append("VALEURS:\n");
+
+        if (!strongValues.isEmpty()) {
+            prompt.append("Dominantes: ");
+            prompt.append(strongValues.keySet().stream()
+                    .map(v -> v.getLabel() + " (" + v.getDescription() + ")")
+                    .collect(Collectors.joining(", ")));
+            prompt.append("\n");
+        }
+
+        if (!suppressedValues.isEmpty()) {
+            prompt.append("Faibles: ");
+            prompt.append(suppressedValues.keySet().stream()
+                    .map(v -> v.getLabel() + " (" + v.getDescription() + ")")
+                    .collect(Collectors.joining(", ")));
+            prompt.append("\n");
+        }
+
+        List<String> conflictPairs = new ArrayList<>();
         for (ValueSchwartz v : strongValues.keySet()) {
             List<ValueSchwartz> antagonists = valueProfile.conflictingValues(v);
-            if (!antagonists.isEmpty()) {
-                conflicts.put(v, antagonists);
+            for (ValueSchwartz ant : antagonists) {
+                conflictPairs.add(v.getLabel() + " ↔ " + ant.getLabel());
             }
         }
-
-        appendDominantValuesDetailed(prompt, strongValues);
-        appendSuppressedValuesDetailed(prompt, suppressedValues);
-        appendValueConflicts(prompt, conflicts);
-        appendDimensionAverages(prompt, dimensionAverages);
-    }
-
-    private void appendDominantValuesDetailed(StringBuilder prompt, Map<ValueSchwartz, Double> strongValues) {
-        prompt.append("VALEURS DOMINANTES (moteurs jugement):\n");
-        for (ValueSchwartz value : strongValues.keySet()) {
-            prompt.append("- ").append(value.getLabel()).append(": ").append(value.getDescription())
-                    .append(" (").append(strongValues.get(value)).append(")\n");
+        if (!conflictPairs.isEmpty()) {
+            prompt.append("Conflits: ").append(String.join(", ", conflictPairs)).append("\n");
         }
-    }
 
-    private void appendSuppressedValuesDetailed(StringBuilder prompt, Map<ValueSchwartz, Double> suppressedValues) {
-        prompt.append("\nVALEURS FAIBLES:\n");
-        for (ValueSchwartz value : suppressedValues.keySet()) {
-            prompt.append("- ").append(value.getLabel()).append(": ").append(value.getDescription())
-                    .append(" (").append(suppressedValues.get(value)).append(")\n");
-        }
-    }
-
-    private void appendValueConflicts(StringBuilder prompt, Map<ValueSchwartz, List<ValueSchwartz>> conflicts) {
-        if (!conflicts.isEmpty()) {
-            prompt.append("\nCONFLITS:\n");
-            conflicts.forEach((low, highList) -> {
-                prompt.append("- ").append(low.getLabel())
-                        .append(" (faible) oppose ")
-                        .append(highList.stream().map(ValueSchwartz::getLabel).collect(Collectors.joining(", ")))
-                        .append("\n");
-            });
-        }
-    }
-
-    private void appendDimensionAverages(StringBuilder prompt, EnumMap<DimensionSchwartz, Double> dimensionAverages) {
-        prompt.append("\nMOYENNES:\n");
+        prompt.append("Axes: ");
+        List<String> axisParts = new ArrayList<>();
         dimensionAverages.forEach((d, avg) -> {
-            prompt.append("- ").append(d.name()).append(": ")
-                    .append(String.format("%.1f", avg));
-            if (avg >= 70) prompt.append(" (fort)");
-            else if (avg <= 30) prompt.append(" (faible)");
-            prompt.append("\n");
+            String level = avg >= 70 ? "fort" : avg <= 30 ? "faible" : "neutre";
+            axisParts.add(d.name() + " " + level);
         });
+        prompt.append(String.join(", ", axisParts)).append("\n");
     }
 
     // ==================== SECTIONS CONTEXTE ====================
@@ -450,7 +403,9 @@ public class PromptBuilder {
         prompt.append("## Opinion\n");
         prompt.append("Sujet: ").append(opinion.getSubject())
                 .append(" | Résumé: ").append(opinion.getSummary()).append("\n");
-        prompt.append("Narrative: ").append(opinion.getNarrative()).append("\n");
+        if (opinion.getCanonicalText() != null && !opinion.getCanonicalText().isEmpty()) {
+            prompt.append("CanonicalText: ").append(opinion.getCanonicalText()).append("\n");
+        }
         prompt.append("Polarité: ").append(String.format("%.2f", opinion.getPolarity()));
         prompt.append(opinion.getPolarity() > 0 ? " (positive)" : " (négative)");
         prompt.append(" | Confiance: ").append(String.format("%.2f", opinion.getConfidence()));
@@ -488,27 +443,12 @@ public class PromptBuilder {
 
     // ==================== INSTRUCTIONS ====================
 
-    private void appendDesireInstructions(StringBuilder prompt) {
-        prompt.append("""
-        Génère désir qui:
-        1. Découle naturellement de l'opinion intense
-        2. S'aligne avec valeurs dominantes
-        3. Maintient polarité opinion source
-        4. Reflète intensité émotionnelle
-        """);
-    }
-
-    private void appendDesireConsiderations(StringBuilder prompt, OpinionEntry opinion) {
-        prompt.append("""
-        Contraintes:
-        - Actionnable, motivant, intensité ≥0.6
-        - Cohérence psychologique opinion/valeurs
-        - Première personne (Je veux...)
-        """);
-
+    private void appendDesireInstructions(StringBuilder prompt, OpinionEntry opinion) {
+        prompt.append("Génère désir : découle de l'opinion, s'aligne avec valeurs dominantes, maintient polarité, première personne (Je veux...), actionnable, intensité ≥0.6.");
         if (opinion.getPolarity() < 0) {
-            prompt.append("- Si opinion négative: corriger/éviter situation\n");
+            prompt.append(" Si opinion négative: corriger/éviter.");
         }
+        prompt.append("\n");
     }
 
     private void appendOpinionRules(StringBuilder prompt) {
@@ -519,6 +459,7 @@ public class PromptBuilder {
         - Première personne
         - Contredit valeurs → critique
         - Renforce valeurs → positif
+        - 'canonicalText': forme canonique (Sujet + Verbe état/sentiment + Objet), première personne, présent indicatif, phrase simple, affirmation directe (pas "Je pense que")
         """);
     }
 

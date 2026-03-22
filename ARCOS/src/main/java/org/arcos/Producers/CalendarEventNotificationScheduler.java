@@ -3,26 +3,23 @@ package org.arcos.Producers;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
-import org.arcos.Tools.CalendarTool.CalendarService;
-import com.google.api.services.calendar.model.Event;
+import org.arcos.Tools.CalendarTool.CalDavCalendarService;
+import org.arcos.Tools.CalendarTool.model.CalendarEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.security.GeneralSecurityException;
 import java.time.LocalDateTime;
-import java.time.ZoneId;
 import java.util.List;
 
 @Slf4j
 @Service
 public class CalendarEventNotificationScheduler {
 
-    private final CalendarService calendarService;
+    private final CalDavCalendarService calendarService;
     private final EventQueue eventQueue;
 
-    public CalendarEventNotificationScheduler(CalendarService calendarService, EventQueue eventQueue ) {
+    public CalendarEventNotificationScheduler(CalDavCalendarService calendarService, EventQueue eventQueue) {
         this.calendarService = calendarService;
         this.eventQueue = eventQueue;
     }
@@ -30,7 +27,7 @@ public class CalendarEventNotificationScheduler {
     @Scheduled(cron = "0 0 * * * *") // Run every hour at the beginning of the hour
     public void scheduleEventNotifications() {
         if (!calendarService.isAvailable()) {
-            log.debug("CalendarService désactivé, notifications ignorées.");
+            log.debug("CalDavCalendarService désactivé, notifications ignorées.");
             return;
         }
 
@@ -43,19 +40,18 @@ public class CalendarEventNotificationScheduler {
         }
 
         try {
-            List<Event> upcomingEvents = calendarService.listUpcomingEvents(10);
-            for (Event event : upcomingEvents) {
-                LocalDateTime eventStartTime = LocalDateTime.ofInstant(
-                        java.time.Instant.ofEpochMilli(event.getStart().getDateTime().getValue()),
-                        ZoneId.systemDefault()
-                );
+            List<CalendarEvent> upcomingEvents = calendarService.listUpcomingEvents(10);
+            for (CalendarEvent event : upcomingEvents) {
+                LocalDateTime eventStartTime = event.getStartDateTime();
+                if (eventStartTime == null) continue;
 
                 if (eventStartTime.isAfter(now) && eventStartTime.isBefore(now.plusHours(1))) {
-                    org.arcos.EventBus.Events.Event<Event> pushedEvent =  new org.arcos.EventBus.Events.Event<Event>(EventType.CALENDAR_EVENT_SCHEDULER, EventPriority.HIGH,event,"Calendar event scheduler");
+                    org.arcos.EventBus.Events.Event<CalendarEvent> pushedEvent = new org.arcos.EventBus.Events.Event<>(
+                            EventType.CALENDAR_EVENT_SCHEDULER, EventPriority.HIGH, event, "Calendar event scheduler");
                     eventQueue.offer(pushedEvent);
                 }
             }
-        } catch (IOException | GeneralSecurityException e) {
+        } catch (Exception e) {
             log.error("Erreur lors de la vérification des événements calendrier", e);
         }
     }
