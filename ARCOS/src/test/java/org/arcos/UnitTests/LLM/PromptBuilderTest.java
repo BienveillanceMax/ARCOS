@@ -3,8 +3,14 @@ package org.arcos.UnitTests.LLM;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.ConversationSummaryService;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
+import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
+import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Values.ValueProfile;
+import org.arcos.PlannedAction.Models.ActionType;
+import org.arcos.PlannedAction.Models.PlannedActionEntry;
+import org.arcos.common.utils.ObjectCreationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
@@ -192,6 +198,94 @@ class PromptBuilderTest {
 
         assertDoesNotThrow(() ->
                 builderNoOpinions.buildConversationnalPrompt(new ConversationContext(), "test"));
+    }
+
+    // ===== buildReWOOPlanPrompt — real construction (catches ST4 template parsing bugs) =====
+
+    @Test
+    void buildReWOOPlanPrompt_shouldSucceedWithSimpleReminder() {
+        PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
+
+        Prompt prompt = promptBuilder.buildReWOOPlanPrompt(entry);
+
+        assertNotNull(prompt);
+        String content = getSystemContent(prompt);
+        assertTrue(content.contains("Appeler le dentiste"),
+                "Prompt should contain the action label");
+        assertTrue(content.contains("TODO"),
+                "Prompt should contain the action type");
+    }
+
+    @Test
+    void buildReWOOPlanPrompt_shouldSucceedWithComplexHabit() {
+        // This entry's label + JSON example in the prompt previously crashed ST4 parsing
+        PlannedActionEntry entry = ObjectCreationUtils.createComplexHabitEntry();
+
+        Prompt prompt = promptBuilder.buildReWOOPlanPrompt(entry);
+
+        assertNotNull(prompt);
+        String content = getSystemContent(prompt);
+        assertTrue(content.contains("Briefing matinal"),
+                "Prompt should contain the action label");
+        assertTrue(content.contains("HABIT"),
+                "Prompt should contain the action type");
+    }
+
+    @Test
+    void buildReWOOPlanPrompt_shouldHandleFrenchApostrophesInLabel() {
+        // French apostrophes in labels combined with JSON curly braces in template
+        // was the exact combination that triggered the ST4 parsing crash
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("Réseau d'espoir régénératif");
+        entry.setActionType(ActionType.HABIT);
+
+        Prompt prompt = promptBuilder.buildReWOOPlanPrompt(entry);
+
+        assertNotNull(prompt);
+        String content = getSystemContent(prompt);
+        assertTrue(content.contains("Réseau d'espoir régénératif"),
+                "Prompt should preserve French apostrophes verbatim");
+    }
+
+    // ===== buildInitiativePrompt — real construction =====
+
+    @Test
+    void buildInitiativePrompt_shouldSucceedWithDesireAndContext() {
+        DesireEntry desire = ObjectCreationUtils.createIntensePendingDesireEntry("opinion-123");
+        List<MemoryEntry> memories = List.of(ObjectCreationUtils.createMemoryEntry());
+        List<OpinionEntry> opinions = List.of(ObjectCreationUtils.createOpinionEntry());
+
+        Prompt prompt = promptBuilder.buildInitiativePrompt(desire, memories, opinions);
+
+        assertNotNull(prompt);
+        String content = getSystemContent(prompt);
+        assertTrue(content.contains("monologue interne"),
+                "Should contain inner-monologue framing");
+        assertTrue(content.contains(desire.getLabel()),
+                "Should contain desire label");
+        assertTrue(content.contains("Souvenirs liés"),
+                "Should include memories section");
+        assertTrue(content.contains("Opinions liées"),
+                "Should include opinions section");
+        assertTrue(content.contains("[SKIP]"),
+                "Should mention the SKIP escape hatch");
+    }
+
+    @Test
+    void buildInitiativePrompt_shouldSucceedWithEmptyContext() {
+        DesireEntry desire = new DesireEntry();
+        desire.setLabel("Test desire");
+        desire.setDescription("Test description");
+
+        Prompt prompt = promptBuilder.buildInitiativePrompt(desire, Collections.emptyList(), Collections.emptyList());
+
+        assertNotNull(prompt);
+        String content = getSystemContent(prompt);
+        assertTrue(content.contains("Test desire"));
+        assertFalse(content.contains("Souvenirs liés"),
+                "Should not include memories section when empty");
+        assertFalse(content.contains("Opinions liées"),
+                "Should not include opinions section when empty");
     }
 
     // ===== Utilitaire =====

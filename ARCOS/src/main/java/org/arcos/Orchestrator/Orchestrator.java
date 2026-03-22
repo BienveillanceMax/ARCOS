@@ -18,6 +18,7 @@ import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.LongTermMemory.service.MemoryService;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Personality.Desires.DesireService;
+import org.arcos.Personality.Initiative.InitiativeService;
 import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.MoodUpdate;

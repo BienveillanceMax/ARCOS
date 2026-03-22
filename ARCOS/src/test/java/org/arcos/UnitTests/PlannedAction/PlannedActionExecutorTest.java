@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.HashMap;
@@ -89,7 +90,7 @@ class PlannedActionExecutorTest {
                 .thenReturn(ActionResult.success(List.of("20°C ensoleillé"), "Recherche effectuée"));
 
         when(promptBuilder.buildPlannedActionSynthesisPrompt(eq(entry), any()))
-                .thenReturn(new Prompt("synthesis prompt"));
+                .thenReturn(new Prompt(new SystemMessage("synthesis prompt")));
         when(llmClient.generateToollessResponse(any(Prompt.class)))
                 .thenReturn("Bonjour ! Votre agenda : réunion à 10h. Actualités : rien de spécial. Météo : 20 degrés.");
 
@@ -116,7 +117,7 @@ class PlannedActionExecutorTest {
                 .thenReturn(ActionResult.success(List.of("20°C"), "Recherche effectuée"));
 
         when(promptBuilder.buildPlannedActionSynthesisPrompt(eq(entry), any()))
-                .thenReturn(new Prompt("synthesis prompt"));
+                .thenReturn(new Prompt(new SystemMessage("synthesis prompt")));
         when(llmClient.generateToollessResponse(any(Prompt.class)))
                 .thenReturn("Briefing partiel sans agenda.");
 
@@ -142,7 +143,7 @@ class PlannedActionExecutorTest {
                 .thenReturn(ActionResult.success(List.of("20°C"), "Recherche effectuée"));
 
         when(promptBuilder.buildPlannedActionSynthesisPrompt(eq(entry), any()))
-                .thenReturn(new Prompt("synthesis prompt"));
+                .thenReturn(new Prompt(new SystemMessage("synthesis prompt")));
         when(llmClient.generateToollessResponse(any(Prompt.class)))
                 .thenThrow(new RuntimeException("LLM down"));
 

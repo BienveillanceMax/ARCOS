@@ -1,4 +1,4 @@
-package org.arcos.Orchestrator;
+package org.arcos.Personality.Initiative;
 
 import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Prompts.PromptBuilder;
@@ -15,6 +15,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -38,43 +39,55 @@ public class InitiativeService {
         this.personalityOrchestrator = personalityOrchestrator;
     }
 
+    static final String SKIP_MARKER = "[SKIP]";
+    private static final int MAX_REASONING_LENGTH = 300;
+
     /**
-     * @return true if the initiative was executed successfully, false on failure (desire reverted to PENDING)
+     * @return true if the initiative was executed successfully, false on failure or skip (desire stays PENDING)
      */
     public boolean processInitiative(DesireEntry desire) {
         try {
             log.info("Processing initiative for desire: {}", desire.getLabel());
 
             // 1. Enrich context
-            log.info("Step 1: Enriching context...");
             List<MemoryEntry> memories = memoryService.searchMemories(desire.getDescription(), 5);
             List<OpinionEntry> opinions = opinionService.searchOpinions(desire.getDescription());
 
             // 2. Build Prompt and Execute
-            log.info("Step 2: Executing initiative via LLM Agent...");
             Prompt prompt = promptBuilder.buildInitiativePrompt(desire, memories, opinions);
-
-            // ChatOrchestrator is configured with tools, so it will autonomously execute actions
             String result = chatOrchestrator.generateChatResponse(prompt);
 
             log.info("Initiative execution result: {}", result);
 
-            // 3. Update state
-            log.info("Step 3: Updating desire state...");
+            if (result == null || result.isBlank()) {
+                log.warn("Initiative '{}' returned empty result, skipping.", desire.getLabel());
+                return false;
+            }
+
+            // 3. Handle [SKIP] — desire is not actionable, keep PENDING
+            if (result.startsWith(SKIP_MARKER)) {
+                log.info("Initiative '{}' skipped (non-actionable): {}", desire.getLabel(), result);
+                return false;
+            }
+
+            // 4. Update state
+            String cappedResult = result.length() > MAX_REASONING_LENGTH
+                    ? result.substring(0, MAX_REASONING_LENGTH) + "..."
+                    : result;
 
             desire.setStatus(DesireEntry.Status.SATISFIED);
-            desire.setReasoning("Executed via initiative. Result: " + result);
-            desire.setLastUpdated(java.time.LocalDateTime.now());
+            desire.setReasoning(cappedResult);
+            desire.setLastUpdated(LocalDateTime.now());
 
             desireService.storeDesire(desire);
-            log.info("Initiative '{}' was satisfied successfully.", desire.getLabel());
+            log.info("Initiative '{}' was satisfied.", desire.getLabel());
 
-            // 4. Close BDI Loop (Memory -> Opinion)
-            log.info("Step 4: Forming memory of initiative...");
+            // 5. Close BDI Loop (Memory -> Opinion)
+            String memoryContent = "J'ai pris l'initiative de " + desire.getLabel() + ". " + cappedResult;
             MemoryEntry memory = new MemoryEntry(
-                "I took initiative to " + desire.getDescription() + ". Result: " + result,
+                memoryContent,
                 Subject.SELF,
-                0.8 // Assuming satisfaction
+                0.7
             );
             memoryService.storeMemory(memory);
             personalityOrchestrator.processMemoryEntryIntoOpinion(memory);
@@ -84,7 +97,7 @@ public class InitiativeService {
         } catch (Exception e) {
             log.error("Initiative '{}' failed (will retry later): {}", desire.getLabel(), e.getMessage());
             desire.setStatus(DesireEntry.Status.PENDING);
-            desire.setLastUpdated(java.time.LocalDateTime.now());
+            desire.setLastUpdated(LocalDateTime.now());
             desireService.storeDesire(desire);
             return false;
         }

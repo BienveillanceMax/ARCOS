@@ -82,14 +82,20 @@ public class CalendarService {
         // Load stored credential WITHOUT triggering browser flow
         Credential credential = flow.loadCredential("user");
         if (credential == null) {
-            throw new IOException("Aucun token OAuth stocké. Lancez l'autorisation initiale avec un navigateur.");
+            throw new IOException("Aucun token OAuth stocké. Lancez : mvn exec:java -Dexec.mainClass=\"org.arcos.Tools.CalendarTool.CalendarOAuthSetup\"");
         }
 
-        // Refresh if expired or about to expire
-        if (credential.getExpiresInSeconds() != null && credential.getExpiresInSeconds() <= 60) {
+        if (credential.getRefreshToken() == null) {
+            throw new IOException("Token OAuth sans refresh token. Révoquez l'accès (https://myaccount.google.com/permissions) et relancez CalendarOAuthSetup.");
+        }
+
+        // Refresh if expired or about to expire (5 min buffer)
+        if (credential.getExpiresInSeconds() != null && credential.getExpiresInSeconds() <= 300) {
+            log.info("Token OAuth expirant dans {}s, tentative de refresh...", credential.getExpiresInSeconds());
             if (!credential.refreshToken()) {
-                throw new IOException("Impossible de rafraîchir le token OAuth. Ré-autorisez via navigateur.");
+                throw new IOException("Impossible de rafraîchir le token OAuth. Relancez CalendarOAuthSetup.");
             }
+            log.info("Token OAuth rafraîchi avec succès.");
         }
 
         return credential;

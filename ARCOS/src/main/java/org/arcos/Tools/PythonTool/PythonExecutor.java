@@ -11,6 +11,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -36,21 +38,24 @@ public class PythonExecutor {
 
     private static final int TIMEOUT_SECONDS = 30;
     private static final int MAX_OUTPUT_BYTES = 4096;
+    private static final boolean HAS_LIB64 = Files.exists(Path.of("/lib64"));
+    private static final boolean HAS_ETC_ALTERNATIVES = Files.exists(Path.of("/etc/alternatives"));
 
-    private volatile Boolean sandboxAvailable;
+    private static volatile Boolean sandboxAvailable;
 
     public boolean isSandboxAvailable() {
         if (sandboxAvailable == null) {
-            synchronized (this) {
+            synchronized (PythonExecutor.class) {
                 if (sandboxAvailable == null) {
                     try {
-                        Process check = new ProcessBuilder("which", "bwrap").start();
+                        // Check bwrap is installed AND can actually execute
+                        Process check = new ProcessBuilder("bwrap", "--ro-bind", "/", "/", "true").start();
                         sandboxAvailable = check.waitFor(5, TimeUnit.SECONDS) && check.exitValue() == 0;
                     } catch (IOException | InterruptedException e) {
                         sandboxAvailable = false;
                     }
                     if (!sandboxAvailable) {
-                        log.warn("bubblewrap (bwrap) not found — Python tool disabled");
+                        log.warn("bubblewrap (bwrap) unavailable or lacking permissions — Python tool disabled");
                     }
                 }
             }
@@ -110,12 +115,12 @@ public class PythonExecutor {
         cmd.addAll(List.of("--ro-bind", "/lib", "/lib"));
 
         // /lib64 symlink if it exists (x86_64)
-        if (Files.exists(Path.of("/lib64"))) {
+        if (HAS_LIB64) {
             cmd.addAll(List.of("--symlink", "usr/lib64", "/lib64"));
         }
 
         // /etc/alternatives for python3 symlink resolution
-        if (Files.exists(Path.of("/etc/alternatives"))) {
+        if (HAS_ETC_ALTERNATIVES) {
             cmd.addAll(List.of("--ro-bind", "/etc/alternatives", "/etc/alternatives"));
         }
 
@@ -127,9 +132,10 @@ public class PythonExecutor {
         cmd.addAll(List.of("--proc", "/proc"));
 
         // Isolation
-        cmd.add("--unshare-net");
         cmd.add("--unshare-pid");
-        // --unshare-user can fail in Docker privileged containers; try without if needed
+        if (canUnshareNet()) {
+            cmd.add("--unshare-net");
+        }
         if (canUnshareUser()) {
             cmd.add("--unshare-user");
         }
@@ -143,25 +149,30 @@ public class PythonExecutor {
         return cmd;
     }
 
-    private volatile Boolean unshareUserSupported;
+    private static final Map<String, Boolean> capabilityCache = new ConcurrentHashMap<>();
+
+    private boolean probeBwrapCapability(String flag) {
+        return capabilityCache.computeIfAbsent(flag, f -> {
+            try {
+                Process test = new ProcessBuilder("bwrap", f, "--ro-bind", "/", "/", "true").start();
+                boolean supported = test.waitFor(5, TimeUnit.SECONDS) && test.exitValue() == 0;
+                if (!supported) {
+                    log.info("bwrap {} not supported in this environment, skipping", f);
+                }
+                return supported;
+            } catch (IOException | InterruptedException e) {
+                log.info("bwrap {} not supported in this environment, skipping", f);
+                return false;
+            }
+        });
+    }
+
+    private boolean canUnshareNet() {
+        return probeBwrapCapability("--unshare-net");
+    }
 
     private boolean canUnshareUser() {
-        if (unshareUserSupported == null) {
-            synchronized (this) {
-                if (unshareUserSupported == null) {
-                    try {
-                        Process test = new ProcessBuilder("bwrap", "--unshare-user", "--ro-bind", "/", "/", "true").start();
-                        unshareUserSupported = test.waitFor(5, TimeUnit.SECONDS) && test.exitValue() == 0;
-                    } catch (IOException | InterruptedException e) {
-                        unshareUserSupported = false;
-                    }
-                    if (!unshareUserSupported) {
-                        log.info("bwrap --unshare-user not supported in this environment, skipping user namespace isolation");
-                    }
-                }
-            }
-        }
-        return unshareUserSupported;
+        return probeBwrapCapability("--unshare-user");
     }
 
     public String readOutput(InputStream inputStream, int maxBytes) throws IOException {

@@ -147,28 +147,48 @@ public class PromptBuilder {
         return new PromptTemplate(templateText).create(model);
     }
 
-    //TODO ADD PERSONALITY, VALUES ETC
     public Prompt buildInitiativePrompt(DesireEntry desire, List<MemoryEntry> memories, List<OpinionEntry> opinions) {
-        String templateText = """
-        Tu es Calcifer. Initiative basée sur désirs internes.
+        StringBuilder system = new StringBuilder();
 
-        Désir: {desireDesc}
-        Raisonnement: {desireReasoning}
+        system.append("""
+                Tu es Calcifer. Ceci est un monologue interne, pas une conversation.
+                Personne ne t'écoute. Tu agis seul pour satisfaire un de tes désirs.
+                Ne t'adresse à personne. Ne propose rien. N'attends aucune réponse.
+                """);
+        system.append(getValueProfile());
+        system.append(getGeneralInformation());
 
-        Mémoires: {memories}
-        Opinions: {opinions}
+        system.append("DÉSIR:\n");
+        system.append("- ").append(desire.getLabel()).append("\n");
+        if (desire.getDescription() != null && !desire.getDescription().isBlank()) {
+            system.append("- ").append(desire.getDescription()).append("\n");
+        }
+        if (desire.getReasoning() != null && !desire.getReasoning().isBlank()) {
+            system.append("- Raisonnement: ").append(desire.getReasoning()).append("\n");
+        }
 
-        Mission: Satisfais ce désir via outils disponibles (recherche, calendrier, Python).
-        Résume ce que tu as fait.
-        """;
+        if (!memories.isEmpty()) {
+            system.append("\nSouvenirs liés:\n");
+            memories.stream().limit(3).forEach(m ->
+                    system.append("- ").append(m.getContent()).append("\n"));
+        }
 
-        Map<String, Object> model = new HashMap<>();
-        model.put("desireDesc", desire.getLabel());
-        model.put("desireReasoning", desire.getReasoning());
-        model.put("memories", memories.stream().map(MemoryEntry::getContent).collect(Collectors.joining("\n")));
-        model.put("opinions", opinions.stream().map(OpinionEntry::getSummary).collect(Collectors.joining("\n")));
+        if (!opinions.isEmpty()) {
+            system.append("\nOpinions liées:\n");
+            opinions.stream().limit(3).forEach(o ->
+                    system.append("- ").append(o.getSummary()).append("\n"));
+        }
 
-        return new PromptTemplate(templateText).create(model);
+        system.append("""
+
+                RÈGLES:
+                - Appelle UN SEUL outil, une seule fois. Pas de chaînage, pas d'enchaînement.
+                - Après l'appel, note ce que tu as fait en une phrase. C'est tout.
+                - Si aucune action concrète possible, réponds UNIQUEMENT: [SKIP] et la raison en une ligne.
+                - INTERDIT: questions, suggestions, propositions, listes, markdown, s'adresser à quelqu'un.
+                """);
+
+        return new Prompt(new SystemMessage(system.toString()));
     }
 
     public Prompt buildMemoryPrompt(String fullConversation) {
@@ -226,39 +246,36 @@ public class PromptBuilder {
     }
 
     public Prompt buildReWOOPlanPrompt(PlannedActionEntry entry) {
-        String templateText = """
-        Planificateur ReWOO pour Calcifer.
-        Action: {label} | Type: {actionType}
+        String prompt = """
+                Planificateur ReWOO pour Calcifer.
+                Action: """ + entry.getLabel() + " | Type: " + entry.getActionType().name() + """
 
-        Outils (nom — params):
-        1. Chercher_sur_Internet — query:String
-        2. Lister_les_evenements_a_venir — maxResults:int
-        3. Ajouter_un_evenement_au_calendrier — title, description, location, startDateTimeStr, endDateTimeStr:String
-        4. Supprimer_un_evenement — title:String (événement du jour)
-        5. Executer_du_code — code:String
-        6. Chercher_dans_ma_memoire — query:String, type:String (SOUVENIR/OPINION/DESIR)
-        7. Lire_une_page_web — url:String
-        8. Consulter_la_meteo — city:String?, forecastDays:int=3
 
-        Règles:
-        - Max 7 étapes, séquence linéaire
-        - `$varName` référence résultat étape précédente
-        - `synthesisPromptTemplate`: placeholders `{varName}` pour résultats
-        - Synthèse TTS: naturelle/fluide
+                Outils (nom — params):
+                1. Chercher_sur_Internet — query:String
+                2. Lister_les_evenements_a_venir — maxResults:int
+                3. Ajouter_un_evenement_au_calendrier — title, description, location, startDateTimeStr, endDateTimeStr:String
+                4. Supprimer_un_evenement — title:String (événement du jour)
+                5. Executer_du_code — code:String
+                6. Chercher_dans_ma_memoire — query:String, type:String (SOUVENIR/OPINION/DESIR)
+                7. Lire_une_page_web — url:String
+                8. Consulter_la_meteo — city:String?, forecastDays:int=3
 
-        Exemple:
-        ```json
-        {"executionPlan":{"steps":[{"stepId":1,"toolName":"Lister_les_evenements_a_venir","parameters":{"maxResults":5},"outputVariable":"agenda","description":"Événements"},{"stepId":2,"toolName":"Chercher_sur_Internet","parameters":{"query":"actus France"},"outputVariable":"actus","description":"Actualités"},{"stepId":3,"toolName":"Chercher_sur_Internet","parameters":{"query":"météo Lyon"},"outputVariable":"meteo","description":"Météo"}]},"synthesisPromptTemplate":"Briefing matinal: Agenda {agenda}, Actus {actus}, Météo {meteo}."}
-        ```
+                Règles:
+                - Max 7 étapes, séquence linéaire
+                - `$varName` référence résultat étape précédente
+                - `synthesisPromptTemplate`: placeholders `{varName}` pour résultats
+                - Synthèse TTS: naturelle/fluide
 
-        Génère le plan.
-        """;
+                Exemple:
+                ```json
+                {"executionPlan":{"steps":[{"stepId":1,"toolName":"Lister_les_evenements_a_venir","parameters":{"maxResults":5},"outputVariable":"agenda","description":"Événements"},{"stepId":2,"toolName":"Chercher_sur_Internet","parameters":{"query":"actus France"},"outputVariable":"actus","description":"Actualités"},{"stepId":3,"toolName":"Chercher_sur_Internet","parameters":{"query":"météo Lyon"},"outputVariable":"meteo","description":"Météo"}]},"synthesisPromptTemplate":"Briefing matinal: Agenda {agenda}, Actus {actus}, Météo {meteo}."}
+                ```
 
-        Map<String, Object> model = new HashMap<>();
-        model.put("label", entry.getLabel());
-        model.put("actionType", entry.getActionType().name());
+                Génère le plan.
+                """;
 
-        return new PromptTemplate(templateText).create(model);
+        return new Prompt(new SystemMessage(prompt));
     }
 
     public Prompt buildPlannedActionSynthesisPrompt(PlannedActionEntry entry, Map<String, ActionResult> stepResults) {

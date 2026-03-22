@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 
 import java.util.List;
@@ -136,7 +137,7 @@ class PlannedActionServiceTest {
         response.setExecutionPlan(plan);
         response.setSynthesisPromptTemplate("template");
 
-        when(promptBuilder.buildReWOOPlanPrompt(entry)).thenReturn(new Prompt("plan prompt"));
+        when(promptBuilder.buildReWOOPlanPrompt(entry)).thenReturn(new Prompt(new SystemMessage("plan prompt")));
         when(llmClient.generatePlannedActionPlanResponse(any(Prompt.class))).thenReturn(response);
 
         // When
@@ -154,7 +155,7 @@ class PlannedActionServiceTest {
         // Given
         PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderEntry();
 
-        when(promptBuilder.buildReWOOPlanPrompt(entry)).thenReturn(new Prompt("plan prompt"));
+        when(promptBuilder.buildReWOOPlanPrompt(entry)).thenReturn(new Prompt(new SystemMessage("plan prompt")));
         when(llmClient.generatePlannedActionPlanResponse(any(Prompt.class)))
                 .thenThrow(new RuntimeException("LLM error"));
 

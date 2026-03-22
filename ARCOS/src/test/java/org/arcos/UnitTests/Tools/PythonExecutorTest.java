@@ -1,6 +1,7 @@
 package org.arcos.UnitTests.Tools;
 
 import org.arcos.Tools.PythonTool.PythonExecutor;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -34,8 +35,8 @@ class PythonExecutorTest {
 
         // Then
         assertThat(cmd.get(0)).isEqualTo("bwrap");
-        assertThat(cmd).contains("--unshare-net", "--unshare-pid");
-        // --unshare-user is conditional on environment support
+        assertThat(cmd).contains("--unshare-pid");
+        // --unshare-net and --unshare-user are conditional on environment support
     }
 
     @Test
@@ -196,5 +197,41 @@ class PythonExecutorTest {
 
         // Then — both calls return same value (cached, not re-evaluated)
         assertThat(second).isEqualTo(first);
+    }
+
+    // ===== Integration: actual sandbox execution =====
+
+    @Test
+    void execute_whenSandboxAvailable_shouldRunSimplePythonScript() {
+        Assumptions.assumeTrue(executor.isSandboxAvailable(),
+                "bwrap unavailable — skipping sandbox integration test");
+
+        // When
+        PythonExecutor.ExecutionResult result = executor.execute("print('hello sandbox')");
+
+        // Then
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getStdout()).contains("hello sandbox");
+    }
+
+    @Test
+    void execute_whenSandboxAvailable_shouldDenyFileSystemWrite() {
+        Assumptions.assumeTrue(executor.isSandboxAvailable(),
+                "bwrap unavailable — skipping sandbox integration test");
+
+        // When — try to write outside /tmp (should be blocked by ro-bind)
+        String code = """
+                try:
+                    with open('/usr/test_write.txt', 'w') as f:
+                        f.write('hack')
+                    print('WRITE_OK')
+                except Exception as e:
+                    print('WRITE_BLOCKED: ' + str(e))
+                """;
+        PythonExecutor.ExecutionResult result = executor.execute(code);
+
+        // Then — write should be blocked
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getStdout()).contains("WRITE_BLOCKED");
     }
 }

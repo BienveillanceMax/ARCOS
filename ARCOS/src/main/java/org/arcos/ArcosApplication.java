@@ -4,6 +4,11 @@ import com.googlecode.lanterna.screen.Screen;
 import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import com.googlecode.lanterna.terminal.Terminal;
+import org.arcos.EventBus.EventQueue;
+import org.arcos.EventBus.Events.Event;
+import org.arcos.EventBus.Events.EventPriority;
+import org.arcos.EventBus.Events.EventType;
+import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Setup.UI.AsciiBanner;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -175,6 +180,19 @@ public class ArcosApplication {
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
         CentralFeedBackHandler handler = context.getBean(CentralFeedBackHandler.class);
         handler.handleFeedBack(new FeedBackEvent(UXEventType.ARCOS_START));
+
+        // TODO REMOVE — debug initiative for manual testing
+        DesireEntry debugDesire = new DesireEntry();
+        debugDesire.setId(java.util.UUID.randomUUID().toString());
+        debugDesire.setLabel("Chercher les dernières nouvelles tech");
+        debugDesire.setDescription("Je veux me tenir au courant des actualités technologiques récentes");
+        debugDesire.setIntensity(0.9);
+        debugDesire.setStatus(DesireEntry.Status.ACTIVE);
+        debugDesire.setReasoning("Debug test desire");
+        EventQueue eventQueue = context.getBean(EventQueue.class);
+        eventQueue.offer(new Event<>(EventType.INITIATIVE, EventPriority.LOW, debugDesire, "DEBUG"));
+        log.info("DEBUG: Injected test initiative event");
+
         orchestrator.start();
     }
 }
