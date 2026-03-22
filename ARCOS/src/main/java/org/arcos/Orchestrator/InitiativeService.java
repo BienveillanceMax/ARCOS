@@ -38,7 +38,10 @@ public class InitiativeService {
         this.personalityOrchestrator = personalityOrchestrator;
     }
 
-    public void processInitiative(DesireEntry desire) {
+    /**
+     * @return true if the initiative was executed successfully, false on failure (desire reverted to PENDING)
+     */
+    public boolean processInitiative(DesireEntry desire) {
         try {
             log.info("Processing initiative for desire: {}", desire.getLabel());
 
@@ -76,12 +79,14 @@ public class InitiativeService {
             memoryService.storeMemory(memory);
             personalityOrchestrator.processMemoryEntryIntoOpinion(memory);
 
+            return true;
+
         } catch (Exception e) {
-            log.error("An unexpected error occurred while processing initiative {}", desire.getId(), e);
-            desire.setStatus(DesireEntry.Status.PENDING); // Revert to PENDING on failure
+            log.error("Initiative '{}' failed (will retry later): {}", desire.getLabel(), e.getMessage());
+            desire.setStatus(DesireEntry.Status.PENDING);
             desire.setLastUpdated(java.time.LocalDateTime.now());
             desireService.storeDesire(desire);
-            throw new RuntimeException(e);
+            return false;
         }
     }
 }

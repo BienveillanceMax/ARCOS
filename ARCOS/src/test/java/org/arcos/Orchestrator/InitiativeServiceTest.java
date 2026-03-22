@@ -51,9 +51,10 @@ class InitiativeServiceTest {
         when(chatOrchestrator.generateChatResponse(any(Prompt.class))).thenReturn("I have read the documentation.");
 
         // When
-        initiativeService.processInitiative(desire);
+        boolean success = initiativeService.processInitiative(desire);
 
         // Then
+        assertTrue(success);
         assertEquals(DesireEntry.Status.SATISFIED, desire.getStatus());
         verify(desireService).storeDesire(desire);
         verify(chatOrchestrator).generateChatResponse(any(Prompt.class));
@@ -72,14 +73,10 @@ class InitiativeServiceTest {
         when(memoryService.searchMemories(anyString(), anyInt())).thenThrow(new RuntimeException("Search failed"));
 
         // When
-        try {
-            initiativeService.processInitiative(desire);
-            fail("Should have thrown exception");
-        } catch (RuntimeException e) {
-            // Expected
-        }
+        boolean success = initiativeService.processInitiative(desire);
 
         // Then
+        assertFalse(success);
         assertEquals(DesireEntry.Status.PENDING, desire.getStatus());
         verify(desireService).storeDesire(desire);
     }

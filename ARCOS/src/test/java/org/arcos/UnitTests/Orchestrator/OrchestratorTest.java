@@ -185,7 +185,7 @@ class OrchestratorTest {
         desire.setLabel("test desire");
         desire.setIntensity(10);
         Event<DesireEntry> initiativeEvent = new Event<>(EventType.INITIATIVE, desire, "test");
-        doNothing().when(initiativeService).processInitiative(any(DesireEntry.class));
+        when(initiativeService.processInitiative(any(DesireEntry.class))).thenReturn(true);
 
         // When
         orchestrator.dispatch(initiativeEvent);

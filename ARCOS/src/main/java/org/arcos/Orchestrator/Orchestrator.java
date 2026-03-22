@@ -131,14 +131,9 @@ public class Orchestrator
             DesireEntry desire = (DesireEntry) event.getPayload();
             try {
                 centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
-                initiativeService.processInitiative(desire);
-                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_END));
-            } catch (Exception e) {
-                log.error("A critical error occurred in InitiativeService, reverting desire status for {}", desire.getId(), e);
-                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
-                desire.setStatus(DesireEntry.Status.PENDING);
-                desire.setLastUpdated(java.time.LocalDateTime.now());
-                desireService.storeDesire(desire);
+                boolean success = initiativeService.processInitiative(desire);
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(
+                        success ? UXEventType.INITIATIVE_END : UXEventType.FAILURE));
             } finally {
                 isExecutingAction = false;
             }
