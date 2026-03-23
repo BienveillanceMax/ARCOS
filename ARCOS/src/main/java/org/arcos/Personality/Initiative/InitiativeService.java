@@ -75,11 +75,12 @@ public class InitiativeService {
                     ? result.substring(0, MAX_REASONING_LENGTH) + "..."
                     : result;
 
-            desire.setStatus(DesireEntry.Status.SATISFIED);
-            desire.setReasoning(cappedResult);
-            desire.setLastUpdated(LocalDateTime.now());
-
-            desireService.storeDesire(desire);
+            desireService.withDesireLock(() -> {
+                desire.setStatus(DesireEntry.Status.SATISFIED);
+                desire.setReasoning(cappedResult);
+                desire.setLastUpdated(LocalDateTime.now());
+                desireService.storeDesire(desire);
+            });
             log.info("Initiative '{}' was satisfied.", desire.getLabel());
 
             // 5. Close BDI Loop (Memory -> Opinion)
@@ -96,9 +97,11 @@ public class InitiativeService {
 
         } catch (Exception e) {
             log.error("Initiative '{}' failed (will retry later): {}", desire.getLabel(), e.getMessage());
-            desire.setStatus(DesireEntry.Status.PENDING);
-            desire.setLastUpdated(LocalDateTime.now());
-            desireService.storeDesire(desire);
+            desireService.withDesireLock(() -> {
+                desire.setStatus(DesireEntry.Status.PENDING);
+                desire.setLastUpdated(LocalDateTime.now());
+                desireService.storeDesire(desire);
+            });
             return false;
         }
     }

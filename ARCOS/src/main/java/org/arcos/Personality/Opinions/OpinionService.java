@@ -6,6 +6,7 @@ import org.arcos.Personality.Mood.MoodService;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.DesireRepository;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
@@ -31,6 +32,7 @@ public class OpinionService {
     private final ValueProfile valueProfile;
     private final PromptBuilder promptBuilder;
     private final OpinionRepository opinionRepository;
+    private final DesireRepository desireRepository;
     private final LLMClient llmClient;
     private final PersonalityProperties personalityProperties;
     private final MoodService moodService;
@@ -38,11 +40,12 @@ public class OpinionService {
 
     // ---- Hyperparamètres externalisés via PersonalityProperties.OpinionParams ----
 
-    public OpinionService(LLMClient llmClient, OpinionRepository opinionRepository, PromptBuilder promptBuilder,
-                          ValueProfile valueProfile, PersonalityProperties personalityProperties,
-                          MoodService moodService) {
+    public OpinionService(LLMClient llmClient, OpinionRepository opinionRepository, DesireRepository desireRepository,
+                          PromptBuilder promptBuilder, ValueProfile valueProfile,
+                          PersonalityProperties personalityProperties, MoodService moodService) {
         this.llmClient = llmClient;
         this.opinionRepository = opinionRepository;
+        this.desireRepository = desireRepository;
         this.promptBuilder = promptBuilder;
         this.valueProfile = valueProfile;
         this.personalityProperties = personalityProperties;
@@ -194,8 +197,13 @@ public class OpinionService {
 
         existingOpinion.setStability(updateStabilityScore(existingOpinion, networkConsistencyScore, newOpinionImportance, newOpinion));
         if (existingOpinion.getStability() <= 0) {
+            String desireId = existingOpinion.getAssociatedDesire();
+            if (desireId != null && !desireId.isEmpty()) {
+                desireRepository.delete(Collections.singletonList(desireId));
+                log.info("Deleted orphaned desire {} (opinion {} stability reached 0)", desireId, existingOpinion.getId());
+            }
             opinionRepository.delete(Collections.singletonList(existingOpinion.getId()));
-            return null; //Opinion deleted -> nothing more to do
+            return null;
         }
         existingOpinion.setConfidence(updateConfidenceScore(existingOpinion, networkConsistencyScore, newOpinionImportance));
         existingOpinion.setPolarity(updatePolarityScore(existingOpinion, networkConsistencyScore, coherency, moodService));
@@ -244,7 +252,11 @@ public class OpinionService {
         opinionEntry.setAssociatedDesire((String) metadata.get("associatedDesire"));
         Object mainDimensionObj = metadata.get("mainDimension");
         if (mainDimensionObj != null) {
-            opinionEntry.setMainDimension(DimensionSchwartz.valueOf(mainDimensionObj.toString()));
+            try {
+                opinionEntry.setMainDimension(DimensionSchwartz.valueOf(mainDimensionObj.toString()));
+            } catch (IllegalArgumentException e) {
+                log.warn("Unknown DimensionSchwartz value: {}", mainDimensionObj);
+            }
         }
         opinionEntry.setCreatedAt(LocalDateTime.parse((String) metadata.get("createdAt"), TIMESTAMP_FORMATTER));
         String updatedAtStr = (String) metadata.get("updatedAt");

@@ -38,6 +38,12 @@ class InitiativeServiceTest {
     @InjectMocks
     InitiativeService initiativeService;
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        lenient().doAnswer(invocation -> { ((Runnable) invocation.getArgument(0)).run(); return null; })
+                .when(desireService).withDesireLock(any(Runnable.class));
+    }
+
     @Test
     void testProcessInitiative_Success() {
         // Given

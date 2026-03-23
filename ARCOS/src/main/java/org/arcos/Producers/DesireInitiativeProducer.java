@@ -74,22 +74,22 @@ public class DesireInitiativeProducer {
     }
 
     private void initiateDesireAction(DesireEntry desire) {
-        // Create an event for the orchestrator
-        Event<DesireEntry> initiativeEvent = new Event<>(
-                EventType.INITIATIVE,
-                EventPriority.LOW, // Initiatives can be low priority compared to direct user interaction
-                desire,
-                "DesireInitiativeProducer"
-        );
+        desireService.withDesireLock(() -> {
+            Event<DesireEntry> initiativeEvent = new Event<>(
+                    EventType.INITIATIVE,
+                    EventPriority.LOW,
+                    desire,
+                    "DesireInitiativeProducer"
+            );
 
-        // Only mark ACTIVE if the event was actually queued
-        boolean queued = eventQueue.offer(initiativeEvent);
-        if (queued) {
-            desire.setStatus(DesireEntry.Status.ACTIVE);
-            desireService.storeDesire(desire);
-        } else {
-            log.warn("Event queue full, could not queue initiative for desire {}", desire.getId());
-        }
+            boolean queued = eventQueue.offer(initiativeEvent);
+            if (queued) {
+                desire.setStatus(DesireEntry.Status.ACTIVE);
+                desireService.storeDesire(desire);
+            } else {
+                log.warn("Event queue full, could not queue initiative for desire {}", desire.getId());
+            }
+        });
     }
 }
 

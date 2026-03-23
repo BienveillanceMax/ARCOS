@@ -49,6 +49,8 @@ class DesireInitiativeProducerTest {
         personalityProperties = new PersonalityProperties();
         personalityProperties.setInitiativeThreshold(0.8);
         personalityProperties.setInitiativeNoInitiativeUntilHour(9);
+        lenient().doAnswer(invocation -> { ((Runnable) invocation.getArgument(0)).run(); return null; })
+                .when(desireService).withDesireLock(any(Runnable.class));
         producer = new DesireInitiativeProducer(eventQueue, desireService,
                 centralFeedBackHandler, personalityProperties, moodService);
     }

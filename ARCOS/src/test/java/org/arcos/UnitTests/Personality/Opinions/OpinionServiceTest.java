@@ -5,6 +5,7 @@ import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
+import org.arcos.Memory.LongTermMemory.Repositories.DesireRepository;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Personality.Opinions.OpinionService;
@@ -37,6 +38,9 @@ class OpinionServiceTest {
     private OpinionRepository opinionRepository;
 
     @Mock
+    private DesireRepository desireRepository;
+
+    @Mock
     private PromptBuilder promptBuilder;
 
     @Mock
@@ -55,8 +59,8 @@ class OpinionServiceTest {
         when(personalityProperties.getOpinionSimilarityThreshold()).thenReturn(0.85);
         when(personalityProperties.getOpinion()).thenReturn(new PersonalityProperties.OpinionParams());
         when(moodService.getMoodOpinionVolatilityFactor()).thenReturn(1.0);
-        opinionService = new OpinionService(llmClient, opinionRepository, promptBuilder,
-                valueProfile, personalityProperties, moodService);
+        opinionService = new OpinionService(llmClient, opinionRepository, desireRepository,
+                promptBuilder, valueProfile, personalityProperties, moodService);
     }
 
     @Test

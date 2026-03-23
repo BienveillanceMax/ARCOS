@@ -20,6 +20,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 
 
 @Service
@@ -32,6 +33,7 @@ public class DesireService
     private final DesireRepository desireRepository;
     private final OpinionRepository opinionRepository;
     private final PersonalityProperties personalityProperties;
+    private final ReentrantLock desireMutationLock = new ReentrantLock();
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
     @Autowired
@@ -47,7 +49,15 @@ public class DesireService
     }
 
     public DesireEntry processOpinion(OpinionEntry opinionEntry) {
+        desireMutationLock.lock();
+        try {
+            return processOpinionInternal(opinionEntry);
+        } finally {
+            desireMutationLock.unlock();
+        }
+    }
 
+    private DesireEntry processOpinionInternal(OpinionEntry opinionEntry) {
         DesireEntry createdDesire;
         if (opinionEntry.getAssociatedDesire() == null || opinionEntry.getAssociatedDesire().isEmpty()) {
             log.info("Associated desire is null or empty");
@@ -93,7 +103,21 @@ public class DesireService
     }
 
     public void storeDesire(DesireEntry desire) {
-        desireRepository.save(toDocument(desire));
+        desireMutationLock.lock();
+        try {
+            desireRepository.save(toDocument(desire));
+        } finally {
+            desireMutationLock.unlock();
+        }
+    }
+
+    public void withDesireLock(Runnable action) {
+        desireMutationLock.lock();
+        try {
+            action.run();
+        } finally {
+            desireMutationLock.unlock();
+        }
     }
 
     private double calculateOpinionIntensity(OpinionEntry opinionEntry) {

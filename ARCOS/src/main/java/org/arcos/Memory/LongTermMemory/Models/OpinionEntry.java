@@ -5,6 +5,7 @@ import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import io.qdrant.client.grpc.JsonWithInt;
 import io.qdrant.client.grpc.Points;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 
 import java.time.LocalDateTime;
@@ -12,6 +13,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 public class OpinionEntry implements QdrantEntry
 {
     private static final DateTimeFormatter TIMESTAMP_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
@@ -66,9 +68,9 @@ public class OpinionEntry implements QdrantEntry
         entry.subject = response.getSubject();
         entry.summary = response.getSummary();
         entry.canonicalText = response.getCanonicalText();
-        entry.polarity = response.getPolarity();
-        entry.confidence = response.getConfidence();
-        entry.stability = response.getStability();
+        entry.polarity = Math.max(-1.0, Math.min(1.0, response.getPolarity()));
+        entry.confidence = Math.max(0.0, Math.min(1.0, response.getConfidence()));
+        entry.stability = Math.max(0.0, Math.min(1.0, response.getStability()));
         entry.associatedMemories = new ArrayList<>();
         entry.associatedDesire = "";
         entry.createdAt = LocalDateTime.now();
