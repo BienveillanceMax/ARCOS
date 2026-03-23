@@ -24,8 +24,6 @@ public class DesireEntry implements QdrantEntry
         entry.label = response.getLabel();
         entry.description = response.getDescription();
         entry.intensity = response.getIntensity();
-        entry.status = response.getStatus();
-        entry.reasoning = response.getReasoning();
         entry.setCreatedAt(LocalDateTime.now());
         entry.setLastUpdated(LocalDateTime.now());
         return entry;
@@ -50,6 +48,7 @@ public class DesireEntry implements QdrantEntry
         description = "";
         reasoning = "";
         opinionId = "";
+        status = Status.ACTIVE;
     }
 
     public String getReasoning() {

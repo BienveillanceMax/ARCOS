@@ -1,7 +1,6 @@
 package org.arcos.LLM.Client.ResponseObject;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 
 public class DesireResponse
 {
@@ -13,13 +12,6 @@ public class DesireResponse
 
     @JsonProperty("intensity")
     private double intensity;    // 0..1
-
-    @JsonProperty("reasoning")
-    private String reasoning;
-
-    @JsonProperty("status")
-    private DesireEntry.Status status;
-
 
     public String getLabel() {
         return label;
@@ -43,21 +35,5 @@ public class DesireResponse
 
     public void setIntensity(double intensity) {
         this.intensity = intensity;
-    }
-
-    public String getReasoning() {
-        return reasoning;
-    }
-
-    public void setReasoning(String reasoning) {
-        this.reasoning = reasoning;
-    }
-
-    public DesireEntry.Status getStatus() {
-        return status;
-    }
-
-    public void setStatus(DesireEntry.Status status) {
-        this.status = status;
     }
 }

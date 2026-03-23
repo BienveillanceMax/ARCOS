@@ -11,8 +11,8 @@ public class OpinionResponse
     @JsonProperty("summary")
     private String summary;         // Résumé court
 
-    @JsonProperty("narrative")
-    private String narrative;       // Version narrative plus longue
+    @JsonProperty("canonicalText")
+    private String canonicalText;   // Forme canonique (Sujet + Verbe + Objet), première personne, présent indicatif
 
     @JsonProperty("polarity")
     private double polarity;        // [-1, 1] (négatif/positif)
@@ -42,12 +42,12 @@ public class OpinionResponse
         this.summary = summary;
     }
 
-    public String getNarrative() {
-        return narrative;
+    public String getCanonicalText() {
+        return canonicalText;
     }
 
-    public void setNarrative(String narrative) {
-        this.narrative = narrative;
+    public void setCanonicalText(String canonicalText) {
+        this.canonicalText = canonicalText;
     }
 
     public double getPolarity() {

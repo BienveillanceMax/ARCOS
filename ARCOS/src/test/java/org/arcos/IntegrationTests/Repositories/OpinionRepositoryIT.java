@@ -20,7 +20,7 @@ class OpinionRepositoryIT {
     private OpinionRepository opinionRepository;
 
     private Document toDocument(OpinionEntry opinionEntry) {
-        String content = opinionEntry.getNarrative() != null ? opinionEntry.getNarrative() : "Default content";
+        String content = opinionEntry.getCanonicalText() != null ? opinionEntry.getCanonicalText() : "Default content";
         return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
     }
 
@@ -37,7 +37,7 @@ class OpinionRepositoryIT {
         assertTrue(result.isPresent());
         Document doc = result.get();
         assertEquals(opinionEntry.getId(), doc.getId());
-        assertEquals(opinionEntry.getNarrative(), doc.getText());
+        assertEquals(opinionEntry.getCanonicalText(), doc.getText());
         assertEquals(opinionEntry.getSubject(), doc.getMetadata().get("subject"));
         assertEquals(opinionEntry.getSummary(), doc.getMetadata().get("summary"));
         assertEquals(opinionEntry.getPolarity(), (Double) doc.getMetadata().get("polarity"));

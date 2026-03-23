@@ -28,9 +28,6 @@ public class OpinionEntry implements QdrantEntry
     @JsonProperty("summary")
     private String summary;         // Résumé court
 
-    @JsonProperty("narrative")
-    private String narrative;       // Version narrative plus longue
-
     @JsonProperty("polarity")
     private double polarity;        // [-1, 1] (négatif/positif)
 
@@ -59,7 +56,6 @@ public class OpinionEntry implements QdrantEntry
     private DimensionSchwartz mainDimension;
 
     public OpinionEntry() {
-        narrative = "";
         associatedMemories = new ArrayList<>();
         associatedDesire = "";
     }
@@ -69,7 +65,7 @@ public class OpinionEntry implements QdrantEntry
         entry.id = UUID.randomUUID().toString();
         entry.subject = response.getSubject();
         entry.summary = response.getSummary();
-        entry.narrative = response.getNarrative();
+        entry.canonicalText = response.getCanonicalText();
         entry.polarity = response.getPolarity();
         entry.confidence = response.getConfidence();
         entry.stability = response.getStability();
@@ -119,14 +115,6 @@ public class OpinionEntry implements QdrantEntry
 
     public void setSummary(String summary) {
         this.summary = summary;
-    }
-
-    public String getNarrative() {
-        return narrative;
-    }
-
-    public void setNarrative(String narrative) {
-        this.narrative = narrative;
     }
 
     public double getPolarity() {
@@ -199,7 +187,6 @@ public class OpinionEntry implements QdrantEntry
         payload.put("subject", this.getSubject());
         payload.put("canonicalText", this.getCanonicalText());
         payload.put("summary", this.getSummary());
-        payload.put("narrative", this.getNarrative());
         payload.put("polarity", this.getPolarity());
         payload.put("confidence", this.getConfidence());
         payload.put("stability", this.getStability());

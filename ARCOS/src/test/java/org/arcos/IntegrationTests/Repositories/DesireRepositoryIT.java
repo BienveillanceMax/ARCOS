@@ -38,7 +38,6 @@ class DesireRepositoryIT {
         assertEquals(desireEntry.getId(), doc.getId());
         assertEquals(desireEntry.getDescription(), doc.getText());
         assertEquals(desireEntry.getLabel(), doc.getMetadata().get("label"));
-        assertEquals(desireEntry.getReasoning(), doc.getMetadata().get("reasoning"));
         assertEquals(desireEntry.getIntensity(), (Double) doc.getMetadata().get("intensity"));
         assertEquals(desireEntry.getStatus().name(), doc.getMetadata().get("status"));
     }

@@ -37,7 +37,6 @@ public class ObjectCreationUtils
         createdOpinion.setUpdatedAt(LocalDateTime.now());
         createdOpinion.setAssociatedMemories(new ArrayList<>());
         createdOpinion.setSummary("On devrait tous s'aimer");
-        createdOpinion.setNarrative("et l'univers t'a dit « je t'aime » et l'univers t'a dit « tu as bien joué le jeu »et l'univers t'a dit « tout ce dont tu as besoin est en toi »et l'univers t'a dit « tu es plus fort que tu ne le penses »et l'univers t'a dit « tu es la lumière du jour »et l'univers t'a dit « tu es la nuit »et l'univers t'a dit « les ténèbres que tu combats sont en toi »et l'univers t'a dit « la lumière que tu cherches est en toi »et l'univers t'a dit « tu n'es pas seul »et l'univers a dit que tu n'es pas séparé de tout le reste et l'univers a dit que tu es l'univers qui se goûte lui-même, qui se parle à lui-même, qui lit son propre code et l'univers a dit « je t'aime parce que tu es amour ».");
         createdOpinion.setPolarity(0.5);
         createdOpinion.setConfidence(0.5);
         createdOpinion.setAssociatedDesire("");

@@ -66,12 +66,6 @@ public class OpinionService {
         try {
             opinionEntry = llmClient.generateOpinionResponse(prompt);
             opinionEntry.getAssociatedMemories().add(memoryEntry.getId());
-
-            // Canonicalization step
-            Prompt canonicalPrompt = promptBuilder.buildCanonicalizationPrompt(opinionEntry.getNarrative(), opinionEntry.getSubject());
-            String canonicalText = llmClient.generateToollessResponse(canonicalPrompt);
-            opinionEntry.setCanonicalText(canonicalText.trim());
-
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;
@@ -244,7 +238,6 @@ public class OpinionService {
         opinionEntry.setSubject((String) metadata.get("subject"));
         opinionEntry.setCanonicalText((String) metadata.get("canonicalText"));
         opinionEntry.setSummary((String) metadata.get("summary"));
-        opinionEntry.setNarrative((String) metadata.get("narrative"));
         opinionEntry.setPolarity((Double) metadata.get("polarity"));
         opinionEntry.setConfidence((Double) metadata.get("confidence"));
         opinionEntry.setStability((Double) metadata.get("stability"));

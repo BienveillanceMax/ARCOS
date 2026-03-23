@@ -22,7 +22,9 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class OpinionServiceTest {
 
@@ -67,11 +69,6 @@ class OpinionServiceTest {
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
-
-        // Mock Canonicalization calls
-        when(promptBuilder.buildCanonicalizationPrompt(anyString(), anyString())).thenReturn(new Prompt("canonicalPrompt"));
-        when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("Canonical Text");
-
         when(opinionRepository.search(any())).thenReturn(new ArrayList<>());
 
         // When
@@ -129,15 +126,9 @@ class OpinionServiceTest {
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
-
-        // Mock Canonicalization calls
-        when(promptBuilder.buildCanonicalizationPrompt(anyString(), anyString())).thenReturn(new Prompt("canonicalPrompt"));
-        when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("Canonical Text");
-
         when(opinionRepository.search(any())).thenReturn(List.of(returnDocument, returnDocument2));
         when(valueProfile.averageByDimension()).thenReturn(values);
         when(valueProfile.dimensionAverage()).thenReturn(50.0);
-
 
         // When
         List<OpinionEntry> result = opinionService.processInteraction(memoryEntry);
@@ -168,8 +159,6 @@ class OpinionServiceTest {
         // Mocks
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
-        when(promptBuilder.buildCanonicalizationPrompt(anyString(), anyString())).thenReturn(new Prompt("canonicalPrompt"));
-        when(llmClient.generateToollessResponse(any(Prompt.class))).thenReturn("Canonical Text");
         when(opinionRepository.search(any())).thenReturn(List.of(existingDoc));
 
         // ValueProfile: averageByDimension(dim) → 50.0 for imp; no-arg → {CONSERVATION: 50.0} for normVp=0
