@@ -8,6 +8,9 @@ public class MemoryResponse
     @JsonProperty("content")
     private String content;
 
+    @JsonProperty("canonicalText")
+    private String canonicalText;
+
     @JsonProperty("subject")
     private Subject subject;
 
@@ -20,6 +23,14 @@ public class MemoryResponse
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getCanonicalText() {
+        return canonicalText;
+    }
+
+    public void setCanonicalText(String canonicalText) {
+        this.canonicalText = canonicalText;
     }
 
     public Subject getSubject() {

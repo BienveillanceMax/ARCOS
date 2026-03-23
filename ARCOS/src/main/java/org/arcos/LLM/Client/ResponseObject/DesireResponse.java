@@ -7,6 +7,9 @@ public class DesireResponse
     @JsonProperty("label")
     private String label;       // title of the desire
 
+    @JsonProperty("canonicalText")
+    private String canonicalText;
+
     @JsonProperty("description")
     private String description;
 
@@ -19,6 +22,14 @@ public class DesireResponse
 
     public void setLabel(String label) {
         this.label = label;
+    }
+
+    public String getCanonicalText() {
+        return canonicalText;
+    }
+
+    public void setCanonicalText(String canonicalText) {
+        this.canonicalText = canonicalText;
     }
 
     public String getDescription() {

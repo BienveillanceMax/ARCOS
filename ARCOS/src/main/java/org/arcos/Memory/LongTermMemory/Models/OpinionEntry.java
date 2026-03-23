@@ -19,11 +19,11 @@ public class OpinionEntry implements QdrantEntry
     @JsonProperty("id")
     private String id;
 
-    @JsonProperty("subject")
-    private String subject;         // Sujet concerné (chiens, politique, utilisateur...), un enum n'est pas suffisant ici
-
     @JsonProperty("canonicalText")
     private String canonicalText;   // Forme canonique pour la recherche (Sujet + Verbe + Objet + Contexte)
+
+    @JsonProperty("subject")
+    private String subject;         // Sujet concerné (chiens, politique, utilisateur...), un enum n'est pas suffisant ici
 
     @JsonProperty("summary")
     private String summary;         // Résumé court
@@ -185,7 +185,9 @@ public class OpinionEntry implements QdrantEntry
     public Map<String, Object> getPayload() {
         Map<String, Object> payload = new HashMap<>();
         payload.put("subject", this.getSubject());
-        payload.put("canonicalText", this.getCanonicalText());
+        if (this.getCanonicalText() != null && !this.getCanonicalText().isEmpty()) {
+            payload.put("canonicalText", this.getCanonicalText());
+        }
         payload.put("summary", this.getSummary());
         payload.put("polarity", this.getPolarity());
         payload.put("confidence", this.getConfidence());

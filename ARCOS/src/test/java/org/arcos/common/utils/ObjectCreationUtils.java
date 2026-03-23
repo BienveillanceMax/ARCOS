@@ -20,6 +20,7 @@ public class ObjectCreationUtils
         MemoryEntry memoryEntry = new MemoryEntry();
         memoryEntry.setId(UUID.randomUUID().toString());
         memoryEntry.setContent("J'ai lu le récit de quelqu'un se sacrifiant par amour.");
+        memoryEntry.setCanonicalText("Je lis un récit de sacrifice par amour.");
         memoryEntry.setSatisfaction(0.5);
         memoryEntry.setSubject(Subject.SELF);
         memoryEntry.setEmbedding(new float[1024]);
@@ -55,6 +56,7 @@ public class ObjectCreationUtils
         desireEntry.setCreatedAt(LocalDateTime.now());
         desireEntry.setEmbedding(new float[1024]);
         desireEntry.setLabel("this is a label");
+        desireEntry.setCanonicalText("Je veux rendre ce monde meilleur.");
         desireEntry.setDescription("Et l'univers t'as dit je t'aime, car tu es l'amour.");
         desireEntry.setOpinionId(associatedOpinionId);
         desireEntry.setCreatedAt(LocalDateTime.now());

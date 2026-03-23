@@ -32,7 +32,7 @@ class MemoryE2IT extends BaseE2IT {
     @Test
     void t1_storeAndRetrieveBySearch() {
         String id = UUID.randomUUID().toString();
-        MemoryEntry jazz = new MemoryEntry(id, JAZZ_CONTENT, Subject.SELF, 0.8,
+        MemoryEntry jazz = new MemoryEntry(id, JAZZ_CONTENT, null, Subject.SELF, 0.8,
             LocalDateTime.now(), null);
         memoryService.storeMemory(jazz);
 
@@ -47,9 +47,9 @@ class MemoryE2IT extends BaseE2IT {
     void t2_mostRelevantMemoryRankedFirst() {
         String jazzId = UUID.randomUUID().toString();
         String workId = UUID.randomUUID().toString();
-        MemoryEntry jazz = new MemoryEntry(jazzId, JAZZ_CONTENT, Subject.SELF, 0.8,
+        MemoryEntry jazz = new MemoryEntry(jazzId, JAZZ_CONTENT, null, Subject.SELF, 0.8,
             LocalDateTime.now(), null);
-        MemoryEntry work = new MemoryEntry(workId, WORK_CONTENT, Subject.SELF, 0.6,
+        MemoryEntry work = new MemoryEntry(workId, WORK_CONTENT, null, Subject.SELF, 0.6,
             LocalDateTime.now(), null);
         memoryService.storeMemory(jazz);
         memoryService.storeMemory(work);
@@ -65,7 +65,7 @@ class MemoryE2IT extends BaseE2IT {
 
     @Test
     void t3_conversationalPromptBuildsAfterMemoryStored() {
-        MemoryEntry jazz = new MemoryEntry(UUID.randomUUID().toString(), JAZZ_CONTENT, Subject.SELF, 0.8,
+        MemoryEntry jazz = new MemoryEntry(UUID.randomUUID().toString(), JAZZ_CONTENT, null, Subject.SELF, 0.8,
             LocalDateTime.now(), null);
         memoryService.storeMemory(jazz);
 

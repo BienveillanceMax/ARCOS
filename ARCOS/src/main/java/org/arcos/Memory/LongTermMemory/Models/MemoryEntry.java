@@ -25,6 +25,9 @@ public class MemoryEntry implements QdrantEntry {
     @JsonProperty("content")
     private String content;
 
+    @JsonProperty("canonicalText")
+    private String canonicalText;
+
     @JsonProperty("subject")
     private Subject subject;
 
@@ -57,10 +60,11 @@ public class MemoryEntry implements QdrantEntry {
     /**
      * Constructeur complet avec ID personnalisé.
      */
-    public MemoryEntry(String id, String content, Subject subject, double satisfaction,
+    public MemoryEntry(String id, String content, String canonicalText, Subject subject, double satisfaction,
                        LocalDateTime timestamp, float[] embedding) {
         this.id = id;
         this.content = content;
+        this.canonicalText = canonicalText;
         this.subject = subject;
         this.satisfaction = Math.max(-1.0, Math.min(1.0, satisfaction));
         this.timestamp = timestamp;
@@ -82,6 +86,14 @@ public class MemoryEntry implements QdrantEntry {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public String getCanonicalText() {
+        return canonicalText;
+    }
+
+    public void setCanonicalText(String canonicalText) {
+        this.canonicalText = canonicalText;
     }
 
     public Subject getSubject() {
@@ -141,8 +153,14 @@ public class MemoryEntry implements QdrantEntry {
     public static Document fromMemoryPoint(Points.RetrievedPoint point) {
         Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
 
-        // Extraire le contenu. Le contenu est stocké directement dans la charge utile.
-        String content = payloadMap.get("doc_content").getStringValue();
+        String content;
+        if (payloadMap.containsKey("canonicalText")) {
+            content = payloadMap.get("canonicalText").getStringValue();
+        } else if (payloadMap.containsKey("doc_content")) {
+            content = payloadMap.get("doc_content").getStringValue();
+        } else {
+            content = payloadMap.get("content").getStringValue();
+        }
 
         // Créer les métadonnées à partir de la charge utile.
         Map<String, Object> metadata = payloadMap.entrySet().stream()
@@ -177,6 +195,9 @@ public class MemoryEntry implements QdrantEntry {
     public Map<String, Object> getPayload() {
         Map<String, Object> payload = new HashMap<>();
         payload.put("content", this.getContent());
+        if (this.getCanonicalText() != null && !this.getCanonicalText().isEmpty()) {
+            payload.put("canonicalText", this.getCanonicalText());
+        }
         payload.put("subject", this.getSubject().getValue());
         payload.put("satisfaction", this.getSatisfaction());
         payload.put("timestamp", this.getTimestamp().format(TIMESTAMP_FORMATTER));
@@ -189,11 +210,10 @@ public class MemoryEntry implements QdrantEntry {
         MemoryEntry memoryEntry = new MemoryEntry();
         memoryEntry.setId(UUID.randomUUID().toString());
         memoryEntry.setContent(memoryResponse.getContent());
+        memoryEntry.setCanonicalText(memoryResponse.getCanonicalText());
         memoryEntry.setSubject(memoryResponse.getSubject());
         memoryEntry.setSatisfaction(memoryResponse.getSatisfaction());
         memoryEntry.setTimestamp(LocalDateTime.now());
         return memoryEntry;
-
-
     }
 }

@@ -46,7 +46,10 @@ class MemoryServiceTest {
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {
-        return new Document(memoryEntry.getId(), memoryEntry.getContent(), memoryEntry.getPayload());
+        String content = memoryEntry.getCanonicalText() != null && !memoryEntry.getCanonicalText().isEmpty()
+                ? memoryEntry.getCanonicalText()
+                : memoryEntry.getContent();
+        return new Document(memoryEntry.getId(), content, memoryEntry.getPayload());
     }
 
     @Test
@@ -153,7 +156,7 @@ class MemoryServiceTest {
     void toDocumentFromDocument_IntegrationTest() {
         // Given
         LocalDateTime now = LocalDateTime.now();
-        MemoryEntry originalEntry = new MemoryEntry("test-id", "Original Content", Subject.fromString("SELF"), 0.85, now, new float[]{1.0f, 2.0f});
+        MemoryEntry originalEntry = new MemoryEntry("test-id", "Original Content", "Je retiens un contenu original.", Subject.fromString("SELF"), 0.85, now, new float[]{1.0f, 2.0f});
 
         // When
         Document document = toDocument(originalEntry);

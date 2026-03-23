@@ -172,12 +172,16 @@ public class DesireService
     }
 
     private Document toDocument(DesireEntry desireEntry) {
-        String content = desireEntry.getLabel() + ". " + desireEntry.getDescription();
+        String content = desireEntry.getCanonicalText() != null && !desireEntry.getCanonicalText().isEmpty()
+                ? desireEntry.getCanonicalText()
+                : desireEntry.getLabel() + ". " + desireEntry.getDescription();
         return new Document(desireEntry.getId(), content, desireEntry.getPayload());
     }
 
     private Document toDocument(OpinionEntry opinionEntry) {
-        String content = opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject();
+        String content = opinionEntry.getCanonicalText() != null && !opinionEntry.getCanonicalText().isEmpty()
+                ? opinionEntry.getCanonicalText()
+                : (opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject());
         return new Document(opinionEntry.getId(), content, opinionEntry.getPayload());
     }
 
@@ -186,7 +190,7 @@ public class DesireService
         DesireEntry desireEntry = new DesireEntry();
         desireEntry.setId(document.getId());
         desireEntry.setLabel((String) metadata.get("label"));
-        // fromDesirePoint (raw Qdrant) stores description as Document text; Spring AI VectorStore keeps it in metadata
+        desireEntry.setCanonicalText((String) metadata.get("canonicalText"));
         String description = (String) metadata.getOrDefault("description", document.getText());
         desireEntry.setDescription(description);
         desireEntry.setReasoning((String) metadata.get("reasoning"));

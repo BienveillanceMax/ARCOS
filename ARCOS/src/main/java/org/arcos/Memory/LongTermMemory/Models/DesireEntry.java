@@ -22,6 +22,7 @@ public class DesireEntry implements QdrantEntry
 
         entry.id = UUID.randomUUID().toString();
         entry.label = response.getLabel();
+        entry.canonicalText = response.getCanonicalText();
         entry.description = response.getDescription();
         entry.intensity = response.getIntensity();
         entry.setCreatedAt(LocalDateTime.now());
@@ -35,6 +36,7 @@ public class DesireEntry implements QdrantEntry
     private String id;
     private String opinionId;      // link to opinion
     private String label;       // title of the desire
+    private String canonicalText;   // Forme canonique pour la recherche vectorielle
     private String description;
     private double intensity;    // 0..1
     private String reasoning;
@@ -45,6 +47,7 @@ public class DesireEntry implements QdrantEntry
 
     public DesireEntry() {
         label = "";
+        canonicalText = "";
         description = "";
         reasoning = "";
         opinionId = "";
@@ -81,6 +84,14 @@ public class DesireEntry implements QdrantEntry
 
     public void setLabel(String label) {
         this.label = label;
+    }
+
+    public String getCanonicalText() {
+        return canonicalText;
+    }
+
+    public void setCanonicalText(String canonicalText) {
+        this.canonicalText = canonicalText;
     }
 
     public String getDescription() {
@@ -135,6 +146,9 @@ public class DesireEntry implements QdrantEntry
     public Map<String, Object> getPayload() {
         Map<String, Object> payload = new HashMap<>();
         payload.put("label", this.getLabel());
+        if (this.getCanonicalText() != null && !this.getCanonicalText().isEmpty()) {
+            payload.put("canonicalText", this.getCanonicalText());
+        }
         payload.put("description", this.getDescription());
         payload.put("reasoning", this.getReasoning());
         payload.put("intensity", this.getIntensity());
@@ -155,7 +169,12 @@ public class DesireEntry implements QdrantEntry
     public static Document fromDesirePoint(Points.RetrievedPoint point) {
         Map<String, JsonWithInt.Value> payloadMap = point.getPayloadMap();
 
-        String description = payloadMap.get("description").getStringValue();
+        String content;
+        if (payloadMap.containsKey("canonicalText")) {
+            content = payloadMap.get("canonicalText").getStringValue();
+        } else {
+            content = payloadMap.get("description").getStringValue();
+        }
 
         Map<String, Object> metadata = payloadMap.entrySet().stream()
                 .filter(entry -> !entry.getKey().equals("description"))
@@ -179,7 +198,7 @@ public class DesireEntry implements QdrantEntry
 
         String id = point.getId().getUuid();
 
-        return new Document(id, description, metadata);
+        return new Document(id, content, metadata);
     }
 }
 

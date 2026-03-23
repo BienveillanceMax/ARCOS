@@ -26,7 +26,7 @@ class PersonalityE2IT extends BaseE2IT {
 
     // Helper: build a MemoryEntry directly (bypasses LLM extraction); uses a fresh UUID as ID
     private MemoryEntry storedMemory(String content) {
-        MemoryEntry mem = new MemoryEntry(UUID.randomUUID().toString(), content, Subject.SELF, 0.7, LocalDateTime.now(), null);
+        MemoryEntry mem = new MemoryEntry(UUID.randomUUID().toString(), content, null, Subject.SELF, 0.7, LocalDateTime.now(), null);
         memoryService.storeMemory(mem);
         return mem;
     }

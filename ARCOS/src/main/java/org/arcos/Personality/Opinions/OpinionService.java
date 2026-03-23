@@ -224,7 +224,6 @@ public class OpinionService {
     }
 
     private Document toDocument(OpinionEntry opinionEntry) {
-        // Use canonicalText as the primary content for embedding/search
         String content = opinionEntry.getCanonicalText() != null && !opinionEntry.getCanonicalText().isEmpty()
                 ? opinionEntry.getCanonicalText()
                 : (opinionEntry.getSummary() != null ? opinionEntry.getSummary() : opinionEntry.getSubject());

@@ -72,13 +72,17 @@ public class MemoryService
     }
 
     private Document toDocument(MemoryEntry memoryEntry) {
-        return new Document(memoryEntry.getId(), memoryEntry.getContent(), memoryEntry.getPayload());
+        String content = memoryEntry.getCanonicalText() != null && !memoryEntry.getCanonicalText().isEmpty()
+                ? memoryEntry.getCanonicalText()
+                : memoryEntry.getContent();
+        return new Document(memoryEntry.getId(), content, memoryEntry.getPayload());
     }
 
     public MemoryEntry fromDocument(Document document) {
         Map<String, Object> metadata = document.getMetadata();
         String id = document.getId();
-        String content = document.getText();
+        String canonicalText = (String) metadata.get("canonicalText");
+        String content = (String) metadata.getOrDefault("content", document.getText());
         Subject subject = Subject.fromString((String) metadata.get("subject"));
         double satisfaction = (double) metadata.get("satisfaction");
         LocalDateTime timestamp = LocalDateTime.parse((String) metadata.get("timestamp"), TIMESTAMP_FORMATTER);
@@ -91,6 +95,6 @@ public class MemoryService
             }
         }
 
-        return new MemoryEntry(id, content, subject, satisfaction, timestamp, embedding);
+        return new MemoryEntry(id, content, canonicalText, subject, satisfaction, timestamp, embedding);
     }
 }

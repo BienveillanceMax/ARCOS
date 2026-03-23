@@ -445,6 +445,7 @@ public class PromptBuilder {
 
     private void appendDesireInstructions(StringBuilder prompt, OpinionEntry opinion) {
         prompt.append("Génère désir : découle de l'opinion, s'aligne avec valeurs dominantes, maintient polarité, première personne (Je veux...), actionnable, intensité ≥0.6.");
+        prompt.append(" 'canonicalText': forme canonique (Sujet + Verbe + Complément), première personne, présent indicatif, phrase simple. Ex: \"Je veux découvrir de nouvelles musiques.\"");
         if (opinion.getPolarity() < 0) {
             prompt.append(" Si opinion négative: corriger/éviter.");
         }
@@ -467,6 +468,7 @@ public class PromptBuilder {
         prompt.append("""
         RÈGLES:
         - 'content': factuel, concis (vectorisation)
+        - 'canonicalText': forme canonique (Sujet + Verbe + Complément), première personne, présent indicatif, phrase simple. Ex: "J'ai appris que Pierre aime le café."
         - Première personne
         - 'subject': 4 valeurs possibles (défaut OTHER)
         - 'satisfaction': 0 (très négatif) à 10 (très positif)
