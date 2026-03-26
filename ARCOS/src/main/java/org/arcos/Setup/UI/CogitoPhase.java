@@ -92,10 +92,10 @@ public final class CogitoPhase {
             String stripped = whisperUrl.replaceFirst("^https?://", "");
             String[] parts = stripped.split(":");
             whisperHost = parts[0];
-            whisperPort = parts.length > 1 ? parseIntOrDefault(parts[1].replaceAll("/.*", ""), 9876) : 9876;
+            whisperPort = parts.length > 1 ? parseIntOrDefault(parts[1].replaceAll("/.*", ""), 8000) : 8000;
         } else {
             whisperHost = "localhost";
-            whisperPort = 9876;
+            whisperPort = 8000;
         }
 
         // If no Mistral key from env, try .env file

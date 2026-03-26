@@ -22,12 +22,21 @@ services:
       start_period: 40s
 
   faster-whisper:
-    build:
-      context: ./docker/remote-faster-whisper
+    image: fedirz/faster-whisper-server:latest-cpu
     container_name: faster-whisper-container
     ports:
-      - "9876:9876"
+      - "8000:8000"
+    environment:
+      - WHISPER__MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
+      - WHISPER__DEVICE=cpu
+      - WHISPER__COMPUTE_TYPE=int8
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
   ollama:
     image: ollama/ollama:latest

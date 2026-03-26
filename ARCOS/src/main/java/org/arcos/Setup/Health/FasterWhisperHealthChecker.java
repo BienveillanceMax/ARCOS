@@ -21,7 +21,7 @@ public class FasterWhisperHealthChecker implements ServiceHealthCheck {
     @Override
     public HealthResult check(ServiceConfig config) {
         String host = config.host() != null ? config.host() : "localhost";
-        int port = config.port() > 0 ? config.port() : 9876;
+        int port = config.port() > 0 ? config.port() : 8000;
 
         long start = System.currentTimeMillis();
         try {

@@ -46,7 +46,7 @@ public class BootReporter {
     @Value("${qdrant.port:6334}")
     private int qdrantPort;
 
-    @Value("${faster-whisper.url:http://localhost:9876}")
+    @Value("${faster-whisper.url:http://localhost:8000}")
     private String fasterWhisperUrl;
 
     @Value("${spring.ai.mistralai.chat.options.model:mistral-large-2512}")

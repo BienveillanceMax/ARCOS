@@ -66,15 +66,17 @@ public class SpeechToText {
             // Create a temporary WAV file
             tempWavFile = createTempWavFile(audioBytes);
 
-            // Build the request
+            // Build the request (OpenAI-compatible API)
             RequestBody requestBody = new MultipartBody.Builder()
                     .setType(MultipartBody.FORM)
-                    .addFormDataPart("audio_file", tempWavFile.getName(),
+                    .addFormDataPart("file", tempWavFile.getName(),
                             RequestBody.create(tempWavFile, MediaType.parse("audio/wav")))
+                    .addFormDataPart("model", "deepdml/faster-whisper-large-v3-turbo-ct2")
+                    .addFormDataPart("language", "fr")
                     .build();
 
             Request request = new Request.Builder()
-                    .url(this.remoteUrl + "/api/v0/transcribe")
+                    .url(this.remoteUrl + "/v1/audio/transcriptions")
                     .post(requestBody)
                     .build();
 

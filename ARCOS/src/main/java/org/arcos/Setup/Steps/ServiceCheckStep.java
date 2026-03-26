@@ -156,7 +156,7 @@ public class ServiceCheckStep implements WizardStep {
 
         checks.put("FASTER-WHISPER", new CheckTask(
                 new FasterWhisperHealthChecker(),
-                ServiceHealthCheck.ServiceConfig.of("localhost", 9876)));
+                ServiceHealthCheck.ServiceConfig.of("localhost", 8000)));
 
         checks.put("PIPER TTS", new CheckTask(
                 new PiperHealthChecker(),
