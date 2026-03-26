@@ -48,7 +48,7 @@ public class LLMClient
         converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
     }
 
-    @CircuitBreaker(name = "mistral_free")
+    @CircuitBreaker(name = "mistral_free", fallbackMethod = "generatePlannedActionPlanResponseFallback")
     @RateLimiter(name = "mistral_free")
     public PlannedActionPlanResponse generatePlannedActionPlanResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
@@ -56,7 +56,7 @@ public class LLMClient
                 .entity(new BeanOutputConverter<>(PlannedActionPlanResponse.class, objectMapper));
     }
 
-    @CircuitBreaker(name = "mistral_free")
+    @CircuitBreaker(name = "mistral_free", fallbackMethod = "generateToollessResponseFallback")
     @RateLimiter(name = "mistral_free")
     public String generateToollessResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
@@ -64,7 +64,7 @@ public class LLMClient
                 .content();
     }
 
-    @CircuitBreaker(name = "mistral_free")
+    @CircuitBreaker(name = "mistral_free", fallbackMethod = "generateMemoryResponseFallback")
     @RateLimiter(name = "mistral_free")
     public MemoryEntry generateMemoryResponse(Prompt prompt) {
         MemoryResponse response = chatClient.prompt(prompt)
@@ -77,7 +77,7 @@ public class LLMClient
         return MemoryEntry.fromMemoryResponse(response);
     }
 
-    @CircuitBreaker(name = "mistral_free")
+    @CircuitBreaker(name = "mistral_free", fallbackMethod = "generateOpinionResponseFallback")
     @RateLimiter(name = "mistral_free")
     public OpinionEntry generateOpinionResponse(Prompt prompt) {
         OpinionResponse response = chatClient.prompt(prompt)
@@ -91,7 +91,7 @@ public class LLMClient
         return OpinionEntry.fromOpinionResponse(response);
     }
 
-    @CircuitBreaker(name = "mistral_free")
+    @CircuitBreaker(name = "mistral_free", fallbackMethod = "generateDesireResponseFallback")
     @RateLimiter(name = "mistral_free")
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
         DesireResponse response = chatClient.prompt(prompt)
@@ -104,11 +104,43 @@ public class LLMClient
         return DesireEntry.fromDesireResponse(response);
     }
 
-    @CircuitBreaker(name = "mistral_free")
+    @CircuitBreaker(name = "mistral_free", fallbackMethod = "generateMoodUpdateResponseFallback")
     @RateLimiter(name = "mistral_free")
     public MoodUpdate generateMoodUpdateResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .call()
                 .entity(converter);
+    }
+
+    // --- Circuit breaker fallbacks (internal pipeline: return null, callers handle gracefully) ---
+
+    private PlannedActionPlanResponse generatePlannedActionPlanResponseFallback(Prompt prompt, Throwable t) {
+        log.error("Mistral indisponible (planned action plan): {}", t.getMessage());
+        return null;
+    }
+
+    private String generateToollessResponseFallback(Prompt prompt, Throwable t) {
+        log.error("Mistral indisponible (toolless): {}", t.getMessage());
+        return null;
+    }
+
+    private MemoryEntry generateMemoryResponseFallback(Prompt prompt, Throwable t) {
+        log.error("Mistral indisponible (memory): {}", t.getMessage());
+        return null;
+    }
+
+    private OpinionEntry generateOpinionResponseFallback(Prompt prompt, Throwable t) {
+        log.error("Mistral indisponible (opinion): {}", t.getMessage());
+        return null;
+    }
+
+    private DesireEntry generateDesireResponseFallback(Prompt prompt, Throwable t) {
+        log.error("Mistral indisponible (desire): {}", t.getMessage());
+        return null;
+    }
+
+    private MoodUpdate generateMoodUpdateResponseFallback(Prompt prompt, Throwable t) {
+        log.error("Mistral indisponible (mood update): {}", t.getMessage());
+        return null;
     }
 }

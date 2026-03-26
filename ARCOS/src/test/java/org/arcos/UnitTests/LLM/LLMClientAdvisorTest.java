@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.LLM;
 
+import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Client.ResponseObject.MemoryResponse;
@@ -74,6 +75,9 @@ class LLMClientAdvisorTest {
     @Mock
     private VectorStore vectorStore;
 
+    @Mock
+    private CentralFeedBackHandler feedBackHandler;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
@@ -86,7 +90,7 @@ class LLMClientAdvisorTest {
     @Test
     void constructor_ShouldCallGetVectorStore_WhenBuildingAdvisor() {
         chatOrchestrator = new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions, searchActions,
-                plannedActionActions, memoryActions, webPageActions, weatherActions, gdeltActions, memoryRepository, 3);
+                plannedActionActions, memoryActions, webPageActions, weatherActions, gdeltActions, memoryRepository, feedBackHandler, 3);
 
         // getVectorStore() doit être appelé exactement une fois pour construire le QuestionAnswerAdvisor
         verify(memoryRepository, times(1)).getVectorStore();
@@ -98,7 +102,7 @@ class LLMClientAdvisorTest {
     void constructor_ShouldCompleteWithoutException_ForAnyPositiveTopK() {
         assertDoesNotThrow(() -> new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions,
                 searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions,
-                gdeltActions, memoryRepository, 5));
+                gdeltActions, memoryRepository, feedBackHandler, 5));
     }
 
     // ===== T3 : generateChatResponse non-régressif avec advisor =====
@@ -112,7 +116,7 @@ class LLMClientAdvisorTest {
                 .content()).thenReturn("réponse de test");
 
         chatOrchestrator = new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions, searchActions,
-                plannedActionActions, memoryActions, webPageActions, weatherActions, gdeltActions, memoryRepository, 3);
+                plannedActionActions, memoryActions, webPageActions, weatherActions, gdeltActions, memoryRepository, feedBackHandler, 3);
 
         String result = chatOrchestrator.generateChatResponse(new Prompt("bonjour"));
 
@@ -141,6 +145,6 @@ class LLMClientAdvisorTest {
 
         assertDoesNotThrow(() -> new ChatOrchestrator(chatClientBuilder, calendarActions, pythonActions,
                 searchActions, plannedActionActions, memoryActions, webPageActions, weatherActions,
-                gdeltActions, memoryRepository, 3));
+                gdeltActions, memoryRepository, feedBackHandler, 3));
     }
 }

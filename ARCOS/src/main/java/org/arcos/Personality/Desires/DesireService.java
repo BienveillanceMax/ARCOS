@@ -1,5 +1,6 @@
 package org.arcos.Personality.Desires;
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Exceptions.DesireCreationException;
 import org.arcos.LLM.Client.LLMClient;
@@ -142,6 +143,9 @@ public class DesireService
                     createdDesire.setStatus(DesireEntry.Status.PENDING);
                 }
                 return createdDesire;
+            } catch (CallNotPermittedException e) {
+                log.warn("Circuit breaker open, aborting desire creation: {}", e.getMessage());
+                throw new DesireCreationException("Circuit breaker open for Mistral API");
             } catch (Exception e) {
                 log.warn("Failed to generate desire (attempt {}/{}): {}", i + 1, retries, e.getMessage());
             }

@@ -39,3 +39,12 @@ arcos:
 
   personality:
     initiative-no-initiative-until-hour: 0
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      mistral_free:
+        sliding-window-size: 20
+        failure-rate-threshold: 80
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 3

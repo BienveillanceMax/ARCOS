@@ -36,7 +36,9 @@ class MemoryServiceIT {
         for (String col : List.of("Memories", "Opinions", "Desires")) {
             try {
                 client.deleteAsync(col, matchAll).get();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                System.err.println("Warning: failed to clear collection " + col + ": " + e.getMessage());
+            }
         }
     }
 
@@ -69,6 +71,8 @@ class MemoryServiceIT {
 
         // then
         assertNotNull(results);
+        assertTrue(results.stream().noneMatch(m -> m.getContent().toLowerCase().contains("jazz")),
+                "Unrelated query should not return jazz memories in top results");
     }
 
     @Test

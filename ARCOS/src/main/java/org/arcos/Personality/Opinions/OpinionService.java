@@ -245,9 +245,9 @@ public class OpinionService {
         opinionEntry.setSubject((String) metadata.get("subject"));
         opinionEntry.setCanonicalText((String) metadata.get("canonicalText"));
         opinionEntry.setSummary((String) metadata.get("summary"));
-        opinionEntry.setPolarity((Double) metadata.get("polarity"));
-        opinionEntry.setConfidence((Double) metadata.get("confidence"));
-        opinionEntry.setStability((Double) metadata.get("stability"));
+        opinionEntry.setPolarity(((Number) metadata.get("polarity")).doubleValue());
+        opinionEntry.setConfidence(((Number) metadata.get("confidence")).doubleValue());
+        opinionEntry.setStability(((Number) metadata.get("stability")).doubleValue());
         opinionEntry.setAssociatedMemories((List<String>) metadata.get("associatedMemories"));
         opinionEntry.setAssociatedDesire((String) metadata.get("associatedDesire"));
         Object mainDimensionObj = metadata.get("mainDimension");
@@ -263,11 +263,11 @@ public class OpinionService {
         if (updatedAtStr != null) {
             opinionEntry.setUpdatedAt(LocalDateTime.parse(updatedAtStr, TIMESTAMP_FORMATTER));
         }
-        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
-        if (embeddingDouble != null) {
-            float[] embeddingFloat = new float[embeddingDouble.size()];
-            for (int i = 0; i < embeddingDouble.size(); i++) {
-                embeddingFloat[i] = embeddingDouble.get(i).floatValue();
+        List<?> embeddingRaw = (List<?>) metadata.get("embedding");
+        if (embeddingRaw != null) {
+            float[] embeddingFloat = new float[embeddingRaw.size()];
+            for (int i = 0; i < embeddingRaw.size(); i++) {
+                embeddingFloat[i] = ((Number) embeddingRaw.get(i)).floatValue();
             }
             opinionEntry.setEmbedding(embeddingFloat);
         }

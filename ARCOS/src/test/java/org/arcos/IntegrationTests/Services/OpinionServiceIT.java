@@ -41,7 +41,9 @@ class OpinionServiceIT {
         for (String col : List.of("Memories", "Opinions", "Desires")) {
             try {
                 client.deleteAsync(col, matchAll).get();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                System.err.println("Warning: failed to clear collection " + col + ": " + e.getMessage());
+            }
         }
     }
 
@@ -162,12 +164,33 @@ class OpinionServiceIT {
     @Test
     @Order(11)
     @Tag("requires-llm")
+    void processInteraction_shouldProduceDistinctCanonicalText() {
+        // given
+        MemoryEntry mem = storedMemory(
+                "Pierre pense que le vélo électrique est un excellent moyen de transport en ville");
+
+        // when
+        List<OpinionEntry> result = opinionService.processInteraction(mem);
+
+        // then
+        Assumptions.assumeTrue(result != null && !result.isEmpty(),
+                "LLM must produce an opinion for canonicalization test");
+        OpinionEntry formed = result.get(0);
+        assertNotNull(formed.getCanonicalText(), "Opinion should have a canonicalText");
+        assertFalse(formed.getCanonicalText().isBlank(), "canonicalText should not be blank");
+        assertNotEquals(formed.getCanonicalText(), formed.getSummary(),
+                "canonicalText should be distinct from summary (actual canonicalization, not copy)");
+    }
+
+    @Test
+    @Order(12)
+    @Tag("requires-llm")
     void processInteraction_similarTopic_shouldUpdateNotDuplicate() {
         // given — seed an opinion on AI
         MemoryEntry seedMem = storedMemory("seed memory for deduplication test");
         OpinionEntry seed = buildOpinion(
                 "L'intelligence artificielle est passionnante", "IA", 0.8, 0.7);
-        opinionService.addOpinion(seed, seedMem);
+        OpinionEntry storedSeed = opinionService.addOpinion(seed, seedMem);
 
         // when — process a similar memory
         MemoryEntry similar = storedMemory(
@@ -179,5 +202,7 @@ class OpinionServiceIT {
         List<OpinionEntry> allAiOpinions = opinionService.searchOpinions("intelligence artificielle");
         assertTrue(allAiOpinions.size() <= 3,
                 "Should not create many duplicates for semantically similar topics");
+        assertTrue(allAiOpinions.stream().anyMatch(o -> storedSeed.getId().equals(o.getId())),
+                "Original seed opinion should still exist (updated, not replaced)");
     }
 }
