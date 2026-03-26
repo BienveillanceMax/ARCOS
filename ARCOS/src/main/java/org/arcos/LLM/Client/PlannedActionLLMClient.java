@@ -3,6 +3,7 @@ package org.arcos.LLM.Client;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import org.arcos.LLM.Client.ResponseObject.PlannedActionPlanResponse;
 import org.springframework.ai.chat.client.ChatClient;
@@ -25,6 +26,7 @@ public class PlannedActionLLMClient
                 .build();
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public PlannedActionPlanResponse generatePlannedActionPlanResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
@@ -32,6 +34,7 @@ public class PlannedActionLLMClient
                 .entity(new BeanOutputConverter<>(PlannedActionPlanResponse.class, objectMapper));
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public String generateToollessResponse(Prompt prompt) {
         return chatClient.prompt(prompt)

@@ -84,14 +84,14 @@ public class MemoryService
         String canonicalText = (String) metadata.get("canonicalText");
         String content = (String) metadata.getOrDefault("content", document.getText());
         Subject subject = Subject.fromString((String) metadata.get("subject"));
-        double satisfaction = (double) metadata.get("satisfaction");
+        double satisfaction = ((Number) metadata.get("satisfaction")).doubleValue();
         LocalDateTime timestamp = LocalDateTime.parse((String) metadata.get("timestamp"), TIMESTAMP_FORMATTER);
-        List<Double> embeddingDouble = (List<Double>) metadata.get("embedding");
+        List<?> embeddingRaw = (List<?>) metadata.get("embedding");
         float[] embedding = null;
-        if (embeddingDouble != null) {
-            embedding = new float[embeddingDouble.size()];
-            for (int i = 0; i < embeddingDouble.size(); i++) {
-                embedding[i] = embeddingDouble.get(i).floatValue();
+        if (embeddingRaw != null) {
+            embedding = new float[embeddingRaw.size()];
+            for (int i = 0; i < embeddingRaw.size(); i++) {
+                embedding[i] = ((Number) embeddingRaw.get(i)).floatValue();
             }
         }
 

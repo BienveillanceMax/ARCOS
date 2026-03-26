@@ -1,0 +1,41 @@
+spring:
+  config:
+    import: "optional:file:./application-local.yaml"
+  ai:
+    retry:
+      max-attempts: 2
+      backoff:
+        initial-interval: 500ms
+
+qdrant:
+  host: localhost
+  port: 6334
+
+arcos:
+  qdrant:
+    embedding-dimension: 1024
+    distance-metric: COSINE
+
+  audio:
+    wake-word:
+      enabled: false
+    tts:
+      piper:
+        enabled: false
+
+  local-llm:
+    enabled: false
+
+  user-model:
+    enabled: true
+    persona-tree-path: data/it-persona-tree.json
+    conversation-queue-path: data/it-conversation-queue.json
+    idle-threshold-minutes: 0
+    batch-check-interval-ms: 99999999
+
+  planned-action:
+    storage-path: data/it-planned-actions.json
+    history-storage-path: data/it-execution-history.json
+
+  personality:
+    initiative-no-initiative-until-hour: 0

@@ -1,5 +1,6 @@
 package org.arcos.LLM.Client;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.arcos.Memory.LongTermMemory.Repositories.MemoryRepository;
@@ -61,6 +62,7 @@ public class ChatOrchestrator {
                 .build();
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public String generateChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
@@ -70,12 +72,17 @@ public class ChatOrchestrator {
                 .content();
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public Flux<String> generateStreamingChatResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
                 .advisors(questionAnswerAdvisor)
                 .tools(tools)
                 .stream()
-                .content();
+                .content()
+                .onErrorResume(e -> {
+                    log.warn("Streaming error (likely tool-call chunk): {}", e.getMessage());
+                    return Flux.empty();
+                });
     }
 }

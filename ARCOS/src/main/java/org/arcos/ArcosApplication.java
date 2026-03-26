@@ -4,7 +4,6 @@ import com.googlecode.lanterna.screen.Screen;
 import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import com.googlecode.lanterna.terminal.Terminal;
-import org.arcos.Personality.PersonalityOrchestrator;
 import org.arcos.Setup.UI.AsciiBanner;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -176,14 +175,7 @@ public class ArcosApplication {
         Orchestrator orchestrator = context.getBean(Orchestrator.class);
         CentralFeedBackHandler handler = context.getBean(CentralFeedBackHandler.class);
         handler.handleFeedBack(new FeedBackEvent(UXEventType.ARCOS_START));
-
-        // TODO REMOVE — debug opinion for manual testing
-        PersonalityOrchestrator personalityOrchestrator = context.getBean(PersonalityOrchestrator.class);
-        String debugConversation = "Utilisateur : J'adore la musique jazz, surtout le jazz manouche de Django Reinhardt. "
-                + "ARCOS : C'est un genre fascinant ! Le jazz manouche a une énergie unique.";
-        personalityOrchestrator.processMemory(debugConversation);
-        log.info("DEBUG: Triggered opinion pipeline with test conversation");
-
         orchestrator.start();
     }
+
 }

@@ -14,6 +14,7 @@ import org.arcos.Tools.Actions.SearchActions;
 import com.fasterxml.jackson.core.json.JsonReadFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -47,6 +48,7 @@ public class LLMClient
         converter = new BeanOutputConverter<>(MoodUpdate.class, this.objectMapper);
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public PlannedActionPlanResponse generatePlannedActionPlanResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
@@ -54,6 +56,7 @@ public class LLMClient
                 .entity(new BeanOutputConverter<>(PlannedActionPlanResponse.class, objectMapper));
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public String generateToollessResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
@@ -61,6 +64,7 @@ public class LLMClient
                 .content();
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public MemoryEntry generateMemoryResponse(Prompt prompt) {
         MemoryResponse response = chatClient.prompt(prompt)
@@ -73,6 +77,7 @@ public class LLMClient
         return MemoryEntry.fromMemoryResponse(response);
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public OpinionEntry generateOpinionResponse(Prompt prompt) {
         OpinionResponse response = chatClient.prompt(prompt)
@@ -86,6 +91,7 @@ public class LLMClient
         return OpinionEntry.fromOpinionResponse(response);
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public DesireEntry generateDesireResponse(Prompt prompt) throws DesireCreationException {
         DesireResponse response = chatClient.prompt(prompt)
@@ -98,6 +104,7 @@ public class LLMClient
         return DesireEntry.fromDesireResponse(response);
     }
 
+    @CircuitBreaker(name = "mistral_free")
     @RateLimiter(name = "mistral_free")
     public MoodUpdate generateMoodUpdateResponse(Prompt prompt) {
         return chatClient.prompt(prompt)
