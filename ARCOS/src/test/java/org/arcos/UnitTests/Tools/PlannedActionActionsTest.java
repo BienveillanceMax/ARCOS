@@ -290,4 +290,49 @@ class PlannedActionActionsTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getMessage()).contains("Aucun historique");
     }
+
+    // ── Gaps comblés — Sprint 8, Story 1.6 ──────────────────────────────────
+
+    @Test
+    void listActions_WithActiveActions_ShouldReturnFormattedDescriptions() {
+        // Given
+        PlannedActionEntry todo = new PlannedActionEntry();
+        todo.setLabel("Appeler dentiste");
+        todo.setActionType(ActionType.TODO);
+        todo.setTriggerDatetime(LocalDateTime.of(2026, 4, 1, 10, 0));
+
+        PlannedActionEntry habit = new PlannedActionEntry();
+        habit.setLabel("Briefing matinal");
+        habit.setActionType(ActionType.HABIT);
+        habit.setCronExpression("0 30 8 * * *");
+
+        when(plannedActionService.listActiveActions()).thenReturn(List.of(todo, habit));
+
+        // When
+        ActionResult result = plannedActionActions.listActions(false, null);
+
+        // Then
+        assertThat(result.isSuccess()).isTrue();
+        assertThat(result.getMessage()).contains("2 action(s)");
+        @SuppressWarnings("unchecked")
+        List<String> data = (List<String>) result.getData();
+        assertThat(data).hasSize(2);
+        assertThat(data.get(0)).contains("Appeler dentiste").contains("TODO");
+        assertThat(data.get(1)).contains("Briefing matinal").contains("cron:");
+    }
+
+    @Test
+    void planAction_WhenServiceThrows_ShouldReturnFailure() {
+        // Given
+        doThrow(new RuntimeException("Storage error")).when(plannedActionService).createAction(any());
+
+        // When
+        ActionResult result = plannedActionActions.planAction(
+                "Test", "TODO", "2026-04-01T10:00:00", null,
+                false, null, null, null);
+
+        // Then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).contains("Erreur lors de la planification");
+    }
 }

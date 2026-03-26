@@ -27,21 +27,31 @@ public class InactivityProducer {
     private final int sessionEndThresholdMinutes;
     private final int idleWindowThresholdMinutes;
 
-    private volatile LocalDateTime lastInteractionTime;
-    private volatile boolean sessionActive = false;
-    private volatile boolean idleWindowEmitted = false;
+    private final Object stateLock = new Object();
+    private LocalDateTime lastInteractionTime;
+    private boolean sessionActive = false;
+    private boolean idleWindowEmitted = false;
+    private boolean hasHadSession = false;
 
     public InactivityProducer(EventQueue eventQueue, UserModelProperties properties) {
         this.eventQueue = eventQueue;
         this.sessionEndThresholdMinutes = properties.getSessionEndThresholdMinutes();
         this.idleWindowThresholdMinutes = properties.getIdleThresholdMinutes();
+        if (sessionEndThresholdMinutes >= idleWindowThresholdMinutes) {
+            throw new IllegalArgumentException(
+                    "sessionEndThresholdMinutes (" + sessionEndThresholdMinutes +
+                    ") must be < idleWindowThresholdMinutes (" + idleWindowThresholdMinutes + ")");
+        }
         this.lastInteractionTime = LocalDateTime.now();
     }
 
     public void recordInteraction() {
-        this.lastInteractionTime = LocalDateTime.now();
-        this.sessionActive = true;
-        this.idleWindowEmitted = false;
+        synchronized (stateLock) {
+            this.lastInteractionTime = LocalDateTime.now();
+            this.sessionActive = true;
+            this.idleWindowEmitted = false;
+            this.hasHadSession = true;
+        }
         log.debug("Interaction recorded at {}", lastInteractionTime);
     }
 
@@ -50,28 +60,32 @@ public class InactivityProducer {
     }
 
     public Duration getIdleDuration() {
-        return Duration.between(lastInteractionTime, LocalDateTime.now());
+        synchronized (stateLock) {
+            return Duration.between(lastInteractionTime, LocalDateTime.now());
+        }
     }
 
     @Scheduled(fixedDelayString = "${arcos.inactivity.check-interval-ms:60000}")
     public void checkInactivity() {
-        if (!sessionActive && idleWindowEmitted) {
-            return;
-        }
-        long inactiveMinutes = getIdleDuration().toMinutes();
+        synchronized (stateLock) {
+            if (!sessionActive && idleWindowEmitted) {
+                return;
+            }
+            long inactiveMinutes = getIdleDuration().toMinutes();
 
-        if (sessionActive && inactiveMinutes >= sessionEndThresholdMinutes) {
-            sessionActive = false;
-            eventQueue.offer(new Event<>(
-                    EventType.SESSION_END, EventPriority.LOW, null, "InactivityProducer"));
-            log.info("SESSION_END emitted after {}min inactivity", inactiveMinutes);
-        }
+            if (sessionActive && inactiveMinutes >= sessionEndThresholdMinutes) {
+                sessionActive = false;
+                eventQueue.offer(new Event<>(
+                        EventType.SESSION_END, EventPriority.LOW, null, "InactivityProducer"));
+                log.info("SESSION_END emitted after {}min inactivity", inactiveMinutes);
+            }
 
-        if (!idleWindowEmitted && inactiveMinutes >= idleWindowThresholdMinutes) {
-            idleWindowEmitted = true;
-            eventQueue.offer(new Event<>(
-                    EventType.IDLE_WINDOW_OPEN, EventPriority.LOW, null, "InactivityProducer"));
-            log.info("IDLE_WINDOW_OPEN emitted after {}min inactivity", inactiveMinutes);
+            if (!idleWindowEmitted && hasHadSession && inactiveMinutes >= idleWindowThresholdMinutes) {
+                idleWindowEmitted = true;
+                eventQueue.offer(new Event<>(
+                        EventType.IDLE_WINDOW_OPEN, EventPriority.LOW, null, "InactivityProducer"));
+                log.info("IDLE_WINDOW_OPEN emitted after {}min inactivity", inactiveMinutes);
+            }
         }
     }
 }

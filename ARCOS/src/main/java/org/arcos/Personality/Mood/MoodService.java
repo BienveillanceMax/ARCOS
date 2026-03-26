@@ -22,15 +22,16 @@ public class MoodService {
     public void applyMoodUpdate(MoodUpdate update) {
         if (update == null) return;
         try {
-            PadState currentPad = moodStateHolder.getPadState();
-            currentPad.update(update.deltaPleasure, update.deltaArousal, update.deltaDominance);
-            moodStateHolder.setPadState(currentPad);
+            synchronized (moodStateHolder) {
+                PadState currentPad = moodStateHolder.getPadState();
+                currentPad.update(update.deltaPleasure, update.deltaArousal, update.deltaDominance);
+                moodStateHolder.setPadState(currentPad);
 
-            log.info("Mood updated: {} (Delta: P={}, A={}, D={}) | Reasoning: {}",
-                Mood.fromPadState(currentPad),
-                update.deltaPleasure, update.deltaArousal, update.deltaDominance,
-                update.reasoning);
-
+                log.info("Mood updated: {} (Delta: P={}, A={}, D={}) | Reasoning: {}",
+                    Mood.fromPadState(currentPad),
+                    update.deltaPleasure, update.deltaArousal, update.deltaDominance,
+                    update.reasoning);
+            }
         } catch (Exception e) {
             log.error("Failed to apply mood update", e);
         }
@@ -48,18 +49,20 @@ public class MoodService {
     @Scheduled(fixedRateString = "${arcos.personality.mood-decay-interval-ms:3600000}")
     public void applyDecay() {
         try {
-            PadState current = moodStateHolder.getPadState();
-            PersonalityProperties.BaselinePad baseline = personalityProperties.getMoodBaselineForProfile();
-            double f = personalityProperties.getMoodDecayFactor();
+            synchronized (moodStateHolder) {
+                PadState current = moodStateHolder.getPadState();
+                PersonalityProperties.BaselinePad baseline = personalityProperties.getMoodBaselineForProfile();
+                double f = personalityProperties.getMoodDecayFactor();
 
-            PadState decayed = new PadState(
-                current.getPleasure() * f + baseline.getPleasure() * (1 - f),
-                current.getArousal() * f + baseline.getArousal() * (1 - f),
-                current.getDominance() * f + baseline.getDominance() * (1 - f)
-            );
-            moodStateHolder.setPadState(decayed);
-            log.debug("{\"event\":\"mood_decay\",\"before\":\"{}\",\"after\":\"{}\",\"decay_factor\":{}}",
-                current, decayed, f);
+                PadState decayed = new PadState(
+                    current.getPleasure() * f + baseline.getPleasure() * (1 - f),
+                    current.getArousal() * f + baseline.getArousal() * (1 - f),
+                    current.getDominance() * f + baseline.getDominance() * (1 - f)
+                );
+                moodStateHolder.setPadState(decayed);
+                log.debug("{\"event\":\"mood_decay\",\"before\":\"{}\",\"after\":\"{}\",\"decay_factor\":{}}",
+                    current, decayed, f);
+            }
         } catch (Exception e) {
             log.error("Erreur lors de la décroissance PAD", e);
         }

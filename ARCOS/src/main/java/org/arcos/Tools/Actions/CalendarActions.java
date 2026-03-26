@@ -55,7 +55,7 @@ public class CalendarActions
             "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?([+-]\\d{2}:\\d{2}|Z)?$"
     );
 
-    @Tool(name = "Ajouter_un_evenement_au_calendrier", description = "Ajoute_un_évenement_au_calendrier")
+    @Tool(name = "Ajouter_un_evenement_au_calendrier", description = "Crée un événement dans le calendrier (visible sur le téléphone). Pour rendez-vous, réunions, activités. Pas pour rappels ou habitudes.")
     public ActionResult AddCalendarEvent(String title, String description, String location, String startDateTimeStr, String endDateTimeStr) {
         if (!calendarService.isAvailable()) {
             log.warn("Ajout calendrier demandé mais service non disponible.");

@@ -277,14 +277,15 @@ class OrchestratorTest {
         // Given
         Event<Void> sessionEndEvent = new Event<>(EventType.SESSION_END, null, "InactivityProducer");
         when(conversationContext.getFullConversation()).thenReturn("USER: bonjour\nASSISTANT: Salut!");
+        when(conversationContext.getMessageHistory()).thenReturn(java.util.List.of());
         when(conversationContext.getMessageCount()).thenReturn(2);
 
         // When
         orchestrator.dispatch(sessionEndEvent);
 
-        // Then: with < 6 messages, no summary but session reset
-        verifyNoInteractions(conversationSummaryService);
+        // Then: startNewSession called synchronously, no summary for < 6 messages
         verify(conversationContext).startNewSession();
+        verifyNoInteractions(conversationSummaryService);
     }
 
     @Test

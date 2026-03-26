@@ -45,9 +45,6 @@ public class ConversationContext {
     @JsonProperty("errors")
     private List<ContextError> errors;
 
-    @JsonProperty("metadata")
-    private Map<String, String> metadata;
-
     // Variables transientes (non sérialisées)
     private transient int maxHistorySize = 50;
     private transient int maxErrorSize = 10;
@@ -64,7 +61,6 @@ public class ConversationContext {
         this.sessionData = new ConcurrentHashMap<>();
         this.actionHistory = Collections.synchronizedList(new ArrayList<>());
         this.errors = Collections.synchronizedList(new ArrayList<>());
-        this.metadata = new ConcurrentHashMap<>();
     }
 
     public ConversationContext(String userId) {
@@ -341,13 +337,6 @@ public class ConversationContext {
     }
     public void setErrors(List<ContextError> errors) {
         this.errors = Collections.synchronizedList(new ArrayList<>(errors));
-    }
-
-    public Map<String, String> getMetadata() {
-        return new HashMap<>(metadata);
-    }
-    public void setMetadata(Map<String, String> metadata) {
-        this.metadata = new ConcurrentHashMap<>(metadata);
     }
 
     public int getMaxHistorySize() { return maxHistorySize; }

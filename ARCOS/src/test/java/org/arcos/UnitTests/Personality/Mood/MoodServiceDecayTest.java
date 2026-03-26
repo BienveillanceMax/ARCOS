@@ -220,15 +220,14 @@ class MoodServiceDecayTest {
         // Given: PAD extreme, CALCIFER baseline (0.3, 0.2, 0.1), f=0.95
         PadState current = new PadState(-0.8, 0.8, 0.8);
         PersonalityProperties.BaselinePad baseline = personalityProperties.getMoodBaselineForProfile();
-        double f = personalityProperties.getMoodDecayFactor();
 
-        // When: simulate 50 decay cycles
+        // When: run 50 real decay cycles through the service
         for (int i = 0; i < 50; i++) {
-            current = new PadState(
-                current.getPleasure() * f + baseline.getPleasure() * (1 - f),
-                current.getArousal() * f + baseline.getArousal() * (1 - f),
-                current.getDominance() * f + baseline.getDominance() * (1 - f)
-            );
+            when(moodStateHolder.getPadState()).thenReturn(current);
+            moodService.applyDecay();
+            ArgumentCaptor<PadState> captor = ArgumentCaptor.forClass(PadState.class);
+            verify(moodStateHolder, atLeast(i + 1)).setPadState(captor.capture());
+            current = captor.getValue();
         }
 
         // Then: should be very close to baseline after 50 cycles

@@ -11,10 +11,12 @@ import org.springframework.ai.chat.prompt.Prompt;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.*;
 
 /**
@@ -27,7 +29,12 @@ class ConversationSummaryServiceTest {
     private LLMClient llmClient;
 
     private ConversationSummaryService service;
-    private final Executor testExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService testExecutor = Executors.newSingleThreadExecutor();
+
+    @org.junit.jupiter.api.AfterEach
+    void tearDown() {
+        testExecutor.shutdownNow();
+    }
 
     @BeforeEach
     void setUp() {
@@ -81,5 +88,36 @@ class ConversationSummaryServiceTest {
         String summary = future.get();
 
         assertEquals("Résumé avec espaces.", summary);
+    }
+
+    // ── Gaps comblés — Sprint 8, Story 1.11 ─────────────────────────────────
+
+    @Test
+    void summarizeAsync_ShouldReturnEmpty_WhenLLMReturnsNull() throws ExecutionException, InterruptedException {
+        when(llmClient.generateToollessResponse(any(Prompt.class)))
+                .thenReturn(null);
+
+        CompletableFuture<String> future = service.summarizeAsync(testExecutor, "USER: test\nASSISTANT: ok");
+        String summary = future.get();
+
+        assertEquals("", summary);
+    }
+
+    @Test
+    void summarizeAsync_ShouldPassConversationToLLM() throws ExecutionException, InterruptedException {
+        // given — verify the prompt built from conversation reaches the LLM
+        String conversation = "USER: J'aime la randonnée\nASSISTANT: Super !";
+        when(llmClient.generateToollessResponse(argThat(prompt ->
+                prompt.getContents().contains("randonnée"))))
+                .thenReturn("Résumé de randonnée.");
+
+        // when
+        CompletableFuture<String> future = service.summarizeAsync(testExecutor, conversation);
+        String summary = future.get();
+
+        // then
+        assertEquals("Résumé de randonnée.", summary);
+        verify(llmClient).generateToollessResponse(argThat(prompt ->
+                prompt.getContents().contains(conversation)));
     }
 }

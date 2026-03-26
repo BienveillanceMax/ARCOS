@@ -148,6 +148,9 @@ public class Orchestrator
                         success ? UXEventType.INITIATIVE_END : UXEventType.FAILURE));
             } catch (CallNotPermittedException e) {
                 handleLlmUnavailable();
+            } catch (Exception e) {
+                log.error("Unexpected error during initiative processing", e);
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
             } finally {
                 isExecutingAction = false;
             }
@@ -264,6 +267,10 @@ public class Orchestrator
             generateFluxAndSpeak(streamingPrompt, userQuery, voiceParams, onTtsDone);
         } catch (CallNotPermittedException e) {
             handleLlmUnavailable();
+        } catch (Exception e) {
+            log.error("Unexpected error during processAndSpeak", e);
+            wakeWordProducer.resumeDetection();
+            centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
         }
 
     }
@@ -381,9 +388,10 @@ public class Orchestrator
             return;
         }
 
-        // Capture snapshots before startNewSession() clears state
+        // Capture snapshots THEN clear state synchronously to prevent race with new events
         String fullConversation = context.getFullConversation();
         List<ConversationMessage> messages = context.getMessageHistory();
+        context.startNewSession();
 
         processPersonalityAndEnqueue(fullConversation, messages);
 
@@ -391,11 +399,9 @@ public class Orchestrator
             conversationSummaryService.summarizeAsync(personalityExecutor, fullConversation)
                     .thenAccept(summary -> {
                         context.setPreviousSessionSummary(summary);
-                        context.startNewSession();
                         log.info("Session ended ({} messages). Summary: {}", messageCount, summary);
                     });
         } else {
-            context.startNewSession();
             log.info("Session ended ({} messages, below threshold — no summary)", messageCount);
         }
     }
@@ -415,6 +421,9 @@ public class Orchestrator
                             pairs.add(new ConversationPair(pendingUser, msg.getContent()));
                             pendingUser = null;
                         }
+                    }
+                    if (pendingUser != null) {
+                        pairs.add(new ConversationPair(pendingUser, ""));
                     }
                     if (!pairs.isEmpty()) {
                         QueuedConversation queued = new QueuedConversation(

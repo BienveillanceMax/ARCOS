@@ -114,4 +114,20 @@ class MemoryActionsTest {
         assertThat(result.isSuccess()).isTrue();
         assertThat(result.getMessage()).isEqualTo("Aucun résultat trouvé.");
     }
+
+    // ── Gap comblé — Sprint 8, Story 1.6 ────────────────────────────────────
+
+    @Test
+    void searchMemory_WhenServiceThrows_ShouldReturnFailure() {
+        // Given
+        when(memoryService.searchMemories("crash", 5)).thenThrow(new RuntimeException("Qdrant down"));
+
+        // When
+        ActionResult result = memoryActions.searchMemory("crash", "SOUVENIR");
+
+        // Then
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getMessage()).contains("Erreur lors de la recherche mémoire");
+        assertThat(result.getMessage()).contains("Qdrant down");
+    }
 }

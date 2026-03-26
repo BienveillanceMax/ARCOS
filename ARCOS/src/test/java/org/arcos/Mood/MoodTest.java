@@ -23,4 +23,21 @@ class MoodTest {
         // Neutral center
         assertEquals(Mood.NEUTRE, Mood.fromPadState(new PadState(0.0, 0.0, 0.0)));
     }
+
+    // ── Gaps comblés — Sprint 8, Story 1.12 ─────────────────────────────────
+
+    @Test
+    void testFromPadState_ExtremeValues_ShouldNotThrow() {
+        // Extreme corners of PAD space — should return a valid Mood
+        assertNotNull(Mood.fromPadState(new PadState(-1.0, -1.0, -1.0)));
+        assertNotNull(Mood.fromPadState(new PadState(1.0, 1.0, 1.0)));
+    }
+
+    @Test
+    void testFromPadState_EachCenter_ShouldReturnMatchingMood() {
+        for (Mood mood : Mood.values()) {
+            assertEquals(mood, Mood.fromPadState(mood.getCenter()),
+                    "fromPadState(center) should return " + mood.name());
+        }
+    }
 }
