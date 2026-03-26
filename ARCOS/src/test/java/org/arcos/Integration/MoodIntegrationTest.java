@@ -7,6 +7,7 @@ import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Personality.Mood.Mood;
 import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodStateHolder;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Values.ValueProfile;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,16 +27,18 @@ public class MoodIntegrationTest {
     ValueProfile valueProfile;
     PromptBuilder promptBuilder;
     ConversationContext context;
+    MoodStateHolder moodStateHolder;
     MoodService moodService;
     PersonalityProperties personalityProperties;
 
     @BeforeEach
     void setUp() {
-        valueProfile = new ValueProfile(); // Real object
-        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null, null); // Real object
-        context = new ConversationContext(); // Real object
-        personalityProperties = new PersonalityProperties(); // Real object with defaults
-        moodService = new MoodService(context, personalityProperties); // Service under test
+        valueProfile = new ValueProfile();
+        context = new ConversationContext();
+        moodStateHolder = new MoodStateHolder();
+        personalityProperties = new PersonalityProperties();
+        promptBuilder = new PromptBuilder(valueProfile, moodStateHolder, 3, true, null, null, null);
+        moodService = new MoodService(moodStateHolder, personalityProperties);
     }
 
     @Test
@@ -46,7 +49,7 @@ public class MoodIntegrationTest {
 
         assertTrue(promptContent.contains("Humeur:"),
                 "Le prompt conversationnel doit contenir la section humeur courante");
-        assertTrue(promptContent.contains(Mood.fromPadState(context.getPadState()).getLabel()),
+        assertTrue(promptContent.contains(Mood.fromPadState(moodStateHolder.getPadState()).getLabel()),
                 "Le prompt conversationnel doit contenir l'état émotionnel");
         assertTrue(promptContent.contains("Calcifer"),
                 "Le prompt conversationnel doit contenir la personnalité Calcifer");

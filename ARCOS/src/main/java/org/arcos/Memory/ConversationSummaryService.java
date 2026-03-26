@@ -7,64 +7,42 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.stereotype.Service;
 
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.Executor;
 
 /**
- * Maintient un résumé roulant de la session conversationnelle en cours.
- * Le résumé est mis à jour de façon asynchrone après chaque tour, sans bloquer la réponse.
- * Thread-safe via AtomicReference.
+ * Génère un résumé de conversation à la fin d'une session.
+ * Appelé une seule fois par session (et seulement si la conversation est assez longue).
  */
 @Slf4j
 @Service
 public class ConversationSummaryService {
 
     private final LLMClient llmClient;
-    private final AtomicReference<String> currentSummary = new AtomicReference<>("");
 
     public ConversationSummaryService(LLMClient llmClient) {
         this.llmClient = llmClient;
     }
 
     /**
-     * Met à jour le résumé de façon non-bloquante (retourne immédiatement).
-     * En cas d'erreur, le résumé précédent reste valide.
+     * Résume la conversation complète de façon asynchrone sur l'executor fourni.
+     * En cas d'erreur, retourne une chaîne vide.
      */
-    public void updateAsync(String previousSummary,
-                            String lastUserMessage,
-                            String lastAssistantMessage) {
-        CompletableFuture.runAsync(() -> {
+    public CompletableFuture<String> summarizeAsync(Executor executor, String fullConversation) {
+        return CompletableFuture.supplyAsync(() -> {
             try {
-                Prompt summaryPrompt = buildSummaryUpdatePrompt(
-                        previousSummary, lastUserMessage, lastAssistantMessage);
-                String newSummary = llmClient.generateToollessResponse(summaryPrompt);
-                if (newSummary != null && !newSummary.isBlank()) {
-                    currentSummary.set(newSummary.trim());
-                }
+                Prompt prompt = buildSummaryPrompt(fullConversation);
+                String summary = llmClient.generateToollessResponse(prompt);
+                return (summary != null && !summary.isBlank()) ? summary.trim() : "";
             } catch (Exception e) {
-                log.warn("Résumé non mis à jour : {}", e.getMessage());
-                // Silencieux — le résumé précédent reste valide
+                log.warn("Summary generation failed: {}", e.getMessage());
+                return "";
             }
-        });
+        }, executor);
     }
 
-    public String getSummary() {
-        return currentSummary.get();
-    }
-
-    public void reset() {
-        currentSummary.set("");
-    }
-
-    Prompt buildSummaryUpdatePrompt(String previousSummary,
-                                    String lastUserMessage,
-                                    String lastAssistantMessage) {
-        String prev = (previousSummary == null || previousSummary.isBlank())
-                ? "(aucun)"
-                : previousSummary;
-        String text = "Résumé précédent: " + prev + "\n"
-                + "UTILISATEUR: " + lastUserMessage + "\n"
-                + "CALCIFER: " + lastAssistantMessage + "\n\n"
-                + "Mets à jour résumé (1-2 phrases). Nouveaux éléments importants uniquement. Résumé seul, sans introduction.";
+    Prompt buildSummaryPrompt(String fullConversation) {
+        String text = fullConversation + "\n\n"
+                + "Résume cette conversation en 1-3 phrases. Éléments importants uniquement. Résumé seul, sans introduction.";
         return new Prompt(new SystemMessage(text));
     }
 }

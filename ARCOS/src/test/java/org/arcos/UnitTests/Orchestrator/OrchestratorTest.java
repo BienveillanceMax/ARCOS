@@ -18,6 +18,7 @@ import org.arcos.Personality.Initiative.InitiativeService;
 import org.arcos.Orchestrator.Orchestrator;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodStateHolder;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.PadState;
@@ -27,6 +28,7 @@ import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.Models.ActionType;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.PlannedAction.PlannedActionService;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -80,6 +82,9 @@ class OrchestratorTest {
     private MoodService moodService;
 
     @Mock
+    private MoodStateHolder moodStateHolder;
+
+    @Mock
     private MoodVoiceMapper moodVoiceMapper;
 
     @Mock
@@ -120,6 +125,7 @@ class OrchestratorTest {
                 initiativeService,
                 desireService,
                 moodService,
+                moodStateHolder,
                 moodVoiceMapper,
                 plannedActionExecutor,
                 plannedActionService,
@@ -137,8 +143,6 @@ class OrchestratorTest {
         // Given
         String userQuery = "test query";
         Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, userQuery, "test");
-        // Sentence splitting triggers on punctuation (.?!), so "Première phrase." and " Deuxième phrase."
-        // arrive as separate chunks that each contain a sentence boundary
         String responseChunk1 = "Première phrase.";
         String responseChunk2 = " Deuxième phrase.";
         String fullResponse = responseChunk1 + responseChunk2;
@@ -148,12 +152,10 @@ class OrchestratorTest {
         when(promptBuilder.buildConversationnalPrompt(any(ConversationContext.class), any(String.class))).thenReturn(new Prompt(""));
         when(chatOrchestrator.generateStreamingChatResponse(any(Prompt.class))).thenReturn(responseStream);
 
-        // For the async part
         when(promptBuilder.buildMoodUpdatePrompt(any(), any(), any())).thenReturn(new Prompt(""));
         when(llmClient.generateMoodUpdateResponse(any(Prompt.class))).thenReturn(moodUpdate);
 
-        // Mock MoodVoiceMapper
-        when(conversationContext.getPadState()).thenReturn(new PadState());
+        when(moodStateHolder.getPadState()).thenReturn(new PadState());
         when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
 
         when(piperEmbeddedTTSModule.speakAsync(any(String.class), anyFloat(), anyFloat(), anyFloat())).thenReturn(null);
@@ -162,17 +164,15 @@ class OrchestratorTest {
         orchestrator.dispatch(wakeWordEvent);
 
         // Then
-        // Verify streaming part — each chunk has a sentence boundary so each produces a speakAsync call
         verify(promptBuilder).buildConversationnalPrompt(conversationContext, userQuery);
         verify(chatOrchestrator).generateStreamingChatResponse(any(Prompt.class));
         verify(piperEmbeddedTTSModule, times(2)).speakAsync(any(String.class), anyFloat(), anyFloat(), anyFloat());
 
-        // Verify completion part (synchronous because of Flux.just)
         verify(conversationContext).addUserMessage(userQuery);
         verify(conversationContext).addAssistantMessage(fullResponse);
-        verify(conversationSummaryService).updateAsync(any(), eq(userQuery), eq(fullResponse));
+        // No per-turn summary call anymore
+        verifyNoInteractions(conversationSummaryService);
 
-        // Verify async part with timeout
         verify(moodService, timeout(1000)).applyMoodUpdate(any(MoodUpdate.class));
         verify(llmClient, timeout(1000)).generateMoodUpdateResponse(any(Prompt.class));
         verify(promptBuilder, timeout(1000)).buildMoodUpdatePrompt(any(), eq(userQuery), eq(fullResponse));
@@ -273,6 +273,21 @@ class OrchestratorTest {
     }
 
     @Test
+    void dispatch_SessionEndEvent_ShouldCallEndSession() {
+        // Given
+        Event<Void> sessionEndEvent = new Event<>(EventType.SESSION_END, null, "InactivityProducer");
+        when(conversationContext.getFullConversation()).thenReturn("USER: bonjour\nASSISTANT: Salut!");
+        when(conversationContext.getMessageCount()).thenReturn(2);
+
+        // When
+        orchestrator.dispatch(sessionEndEvent);
+
+        // Then: with < 6 messages, no summary but session reset
+        verifyNoInteractions(conversationSummaryService);
+        verify(conversationContext).startNewSession();
+    }
+
+    @Test
     void dispatch_CalendarEvent_ShouldGenerateAndSpeakResponse() {
         // Given
         String calendarEventPayload = "test calendar event";
@@ -287,5 +302,77 @@ class OrchestratorTest {
         // Then
         verify(llmClient).generateToollessResponse(any(Prompt.class));
         verify(piperEmbeddedTTSModule).speakAsync("test response");
+    }
+
+    // ── Dégradation gracieuse quand circuit breaker OPEN ────────
+
+    @Test
+    void dispatch_WakeWord_WhenCircuitBreakerOpen_ShouldSpeakDegradationMessage() {
+        // Given
+        Event<String> wakeWordEvent = new Event<>(EventType.WAKEWORD, "bonjour", "test");
+        when(moodStateHolder.getPadState()).thenReturn(new PadState());
+        when(moodVoiceMapper.mapToVoice(any(PadState.class))).thenReturn(new MoodVoiceMapper.VoiceParams(1.0f, 0.6f, 0.8f));
+        when(promptBuilder.buildConversationnalPrompt(any(), any())).thenReturn(new Prompt(""));
+        when(chatOrchestrator.generateStreamingChatResponse(any(Prompt.class)))
+                .thenThrow(mock(CallNotPermittedException.class));
+
+        // When
+        orchestrator.dispatch(wakeWordEvent);
+
+        // Then
+        verify(piperEmbeddedTTSModule).speakAsync("Désolé, le service de langage est temporairement indisponible. Réessaie dans quelques instants.");
+        verify(wakeWordProducer).resumeDetection();
+    }
+
+    @Test
+    void dispatch_Initiative_WhenCircuitBreakerOpen_ShouldSpeakDegradationMessage() {
+        // Given
+        DesireEntry desire = new DesireEntry();
+        desire.setLabel("test desire");
+        Event<DesireEntry> initiativeEvent = new Event<>(EventType.INITIATIVE, desire, "test");
+        when(initiativeService.processInitiative(any(DesireEntry.class)))
+                .thenThrow(mock(CallNotPermittedException.class));
+
+        // When
+        orchestrator.dispatch(initiativeEvent);
+
+        // Then
+        verify(piperEmbeddedTTSModule).speakAsync("Désolé, le service de langage est temporairement indisponible. Réessaie dans quelques instants.");
+        verify(wakeWordProducer).resumeDetection();
+    }
+
+    @Test
+    void dispatch_CalendarEvent_WhenCircuitBreakerOpen_ShouldFallbackToSimpleMessage() {
+        // Given
+        String calendarPayload = "Réunion équipe 14h";
+        Event<String> calendarEvent = new Event<>(EventType.CALENDAR_EVENT_SCHEDULER, calendarPayload, "test");
+        when(promptBuilder.buildSchedulerAlertPrompt(calendarPayload)).thenReturn(new Prompt(""));
+        when(llmClient.generateToollessResponse(any(Prompt.class)))
+                .thenThrow(mock(CallNotPermittedException.class));
+
+        // When
+        orchestrator.dispatch(calendarEvent);
+
+        // Then — fallback message without LLM
+        verify(piperEmbeddedTTSModule).speakAsync("Rappel d'événement : " + calendarPayload);
+    }
+
+    @Test
+    void dispatch_PlannedActionReminder_WhenCircuitBreakerOpen_ShouldStillWork() {
+        // Given — reminder path doesn't use LLM
+        PlannedActionEntry action = new PlannedActionEntry();
+        action.setLabel("Appeler le médecin");
+        action.setActionType(ActionType.TODO);
+        action.setReminderTrigger(true);
+
+        Event<PlannedActionEntry> event = new Event<>(EventType.PLANNED_ACTION, action, "test");
+
+        // When
+        orchestrator.dispatch(event);
+
+        // Then — reminder processed without any LLM call
+        verify(piperEmbeddedTTSModule).speakAsync(argThat(msg -> msg.contains("Rappel : Appeler le médecin")));
+        verify(llmClient, never()).generateToollessResponse(any());
+        verify(plannedActionExecutor, never()).execute(any());
     }
 }

@@ -5,7 +5,6 @@ import org.arcos.UserModel.BatchPipeline.Queue.ConversationChunk;
 import org.arcos.UserModel.BatchPipeline.Queue.ConversationQueueService;
 import org.arcos.UserModel.BatchPipeline.Queue.QueuedConversation;
 import org.arcos.UserModel.PersonaTree.PersonaTreeGate;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,7 +18,6 @@ public class BatchPipelineOrchestrator {
     private final MemListenerClient memListenerClient;
     private final MemListenerPromptBuilder promptBuilder;
     private final PersonaTreeGate personaTreeGate;
-    private final IdleDetectionService idleDetectionService;
     private final MemListenerReadinessCheck readinessCheck;
 
     private volatile boolean interrupted = false;
@@ -29,36 +27,24 @@ public class BatchPipelineOrchestrator {
                                      MemListenerClient memListenerClient,
                                      MemListenerPromptBuilder promptBuilder,
                                      PersonaTreeGate personaTreeGate,
-                                     IdleDetectionService idleDetectionService,
                                      MemListenerReadinessCheck readinessCheck) {
         this.queueService = queueService;
         this.chunker = chunker;
         this.memListenerClient = memListenerClient;
         this.promptBuilder = promptBuilder;
         this.personaTreeGate = personaTreeGate;
-        this.idleDetectionService = idleDetectionService;
         this.readinessCheck = readinessCheck;
     }
 
-    @Scheduled(fixedDelayString = "${arcos.user-model.batch-check-interval-ms:60000}")
-    public void checkAndRun() {
+    public void runBatch() {
         if (!readinessCheck.isModelReady()) {
-            log.debug("MemListener model not available, skipping batch pipeline check");
-            return;
-        }
-        if (!idleDetectionService.isIdle()) {
-            log.debug("System not idle, skipping batch pipeline check");
+            log.debug("MemListener model not available, skipping batch");
             return;
         }
         if (queueService.isEmpty()) {
-            log.debug("Queue is empty, skipping batch pipeline run");
+            log.debug("Queue empty, skipping batch");
             return;
         }
-        log.info("System idle and queue not empty, starting batch pipeline");
-        runBatch();
-    }
-
-    public void runBatch() {
         interrupted = false;
         personaTreeGate.createSnapshot();
 

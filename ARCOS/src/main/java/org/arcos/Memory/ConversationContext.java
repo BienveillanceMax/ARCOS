@@ -2,7 +2,6 @@ package org.arcos.Memory;
 
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Orchestrator.Entities.ExecutionPlan;
-import org.arcos.Personality.Mood.PadState;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.stereotype.Component;
@@ -10,7 +9,6 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.stream.Collectors;
 
 /**
  * Contexte conversationnel maintenant l'état de la session utilisateur
@@ -50,12 +48,10 @@ public class ConversationContext {
     @JsonProperty("metadata")
     private Map<String, String> metadata;
 
-    @JsonProperty("pad_state")
-    private PadState padState;
-
     // Variables transientes (non sérialisées)
     private transient int maxHistorySize = 50;
     private transient int maxErrorSize = 10;
+    private transient volatile String previousSessionSummary = "";
 
     // ===== CONSTRUCTEURS =====
 
@@ -69,7 +65,6 @@ public class ConversationContext {
         this.actionHistory = Collections.synchronizedList(new ArrayList<>());
         this.errors = Collections.synchronizedList(new ArrayList<>());
         this.metadata = new ConcurrentHashMap<>();
-        this.padState = new PadState();
     }
 
     public ConversationContext(String userId) {
@@ -130,15 +125,6 @@ public class ConversationContext {
         }
     }
 
-    /**
-     * Récupère les messages récents formatés pour le prompt
-     */
-    public List<String> getRecentMessages() {
-        return getRecentMessages(10).stream()
-                .map(msg -> msg.getType().name() + ": " + msg.getContent())
-                .collect(Collectors.toList());
-    }
-
     public String getFullConversation() {
         synchronized (messageHistory) {
             StringBuilder sb = new StringBuilder();
@@ -152,33 +138,34 @@ public class ConversationContext {
         }
     }
 
+    // ===== SESSION LIFECYCLE =====
+
+    public String getPreviousSessionSummary() {
+        return previousSessionSummary;
+    }
+
+    public void setPreviousSessionSummary(String summary) {
+        previousSessionSummary = (summary != null ? summary.trim() : "");
+    }
+
+    public int getMessageCount() {
+        synchronized (messageHistory) {
+            return messageHistory.size();
+        }
+    }
+
     /**
-     * Génère un résumé de la conversation pour le contexte
+     * Réinitialise le contexte pour une nouvelle session.
+     * Préserve les préférences utilisateur et le résumé de session précédente.
      */
-    public String getSummary() {
-        if (messageHistory.isEmpty()) {
-            return "Nouvelle conversation";
-        }
-
-        StringBuilder summary = new StringBuilder();
-        summary.append("Session: ").append(sessionId).append("\n");
-
-        if (userId != null) {
-            summary.append("Utilisateur: ").append(userId).append("\n");
-        }
-
-        summary.append("Messages: ").append(messageHistory.size()).append("\n");
-
-        // Ajoute les derniers messages si pertinents
-        List<ConversationMessage> recent = getRecentMessages(3);
-        if (!recent.isEmpty()) {
-            summary.append("Derniers échanges:\n");
-            recent.forEach(msg ->
-                    summary.append("- ").append(msg.getType()).append(": ")
-                            .append(truncateContent(msg.getContent(), 100)).append("\n"));
-        }
-
-        return summary.toString();
+    public void startNewSession() {
+        this.sessionId = UUID.randomUUID().toString();
+        this.createdAt = LocalDateTime.now();
+        synchronized (messageHistory) { messageHistory.clear(); }
+        synchronized (actionHistory) { actionHistory.clear(); }
+        synchronized (errors) { errors.clear(); }
+        sessionData.clear();
+        updateTimestamp();
     }
 
     // ===== GESTION DES PRÉFÉRENCES =====
@@ -291,31 +278,6 @@ public class ConversationContext {
     // ===== MÉTHODES UTILITAIRES =====
 
     /**
-     * Vide le contexte tout en gardant les préférences utilisateur
-     */
-    public void clearConversation() {
-        messageHistory.clear();
-        actionHistory.clear();
-        errors.clear();
-        sessionData.clear();
-        // Les préférences utilisateur sont conservées
-        updateTimestamp();
-    }
-
-    /**
-     * Remet à zéro complètement le contexte
-     */
-    public void reset() {
-        messageHistory.clear();
-        userPreferences.clear();
-        sessionData.clear();
-        actionHistory.clear();
-        errors.clear();
-        metadata.clear();
-        updateTimestamp();
-    }
-
-    /**
      * Vérifie si le contexte est vide
      */
     public boolean isEmpty() {
@@ -330,28 +292,6 @@ public class ConversationContext {
      */
     private void updateTimestamp() {
         this.lastUpdated = LocalDateTime.now();
-    }
-
-    /**
-     * Tronque le contenu pour l'affichage
-     */
-    private String truncateContent(String content, int maxLength) {
-        if (content == null || content.length() <= maxLength) {
-            return content;
-        }
-        return content.substring(0, maxLength) + "...";
-    }
-
-    /**
-     * Compare si deux sets de paramètres sont similaires
-     */
-    private boolean parametersAreSimilar(Map<String, Object> params1, Map<String, Object> params2) {
-        if (params1 == null || params2 == null) {
-            return params1 == params2;
-        }
-
-        // Comparaison simple - peut être raffinée selon les besoins
-        return params1.equals(params2);
     }
 
     // ===== GETTERS ET SETTERS =====
@@ -410,14 +350,6 @@ public class ConversationContext {
         this.metadata = new ConcurrentHashMap<>(metadata);
     }
 
-    public PadState getPadState() {
-        return padState;
-    }
-
-    public void setPadState(PadState padState) {
-        this.padState = padState;
-    }
-
     public int getMaxHistorySize() { return maxHistorySize; }
     public void setMaxHistorySize(int maxHistorySize) { this.maxHistorySize = maxHistorySize; }
 
@@ -432,59 +364,6 @@ public class ConversationContext {
 }
 
 // ===== CLASSES INTERNES ET DE SUPPORT =====
-
-/**
- * Représente un message dans la conversation
- */
-class ConversationMessage {
-
-    public enum MessageType {
-        USER, ASSISTANT, SYSTEM
-    }
-
-    @JsonProperty("type")
-    private MessageType type;
-
-    @JsonProperty("content")
-    private String content;
-
-    @JsonProperty("timestamp")
-    private LocalDateTime timestamp;
-
-    @JsonProperty("execution_plan")
-    private ExecutionPlan executionPlan;
-
-    @JsonProperty("metadata")
-    private Map<String, String> metadata;
-
-    public ConversationMessage() {
-        this.timestamp = LocalDateTime.now();
-        this.metadata = new HashMap<>();
-    }
-
-    public ConversationMessage(MessageType type, String content, ExecutionPlan executionPlan) {
-        this();
-        this.type = type;
-        this.content = content;
-        this.executionPlan = executionPlan;
-    }
-
-    // Getters et Setters
-    public MessageType getType() { return type; }
-    public void setType(MessageType type) { this.type = type; }
-
-    public String getContent() { return content; }
-    public void setContent(String content) { this.content = content; }
-
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
-
-    public ExecutionPlan getExecutionPlan() { return executionPlan; }
-    public void setExecutionPlan(ExecutionPlan executionPlan) { this.executionPlan = executionPlan; }
-
-    public Map<String, String> getMetadata() { return metadata; }
-    public void setMetadata(Map<String, String> metadata) { this.metadata = metadata; }
-}
 
 /**
  * Représente une action exécutée dans l'historique

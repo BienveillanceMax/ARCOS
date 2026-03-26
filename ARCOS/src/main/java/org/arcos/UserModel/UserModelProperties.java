@@ -15,6 +15,7 @@ public class UserModelProperties {
     private long debounceSaveMs = 500;
 
     // Batch pipeline (Epic 2)
+    private int sessionEndThresholdMinutes = 5;
     private int idleThresholdMinutes = 30;
     private long batchCheckIntervalMs = 60000;
     private int chunkWindowSize = 3;

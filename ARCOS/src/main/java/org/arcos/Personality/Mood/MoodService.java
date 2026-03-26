@@ -1,7 +1,6 @@
 package org.arcos.Personality.Mood;
 
 import org.arcos.Configuration.PersonalityProperties;
-import org.arcos.Memory.ConversationContext;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,21 +10,21 @@ import org.springframework.stereotype.Service;
 @Slf4j
 public class MoodService {
 
-    private final ConversationContext conversationContext;
+    private final MoodStateHolder moodStateHolder;
     private final PersonalityProperties personalityProperties;
 
     @Autowired
-    public MoodService(ConversationContext conversationContext, PersonalityProperties personalityProperties) {
-        this.conversationContext = conversationContext;
+    public MoodService(MoodStateHolder moodStateHolder, PersonalityProperties personalityProperties) {
+        this.moodStateHolder = moodStateHolder;
         this.personalityProperties = personalityProperties;
     }
 
     public void applyMoodUpdate(MoodUpdate update) {
         if (update == null) return;
         try {
-            PadState currentPad = conversationContext.getPadState();
+            PadState currentPad = moodStateHolder.getPadState();
             currentPad.update(update.deltaPleasure, update.deltaArousal, update.deltaDominance);
-            conversationContext.setPadState(currentPad);
+            moodStateHolder.setPadState(currentPad);
 
             log.info("Mood updated: {} (Delta: P={}, A={}, D={}) | Reasoning: {}",
                 Mood.fromPadState(currentPad),
@@ -38,7 +37,7 @@ public class MoodService {
     }
 
     public Mood getCurrentMood() {
-        return Mood.fromPadState(conversationContext.getPadState());
+        return Mood.fromPadState(moodStateHolder.getPadState());
     }
 
     /**
@@ -49,7 +48,7 @@ public class MoodService {
     @Scheduled(fixedRateString = "${arcos.personality.mood-decay-interval-ms:3600000}")
     public void applyDecay() {
         try {
-            PadState current = conversationContext.getPadState();
+            PadState current = moodStateHolder.getPadState();
             PersonalityProperties.BaselinePad baseline = personalityProperties.getMoodBaselineForProfile();
             double f = personalityProperties.getMoodDecayFactor();
 
@@ -58,7 +57,7 @@ public class MoodService {
                 current.getArousal() * f + baseline.getArousal() * (1 - f),
                 current.getDominance() * f + baseline.getDominance() * (1 - f)
             );
-            conversationContext.setPadState(decayed);
+            moodStateHolder.setPadState(decayed);
             log.debug("{\"event\":\"mood_decay\",\"before\":\"{}\",\"after\":\"{}\",\"decay_factor\":{}}",
                 current, decayed, f);
         } catch (Exception e) {
@@ -72,7 +71,7 @@ public class MoodService {
      * Plaisir négatif → seuil plus élevé (plus réservé).
      */
     public double getEffectiveInitiativeThreshold(double baseThreshold) {
-        double pleasure = conversationContext.getPadState().getPleasure();
+        double pleasure = moodStateHolder.getPadState().getPleasure();
         double factor = personalityProperties.getMoodInitiativeFactor();
         return baseThreshold * (1.0 - pleasure * factor);
     }
@@ -82,7 +81,7 @@ public class MoodService {
      * Arousal élevé → volatilité accrue.
      */
     public double getMoodOpinionVolatilityFactor() {
-        double arousal = conversationContext.getPadState().getArousal();
+        double arousal = moodStateHolder.getPadState().getArousal();
         double weight = personalityProperties.getMoodOpinionActivationWeight();
         return 1.0 + Math.max(0.0, arousal) * weight;
     }

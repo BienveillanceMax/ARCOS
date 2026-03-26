@@ -1,9 +1,9 @@
 package org.arcos.Mood;
 
 import org.arcos.Configuration.PersonalityProperties;
-import org.arcos.Memory.ConversationContext;
 import org.arcos.Personality.Mood.Mood;
 import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodStateHolder;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.PadState;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MoodServiceTest {
 
     @Mock
-    private ConversationContext context;
+    private MoodStateHolder moodStateHolder;
 
     @Mock
     private PersonalityProperties personalityProperties;
@@ -29,14 +29,14 @@ class MoodServiceTest {
 
     @BeforeEach
     void setUp() {
-        moodService = new MoodService(context, personalityProperties);
+        moodService = new MoodService(moodStateHolder, personalityProperties);
     }
 
     @Test
     void testApplyMoodUpdate() {
         // Given
         PadState initialState = new PadState(0.0, 0.0, 0.0);
-        when(context.getPadState()).thenReturn(initialState);
+        when(moodStateHolder.getPadState()).thenReturn(initialState);
 
         MoodUpdate update = new MoodUpdate();
         update.deltaPleasure = 0.5;
@@ -48,8 +48,8 @@ class MoodServiceTest {
         moodService.applyMoodUpdate(update);
 
         // Then
-        verify(context).getPadState();
-        verify(context).setPadState(argThat(state ->
+        verify(moodStateHolder).getPadState();
+        verify(moodStateHolder).setPadState(argThat(state ->
             state.getPleasure() == 0.5 &&
             state.getArousal() == 0.2 &&
             state.getDominance() == 0.1
@@ -58,7 +58,7 @@ class MoodServiceTest {
 
     @Test
     void testGetCurrentMood() {
-        when(context.getPadState()).thenReturn(new PadState(0.8, 0.6, 0.5));
+        when(moodStateHolder.getPadState()).thenReturn(new PadState(0.8, 0.6, 0.5));
         assertEquals(Mood.JOIE, moodService.getCurrentMood());
     }
 }

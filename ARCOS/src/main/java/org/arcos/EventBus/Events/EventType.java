@@ -20,7 +20,9 @@ public enum EventType
     INITIATIVE("Initiative"),
     CALENDAR_EVENT_SCHEDULER("Événement de calendrier"),
     PLANNED_ACTION("Action planifiée à exécuter"),
-    LISTENING_WINDOW_TIMEOUT("Fin de fenêtre d'écoute conversation");
+    LISTENING_WINDOW_TIMEOUT("Fin de fenêtre d'écoute conversation"),
+    SESSION_END("Fin de session conversationnelle par inactivité"),
+    IDLE_WINDOW_OPEN("Fenêtre d'inactivité ouverte pour traitement batch");
 
     private final String description;
 

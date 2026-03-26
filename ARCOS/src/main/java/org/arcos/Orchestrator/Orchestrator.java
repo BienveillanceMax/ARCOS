@@ -20,6 +20,7 @@ import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Initiative.InitiativeService;
 import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodStateHolder;
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.PadState;
@@ -27,8 +28,9 @@ import org.arcos.PlannedAction.ExecutionHistoryService;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.PlannedAction.PlannedActionService;
+import org.arcos.Memory.ConversationMessage;
+import org.arcos.Producers.InactivityProducer;
 import org.arcos.UserModel.BatchPipeline.BatchPipelineOrchestrator;
-import org.arcos.UserModel.BatchPipeline.IdleDetectionService;
 import org.arcos.UserModel.BatchPipeline.Queue.ConversationPair;
 import org.arcos.UserModel.BatchPipeline.Queue.ConversationQueueService;
 import org.arcos.UserModel.BatchPipeline.Queue.QueuedConversation;
@@ -40,11 +42,13 @@ import org.springframework.stereotype.Component;
 import org.arcos.Personality.PersonalityOrchestrator;
 
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import jakarta.annotation.PreDestroy;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -62,6 +66,7 @@ public class Orchestrator
     private final PiperEmbeddedTTSModule ttsHandler;
     private final PersonalityOrchestrator personalityOrchestrator;
     private final MoodService moodService;
+    private final MoodStateHolder moodStateHolder;
     private final MoodVoiceMapper moodVoiceMapper;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final PlannedActionExecutor plannedActionExecutor;
@@ -72,14 +77,16 @@ public class Orchestrator
     private final WakeWordProducer wakeWordProducer;
     private final AudioProperties audioProperties;
     private final ConversationQueueService conversationQueueService;
-    private final IdleDetectionService idleDetectionService;
+    private final InactivityProducer inactivityProducer;
     private final BatchPipelineOrchestrator batchPipelineOrchestrator;
     private volatile boolean isExecutingAction = false;
     private volatile boolean inConversationMode = false;
 
-    private volatile LocalDateTime lastInteracted;
     private volatile boolean running = true;
     private DesireService desireService;
+    static final int MIN_MESSAGES_FOR_SUMMARY = 6;
+    static final String LLM_UNAVAILABLE_MESSAGE =
+            "Désolé, le service de langage est temporairement indisponible. Réessaie dans quelques instants.";
     private final ExecutorService moodExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "mood-updater");
         t.setDaemon(true);
@@ -92,7 +99,7 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable ConversationQueueService conversationQueueService, @Nullable IdleDetectionService idleDetectionService, @Nullable BatchPipelineOrchestrator batchPipelineOrchestrator) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodStateHolder moodStateHolder, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable ConversationQueueService conversationQueueService, @Nullable InactivityProducer inactivityProducer, @Nullable BatchPipelineOrchestrator batchPipelineOrchestrator) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
@@ -105,6 +112,7 @@ public class Orchestrator
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
         this.moodService = moodService;
+        this.moodStateHolder = moodStateHolder;
         this.moodVoiceMapper = moodVoiceMapper;
         this.plannedActionExecutor = plannedActionExecutor;
         this.plannedActionService = plannedActionService;
@@ -113,9 +121,8 @@ public class Orchestrator
         this.audioProperties = audioProperties;
         this.conversationSummaryService = conversationSummaryService;
         this.conversationQueueService = conversationQueueService;
-        this.idleDetectionService = idleDetectionService;
+        this.inactivityProducer = inactivityProducer;
         this.batchPipelineOrchestrator = batchPipelineOrchestrator;
-        lastInteracted = LocalDateTime.now();
     }
 
 
@@ -127,6 +134,10 @@ public class Orchestrator
         } else if (event.getType() == EventType.LISTENING_WINDOW_TIMEOUT) {
             inConversationMode = false;
             log.info("Mode conversation terminé — retour veille standard");
+        } else if (event.getType() == EventType.SESSION_END) {
+            endSession();
+        } else if (event.getType() == EventType.IDLE_WINDOW_OPEN) {
+            triggerBatchPipeline();
         } else if (event.getType() == EventType.INITIATIVE) {
             isExecutingAction = true;
             DesireEntry desire = (DesireEntry) event.getPayload();
@@ -135,11 +146,18 @@ public class Orchestrator
                 boolean success = initiativeService.processInitiative(desire);
                 centralFeedBackHandler.handleFeedBack(new FeedBackEvent(
                         success ? UXEventType.INITIATIVE_END : UXEventType.FAILURE));
+            } catch (CallNotPermittedException e) {
+                handleLlmUnavailable();
             } finally {
                 isExecutingAction = false;
             }
         } else if (event.getType() == EventType.CALENDAR_EVENT_SCHEDULER) {
-            ttsHandler.speakAsync(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+            try {
+                ttsHandler.speakAsync(llmClient.generateToollessResponse(promptBuilder.buildSchedulerAlertPrompt((event.getPayload()))));
+            } catch (CallNotPermittedException e) {
+                log.warn("Circuit breaker OPEN — fallback calendrier sans LLM");
+                ttsHandler.speakAsync("Rappel d'événement : " + event.getPayload());
+            }
         } else if (event.getType() == EventType.PLANNED_ACTION) {
             isExecutingAction = true;
             PlannedActionEntry action = (PlannedActionEntry) event.getPayload();
@@ -213,8 +231,8 @@ public class Orchestrator
 
     private void processAndSpeak(String userQuery, boolean isMultiTurn) {
         log.info("Processing query: {}", userQuery);
-        if (idleDetectionService != null) {
-            idleDetectionService.recordInteraction();
+        if (inactivityProducer != null) {
+            inactivityProducer.recordInteraction();
         }
         if (batchPipelineOrchestrator != null) {
             batchPipelineOrchestrator.interrupt();
@@ -226,7 +244,7 @@ public class Orchestrator
         log.info("Streaming Prompt: {}", streamingPrompt);
 
         // Get Voice Parameters based on current Mood
-        PadState currentPad = context.getPadState();
+        PadState currentPad = moodStateHolder.getPadState();
         MoodVoiceMapper.VoiceParams voiceParams = moodVoiceMapper.mapToVoice(currentPad);
         // Suspend mic processing before TTS starts to prevent audio feedback
         wakeWordProducer.suspend();
@@ -242,12 +260,19 @@ public class Orchestrator
             }
         };
 
-        generateFluxAndSpeak(streamingPrompt, userQuery, voiceParams, onTtsDone);
+        try {
+            generateFluxAndSpeak(streamingPrompt, userQuery, voiceParams, onTtsDone);
+        } catch (CallNotPermittedException e) {
+            handleLlmUnavailable();
+        }
 
+    }
 
-
-
-
+    private void handleLlmUnavailable() {
+        log.warn("Circuit breaker Mistral OPEN — dégradation gracieuse, feedback vocal");
+        ttsHandler.speakAsync(LLM_UNAVAILABLE_MESSAGE);
+        wakeWordProducer.resumeDetection();
+        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
     }
 
     private void generateFluxAndSpeak(Prompt streamingPrompt, String userQuery, MoodVoiceMapper.VoiceParams voiceParams, Runnable onTtsDone) {
@@ -294,11 +319,8 @@ public class Orchestrator
 
                     context.addUserMessage(userQuery);
                     context.addAssistantMessage(finalResponse);
-                    conversationSummaryService.updateAsync(
-                            conversationSummaryService.getSummary(), userQuery, finalResponse);
                     updateMoodAsync(userQuery, finalResponse);
                     log.info("Complete response : " + fullResponse);
-                    triggerPersonalityProcessing(lastInteracted);
                 })
                 .subscribe(
                         unused -> {},
@@ -343,7 +365,7 @@ public class Orchestrator
         moodExecutor.submit(() -> {
             try {
                 log.info("Starting asynchronous mood update...");
-                Prompt moodPrompt = promptBuilder.buildMoodUpdatePrompt(context.getPadState(), userQuery, assistantResponse);
+                Prompt moodPrompt = promptBuilder.buildMoodUpdatePrompt(moodStateHolder.getPadState(), userQuery, assistantResponse);
                 MoodUpdate moodUpdate = llmClient.generateMoodUpdateResponse(moodPrompt);
                 moodService.applyMoodUpdate(moodUpdate);
                 log.info("Asynchronous mood update completed.");
@@ -353,43 +375,69 @@ public class Orchestrator
         });
     }
 
-    private void triggerPersonalityProcessing(LocalDateTime lastInteraction) {
+    private void endSession() {
+        int messageCount = context.getMessageCount();
+        if (messageCount == 0) {
+            return;
+        }
+
+        // Capture snapshots before startNewSession() clears state
+        String fullConversation = context.getFullConversation();
+        List<ConversationMessage> messages = context.getMessageHistory();
+
+        processPersonalityAndEnqueue(fullConversation, messages);
+
+        if (messageCount >= MIN_MESSAGES_FOR_SUMMARY) {
+            conversationSummaryService.summarizeAsync(personalityExecutor, fullConversation)
+                    .thenAccept(summary -> {
+                        context.setPreviousSessionSummary(summary);
+                        context.startNewSession();
+                        log.info("Session ended ({} messages). Summary: {}", messageCount, summary);
+                    });
+        } else {
+            context.startNewSession();
+            log.info("Session ended ({} messages, below threshold — no summary)", messageCount);
+        }
+    }
+
+    private void processPersonalityAndEnqueue(String fullConversation, List<ConversationMessage> messages) {
         personalityExecutor.submit(() -> {
             try {
-                Duration elapsedTime = Duration.between(lastInteraction, LocalDateTime.now());
-                if (elapsedTime.toMinutes() >= 5) {
-                    log.info("Triggering personality processing...");
-                    String fullConversation = context.getFullConversation();
-                    personalityOrchestrator.processMemory(fullConversation);
-                    lastInteracted = LocalDateTime.now();
-                }
+                personalityOrchestrator.processMemory(fullConversation);
 
                 if (conversationQueueService != null) {
-                    List<String> recentMessages = context.getRecentMessages();
-                    List<ConversationPair> pairs = new java.util.ArrayList<>();
+                    List<ConversationPair> pairs = new ArrayList<>();
                     String pendingUser = null;
-                    for (String msg : recentMessages) {
-                        if (msg.startsWith("USER: ")) {
-                            pendingUser = msg.substring("USER: ".length());
-                        } else if (msg.startsWith("ASSISTANT: ") && pendingUser != null) {
-                            pairs.add(new ConversationPair(pendingUser, msg.substring("ASSISTANT: ".length())));
+                    for (ConversationMessage msg : messages) {
+                        if (msg.getType() == ConversationMessage.MessageType.USER) {
+                            pendingUser = msg.getContent();
+                        } else if (msg.getType() == ConversationMessage.MessageType.ASSISTANT && pendingUser != null) {
+                            pairs.add(new ConversationPair(pendingUser, msg.getContent()));
                             pendingUser = null;
                         }
                     }
                     if (!pairs.isEmpty()) {
                         QueuedConversation queued = new QueuedConversation(
-                                java.util.UUID.randomUUID().toString(),
-                                pairs,
-                                LocalDateTime.now(),
-                                false
-                        );
+                                UUID.randomUUID().toString(), pairs, LocalDateTime.now(), false);
                         conversationQueueService.enqueue(queued);
-                        log.debug("Enqueued conversation with {} pairs for batch processing", pairs.size());
+                        log.debug("Enqueued {} pairs for batch processing", pairs.size());
                     }
                 }
             } catch (Exception e) {
-                log.error("Error during personality processing", e);
+                log.error("Error during session-end personality processing", e);
             }
         });
+    }
+
+    private void triggerBatchPipeline() {
+        if (batchPipelineOrchestrator != null) {
+            personalityExecutor.submit(() -> {
+                try {
+                    batchPipelineOrchestrator.runBatch();
+                } catch (Exception e) {
+                    log.error("Error running batch pipeline", e);
+                }
+            });
+        }
     }
 }

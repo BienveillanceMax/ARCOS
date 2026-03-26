@@ -28,7 +28,6 @@ class BatchPipelineOrchestratorTest {
     @Mock private MemListenerClient memListenerClient;
     @Mock private MemListenerPromptBuilder promptBuilder;
     @Mock private PersonaTreeGate personaTreeGate;
-    @Mock private IdleDetectionService idleDetectionService;
     @Mock private MemListenerReadinessCheck readinessCheck;
 
     private BatchPipelineOrchestrator orchestrator;
@@ -37,51 +36,8 @@ class BatchPipelineOrchestratorTest {
     void setUp() {
         orchestrator = new BatchPipelineOrchestrator(
                 queueService, chunker, memListenerClient,
-                promptBuilder, personaTreeGate, idleDetectionService,
+                promptBuilder, personaTreeGate,
                 readinessCheck);
-    }
-
-    @Test
-    void checkAndRun_doesNothingWhenModelNotReady() {
-        // Given
-        when(readinessCheck.isModelReady()).thenReturn(false);
-
-        // When
-        orchestrator.checkAndRun();
-
-        // Then
-        verify(idleDetectionService, never()).isIdle();
-        verify(queueService, never()).drainAll();
-        verify(personaTreeGate, never()).createSnapshot();
-    }
-
-    @Test
-    void checkAndRun_doesNothingWhenNotIdle() {
-        // Given
-        when(readinessCheck.isModelReady()).thenReturn(true);
-        when(idleDetectionService.isIdle()).thenReturn(false);
-
-        // When
-        orchestrator.checkAndRun();
-
-        // Then
-        verify(queueService, never()).drainAll();
-        verify(personaTreeGate, never()).createSnapshot();
-    }
-
-    @Test
-    void checkAndRun_doesNothingWhenQueueEmpty() {
-        // Given
-        when(readinessCheck.isModelReady()).thenReturn(true);
-        when(idleDetectionService.isIdle()).thenReturn(true);
-        when(queueService.isEmpty()).thenReturn(true);
-
-        // When
-        orchestrator.checkAndRun();
-
-        // Then
-        verify(queueService, never()).drainAll();
-        verify(personaTreeGate, never()).createSnapshot();
     }
 
     @Test
@@ -95,6 +51,8 @@ class BatchPipelineOrchestratorTest {
         ConversationChunk chunk = new ConversationChunk(
                 List.of(new ConversationPair("Hello", "Hi")), "conv-1");
 
+        when(readinessCheck.isModelReady()).thenReturn(true);
+        when(queueService.isEmpty()).thenReturn(false);
         when(queueService.drainAll()).thenReturn(List.of(conv));
         when(chunker.chunk(conv)).thenReturn(List.of(chunk));
         when(promptBuilder.buildPrompt(chunk)).thenReturn("test prompt");
@@ -127,6 +85,8 @@ class BatchPipelineOrchestratorTest {
         ConversationChunk chunk1 = new ConversationChunk(
                 List.of(new ConversationPair("A", "B")), "conv-1");
 
+        when(readinessCheck.isModelReady()).thenReturn(true);
+        when(queueService.isEmpty()).thenReturn(false);
         when(queueService.drainAll()).thenReturn(List.of(conv1, conv2, conv3));
         when(chunker.chunk(conv1)).thenReturn(List.of(chunk1));
         when(promptBuilder.buildPrompt(chunk1)).thenReturn("prompt");

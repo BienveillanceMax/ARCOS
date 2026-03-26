@@ -2,11 +2,12 @@ package org.arcos.UnitTests.LLM;
 
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
-import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
+import org.arcos.Personality.Mood.MoodStateHolder;
+import org.arcos.Personality.Mood.PadState;
 import org.arcos.Personality.Values.ValueProfile;
 import org.arcos.PlannedAction.Models.ActionType;
 import org.arcos.PlannedAction.Models.PlannedActionEntry;
@@ -29,13 +30,13 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests unitaires pour PromptBuilder — section "Contexte de la Conversation" (STORY-RCS-002).
- * Vérifie que generateContextDescription() utilise le résumé roulant + N messages récents bruts.
+ * Tests unitaires pour PromptBuilder — section "Contexte de la Conversation".
+ * Vérifie que generateContextDescription() utilise le résumé de session précédente + N messages récents.
  */
 class PromptBuilderTest {
 
     @Mock
-    private ConversationSummaryService conversationSummaryService;
+    private MoodStateHolder moodStateHolder;
 
     @Mock
     private OpinionRepository opinionRepository;
@@ -45,18 +46,17 @@ class PromptBuilderTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
-        // ValueProfile avec profil DEFAULT (scores à 50.0) — pas de valeurs dominantes/supprimées
+        when(moodStateHolder.getPadState()).thenReturn(new PadState());
         ValueProfile valueProfile = new ValueProfile();
-        promptBuilder = new PromptBuilder(valueProfile, conversationSummaryService, 3, true, null, null, null);
+        promptBuilder = new PromptBuilder(valueProfile, moodStateHolder, 3, true, null, null, null);
     }
 
     // ===== T7 : résumé disponible + contexte non vide =====
 
     @Test
     void generateContextDescription_ShouldIncludeSummaryAndRecentMessages_WhenBothPresent() {
-        when(conversationSummaryService.getSummary()).thenReturn("L'utilisateur aime les films d'action et a demandé la météo.");
-
         ConversationContext context = new ConversationContext();
+        context.setPreviousSessionSummary("L'utilisateur aime les films d'action et a demandé la météo.");
         context.addUserMessage("j'aime les films d'action");
         context.addAssistantMessage("Ah oui, les films d'action.");
         context.addUserMessage("c'est quoi la météo demain");
@@ -65,8 +65,8 @@ class PromptBuilderTest {
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "test");
         String systemContent = getSystemContent(prompt);
 
-        assertTrue(systemContent.contains("Résumé session:"),
-                "Doit contenir l'en-tête du résumé");
+        assertTrue(systemContent.contains("Session précédente:"),
+                "Doit contenir l'en-tête du résumé de session précédente");
         assertTrue(systemContent.contains("L'utilisateur aime les films d'action"),
                 "Doit contenir le texte du résumé");
         assertTrue(systemContent.contains("Derniers échanges:"),
@@ -76,8 +76,7 @@ class PromptBuilderTest {
                         systemContent.contains("USER: c'est quoi la météo demain") ||
                         systemContent.contains("ASSISTANT: Demain il fera 12°C"),
                 "Doit contenir au moins un des 3 derniers messages");
-        // Le premier message (USER: j'aime les films d'action) ne doit pas apparaître
-        // (il est le 4ème en partant de la fin, donc exclu avec N=3)
+        // Le premier message ne doit pas apparaître (il est le 4ème en partant de la fin)
         assertFalse(systemContent.contains("- USER: j'aime les films d'action"),
                 "Le 1er message ne doit pas figurer avec N=3");
     }
@@ -86,8 +85,6 @@ class PromptBuilderTest {
 
     @Test
     void generateContextDescription_ShouldShowOnlyRecentMessages_WhenSummaryIsEmpty() {
-        when(conversationSummaryService.getSummary()).thenReturn("");
-
         ConversationContext context = new ConversationContext();
         context.addUserMessage("c'est quoi la météo");
         context.addAssistantMessage("Il fait 15°C.");
@@ -95,7 +92,7 @@ class PromptBuilderTest {
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "test");
         String systemContent = getSystemContent(prompt);
 
-        assertFalse(systemContent.contains("Résumé session:"),
+        assertFalse(systemContent.contains("Session précédente:"),
                 "Ne doit pas contenir l'en-tête du résumé si résumé vide");
         assertTrue(systemContent.contains("Derniers échanges:"),
                 "Doit contenir les derniers échanges");
@@ -107,15 +104,13 @@ class PromptBuilderTest {
 
     @Test
     void generateContextDescription_ShouldShowOnlySummary_WhenContextIsEmpty() {
-        when(conversationSummaryService.getSummary()).thenReturn("L'utilisateur est intéressé par les nouvelles technologies.");
-
         ConversationContext context = new ConversationContext();
-        // Contexte vide — pas de messages, pas de préférences
+        context.setPreviousSessionSummary("L'utilisateur est intéressé par les nouvelles technologies.");
 
         Prompt prompt = promptBuilder.buildConversationnalPrompt(context, "test");
         String systemContent = getSystemContent(prompt);
 
-        assertTrue(systemContent.contains("Résumé session:"),
+        assertTrue(systemContent.contains("Session précédente:"),
                 "Doit contenir l'en-tête du résumé même si le contexte est vide");
         assertTrue(systemContent.contains("L'utilisateur est intéressé par les nouvelles technologies."),
                 "Doit contenir le texte du résumé");
@@ -127,8 +122,6 @@ class PromptBuilderTest {
 
     @Test
     void buildConversationnalPrompt_shouldIncludeOpinions_whenRepoReturnsResults() {
-        when(conversationSummaryService.getSummary()).thenReturn("");
-
         Document doc1 = new Document("J'aime la pluie d'automne.",
                 Map.of("canonicalText", "J'aime la pluie d'automne.", "polarity", 0.7));
         Document doc2 = new Document("La politique manque de vision.",
@@ -138,7 +131,7 @@ class PromptBuilderTest {
                 .thenReturn(List.of(doc1, doc2));
 
         PromptBuilder builderWithOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, null, opinionRepository);
+                new ValueProfile(), moodStateHolder, 3, true, null, null, opinionRepository);
 
         Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "test météo");
         String systemContent = getSystemContent(prompt);
@@ -153,8 +146,6 @@ class PromptBuilderTest {
 
     @Test
     void buildConversationnalPrompt_shouldIncludeSingleOpinion_withoutSeparator() {
-        when(conversationSummaryService.getSummary()).thenReturn("");
-
         Document doc = new Document("Le café est essentiel.",
                 Map.of("canonicalText", "Le café est essentiel.", "polarity", 0.8));
 
@@ -162,7 +153,7 @@ class PromptBuilderTest {
                 .thenReturn(List.of(doc));
 
         PromptBuilder builderWithOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, null, opinionRepository);
+                new ValueProfile(), moodStateHolder, 3, true, null, null, opinionRepository);
 
         Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "café");
         String systemContent = getSystemContent(prompt);
@@ -175,12 +166,11 @@ class PromptBuilderTest {
 
     @Test
     void buildConversationnalPrompt_shouldSkipOpinions_whenRepoReturnsEmpty() {
-        when(conversationSummaryService.getSummary()).thenReturn("");
         when(opinionRepository.search(any(SearchRequest.class)))
                 .thenReturn(Collections.emptyList());
 
         PromptBuilder builderWithOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, null, opinionRepository);
+                new ValueProfile(), moodStateHolder, 3, true, null, null, opinionRepository);
 
         Prompt prompt = builderWithOpinions.buildConversationnalPrompt(new ConversationContext(), "bonjour");
         String systemContent = getSystemContent(prompt);
@@ -191,16 +181,14 @@ class PromptBuilderTest {
 
     @Test
     void buildConversationnalPrompt_shouldNotCrash_whenOpinionRepoIsNull() {
-        when(conversationSummaryService.getSummary()).thenReturn("");
-
         PromptBuilder builderNoOpinions = new PromptBuilder(
-                new ValueProfile(), conversationSummaryService, 3, true, null, null, null);
+                new ValueProfile(), moodStateHolder, 3, true, null, null, null);
 
         assertDoesNotThrow(() ->
                 builderNoOpinions.buildConversationnalPrompt(new ConversationContext(), "test"));
     }
 
-    // ===== buildReWOOPlanPrompt — real construction (catches ST4 template parsing bugs) =====
+    // ===== buildReWOOPlanPrompt — real construction =====
 
     @Test
     void buildReWOOPlanPrompt_shouldSucceedWithSimpleReminder() {
@@ -218,7 +206,6 @@ class PromptBuilderTest {
 
     @Test
     void buildReWOOPlanPrompt_shouldSucceedWithComplexHabit() {
-        // This entry's label + JSON example in the prompt previously crashed ST4 parsing
         PlannedActionEntry entry = ObjectCreationUtils.createComplexHabitEntry();
 
         Prompt prompt = promptBuilder.buildReWOOPlanPrompt(entry);
@@ -233,8 +220,6 @@ class PromptBuilderTest {
 
     @Test
     void buildReWOOPlanPrompt_shouldHandleFrenchApostrophesInLabel() {
-        // French apostrophes in labels combined with JSON curly braces in template
-        // was the exact combination that triggered the ST4 parsing crash
         PlannedActionEntry entry = new PlannedActionEntry();
         entry.setLabel("Réseau d'espoir régénératif");
         entry.setActionType(ActionType.HABIT);

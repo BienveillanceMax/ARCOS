@@ -1,8 +1,9 @@
 package org.arcos.UnitTests.Personality.Mood;
 
 import org.arcos.Configuration.PersonalityProperties;
-import org.arcos.Memory.ConversationContext;
 import org.arcos.Personality.Mood.MoodService;
+import org.arcos.Personality.Mood.MoodStateHolder;
+import org.arcos.Personality.Mood.MoodUpdate;
 import org.arcos.Personality.Mood.PadState;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,7 +22,7 @@ import static org.mockito.Mockito.*;
 class MoodServiceDecayTest {
 
     @Mock
-    private ConversationContext context;
+    private MoodStateHolder moodStateHolder;
 
     private PersonalityProperties personalityProperties;
     private MoodService moodService;
@@ -30,7 +31,7 @@ class MoodServiceDecayTest {
     void setUp() {
         personalityProperties = new PersonalityProperties();
         personalityProperties.setProfile("CALCIFER");
-        moodService = new MoodService(context, personalityProperties);
+        moodService = new MoodService(moodStateHolder, personalityProperties);
     }
 
     // ── T4-001 : Décroissance d'un cycle ──────────────────────────────────────
@@ -39,14 +40,14 @@ class MoodServiceDecayTest {
     void applyDecay_SingleCycle_ShouldConvergeTowardBaseline() {
         // Given: PAD extrême, profil CALCIFER (baseline P=0.3, A=0.2, D=0.1), f=0.95
         PadState extreme = new PadState(-0.8, 0.8, 0.8);
-        when(context.getPadState()).thenReturn(extreme);
+        when(moodStateHolder.getPadState()).thenReturn(extreme);
 
         // When
         moodService.applyDecay();
 
         // Then: new_P = -0.8 * 0.95 + 0.3 * 0.05 = -0.760 + 0.015 = -0.745
         ArgumentCaptor<PadState> captor = ArgumentCaptor.forClass(PadState.class);
-        verify(context).setPadState(captor.capture());
+        verify(moodStateHolder).setPadState(captor.capture());
         PadState result = captor.getValue();
         assertEquals(-0.745, result.getPleasure(), 0.001, "Plaisir décroît vers baseline");
         // new_A = 0.8 * 0.95 + 0.2 * 0.05 = 0.760 + 0.010 = 0.770
@@ -59,14 +60,14 @@ class MoodServiceDecayTest {
     void applyDecay_NeutralState_ShouldConvergeTowardCalciferBaseline() {
         // Given: PAD neutre (0,0,0), profil CALCIFER (baseline P=0.3, A=0.2, D=0.1)
         PadState neutral = new PadState(0.0, 0.0, 0.0);
-        when(context.getPadState()).thenReturn(neutral);
+        when(moodStateHolder.getPadState()).thenReturn(neutral);
 
         // When
         moodService.applyDecay();
 
         // Then: new_P = 0.0 * 0.95 + 0.3 * 0.05 = 0.015
         ArgumentCaptor<PadState> captor = ArgumentCaptor.forClass(PadState.class);
-        verify(context).setPadState(captor.capture());
+        verify(moodStateHolder).setPadState(captor.capture());
         PadState result = captor.getValue();
         assertEquals(0.015, result.getPleasure(), 0.001, "PAD converge positivement depuis 0");
     }
@@ -123,7 +124,7 @@ class MoodServiceDecayTest {
         // Given: plaisir=0.5, base=0.80, factor=0.15
         // Expected: 0.80 * (1 - 0.5 * 0.15) = 0.80 * 0.925 = 0.74
         PadState happyMood = new PadState(0.5, 0.0, 0.0);
-        when(context.getPadState()).thenReturn(happyMood);
+        when(moodStateHolder.getPadState()).thenReturn(happyMood);
 
         double adjusted = moodService.getEffectiveInitiativeThreshold(0.80);
         assertEquals(0.74, adjusted, 0.01, "Plaisir positif abaisse le seuil d'initiative");
@@ -134,7 +135,7 @@ class MoodServiceDecayTest {
         // Given: plaisir=-0.6, base=0.80, factor=0.15
         // Expected: 0.80 * (1 - (-0.6) * 0.15) = 0.80 * 1.09 = 0.872
         PadState sadMood = new PadState(-0.6, 0.0, 0.0);
-        when(context.getPadState()).thenReturn(sadMood);
+        when(moodStateHolder.getPadState()).thenReturn(sadMood);
 
         double adjusted = moodService.getEffectiveInitiativeThreshold(0.80);
         assertEquals(0.872, adjusted, 0.01, "Plaisir négatif élève le seuil d'initiative");
@@ -144,7 +145,7 @@ class MoodServiceDecayTest {
     void getEffectiveInitiativeThreshold_NeutralPleasure_ShouldReturnBaseThreshold() {
         // Given: plaisir=0.0, factor=0.15 → aucun ajustement
         PadState neutralMood = new PadState(0.0, 0.0, 0.0);
-        when(context.getPadState()).thenReturn(neutralMood);
+        when(moodStateHolder.getPadState()).thenReturn(neutralMood);
 
         double adjusted = moodService.getEffectiveInitiativeThreshold(0.80);
         assertEquals(0.80, adjusted, 0.001, "Plaisir neutre = seuil inchangé");
@@ -156,7 +157,7 @@ class MoodServiceDecayTest {
     void getMoodOpinionVolatilityFactor_HighArousal_ShouldIncreaseVolatility() {
         // Given: arousal=0.8, weight=0.5 → factor = 1.0 + 0.8 * 0.5 = 1.4
         PadState highArousal = new PadState(0.0, 0.8, 0.0);
-        when(context.getPadState()).thenReturn(highArousal);
+        when(moodStateHolder.getPadState()).thenReturn(highArousal);
 
         double factor = moodService.getMoodOpinionVolatilityFactor();
         assertEquals(1.4, factor, 0.001, "Arousal 0.8 → facteur 1.4x");
@@ -166,7 +167,7 @@ class MoodServiceDecayTest {
     void getMoodOpinionVolatilityFactor_NeutralArousal_ShouldReturnOne() {
         // Given: arousal=0.0 → factor = 1.0
         PadState neutralMood = new PadState(0.0, 0.0, 0.0);
-        when(context.getPadState()).thenReturn(neutralMood);
+        when(moodStateHolder.getPadState()).thenReturn(neutralMood);
 
         double factor = moodService.getMoodOpinionVolatilityFactor();
         assertEquals(1.0, factor, 0.001, "Arousal 0 → facteur neutre 1.0x");
@@ -176,9 +177,63 @@ class MoodServiceDecayTest {
     void getMoodOpinionVolatilityFactor_NegativeArousal_ShouldReturnOne() {
         // Given: arousal=-0.5 → Math.max(0, -0.5) = 0 → factor = 1.0
         PadState lowArousal = new PadState(0.0, -0.5, 0.0);
-        when(context.getPadState()).thenReturn(lowArousal);
+        when(moodStateHolder.getPadState()).thenReturn(lowArousal);
 
         double factor = moodService.getMoodOpinionVolatilityFactor();
         assertEquals(1.0, factor, 0.001, "Arousal négatif → facteur plafonné à 1.0x");
+    }
+
+    // ── Gaps comblés — Sprint 8, Story 1.12 ─────────────────────────────────
+
+    @Test
+    void applyMoodUpdate_WithNull_ShouldNotThrow() {
+        // Given/When/Then — null update is silently ignored
+        assertDoesNotThrow(() -> moodService.applyMoodUpdate(null));
+    }
+
+    @Test
+    void applyMoodUpdate_WithLargeDeltas_ShouldClamp() {
+        // Given: PAD at (0.8, -0.8, 0.5), deltas that push past bounds
+        PadState initial = new PadState(0.8, -0.8, 0.5);
+        when(moodStateHolder.getPadState()).thenReturn(initial);
+
+        MoodUpdate update = new MoodUpdate();
+        update.deltaPleasure = 0.5;   // 0.8 + 0.5 = 1.3 → clamp to 1.0
+        update.deltaArousal = -0.5;   // -0.8 + (-0.5) = -1.3 → clamp to -1.0
+        update.deltaDominance = 0.0;
+        update.reasoning = "test clamping";
+
+        // When
+        moodService.applyMoodUpdate(update);
+
+        // Then
+        ArgumentCaptor<PadState> captor = ArgumentCaptor.forClass(PadState.class);
+        verify(moodStateHolder).setPadState(captor.capture());
+        PadState result = captor.getValue();
+        assertEquals(1.0, result.getPleasure(), 0.001, "Pleasure should clamp at 1.0");
+        assertEquals(-1.0, result.getArousal(), 0.001, "Arousal should clamp at -1.0");
+        assertEquals(0.5, result.getDominance(), 0.001, "Dominance unchanged");
+    }
+
+    @Test
+    void applyDecay_MultipleCycles_ShouldConvergeTowardBaseline() {
+        // Given: PAD extreme, CALCIFER baseline (0.3, 0.2, 0.1), f=0.95
+        PadState current = new PadState(-0.8, 0.8, 0.8);
+        PersonalityProperties.BaselinePad baseline = personalityProperties.getMoodBaselineForProfile();
+        double f = personalityProperties.getMoodDecayFactor();
+
+        // When: simulate 50 decay cycles
+        for (int i = 0; i < 50; i++) {
+            current = new PadState(
+                current.getPleasure() * f + baseline.getPleasure() * (1 - f),
+                current.getArousal() * f + baseline.getArousal() * (1 - f),
+                current.getDominance() * f + baseline.getDominance() * (1 - f)
+            );
+        }
+
+        // Then: should be very close to baseline after 50 cycles
+        assertEquals(baseline.getPleasure(), current.getPleasure(), 0.1, "Pleasure converges to baseline");
+        assertEquals(baseline.getArousal(), current.getArousal(), 0.1, "Arousal converges to baseline");
+        assertEquals(baseline.getDominance(), current.getDominance(), 0.1, "Dominance converges to baseline");
     }
 }

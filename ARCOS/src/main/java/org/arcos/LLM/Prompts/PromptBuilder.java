@@ -1,12 +1,13 @@
 package org.arcos.LLM.Prompts;
 
 import org.arcos.Memory.ConversationContext;
-import org.arcos.Memory.ConversationSummaryService;
+import org.arcos.Memory.ConversationMessage;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Mood.Mood;
+import org.arcos.Personality.Mood.MoodStateHolder;
 import org.arcos.Personality.Mood.PadState;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.Personality.Values.Entities.ValueSchwartz;
@@ -41,7 +42,7 @@ import java.util.stream.Collectors;
 public class PromptBuilder {
 
     private final ValueProfile valueProfile;
-    private final ConversationSummaryService conversationSummaryService;
+    private final MoodStateHolder moodStateHolder;
     private final int recentMessagesCount;
     private final boolean userModelEnabled;
     private final DfsNavigatorService dfsNavigatorService;
@@ -50,14 +51,14 @@ public class PromptBuilder {
 
     @Autowired
     public PromptBuilder(ValueProfile valueProfile,
-                         ConversationSummaryService conversationSummaryService,
+                         MoodStateHolder moodStateHolder,
                          @Value("${arcos.conversation.summary.recent-messages-count:3}") int recentMessagesCount,
                          @Value("${arcos.user-model.enabled:true}") boolean userModelEnabled,
                          @Nullable DfsNavigatorService dfsNavigatorService,
                          @Nullable UserContextFormatter userContextFormatter,
                          @Nullable OpinionRepository opinionRepository) {
         this.valueProfile = valueProfile;
-        this.conversationSummaryService = conversationSummaryService;
+        this.moodStateHolder = moodStateHolder;
         this.recentMessagesCount = recentMessagesCount;
         this.userModelEnabled = userModelEnabled;
         this.dfsNavigatorService = dfsNavigatorService;
@@ -178,7 +179,7 @@ public class PromptBuilder {
 
         StringBuilder system = new StringBuilder();
         system.append(getCalciferPersonality());
-        appendMoodInfo(system, context);
+        appendMoodInfo(system);
         system.append(getValueProfile());
         appendUserProfileIfAvailable(system, originalQuery);
         appendRelevantOpinions(system, originalQuery);
@@ -323,8 +324,8 @@ public class PromptBuilder {
                 """;
     }
 
-    private void appendMoodInfo(StringBuilder prompt, ConversationContext context) {
-        PadState pad = context.getPadState();
+    private void appendMoodInfo(StringBuilder prompt) {
+        PadState pad = moodStateHolder.getPadState();
         Mood mood = Mood.fromPadState(pad);
         prompt.append("Humeur: ").append(mood.getLabel()).append(" — ").append(mood.getDescription()).append("\n");
     }
@@ -429,7 +430,7 @@ public class PromptBuilder {
     }
 
     private String getConversationContextIfPresent(ConversationContext context) {
-        String summary = conversationSummaryService.getSummary();
+        String summary = context != null ? context.getPreviousSessionSummary() : "";
         boolean hasSummary = summary != null && !summary.isBlank();
         boolean hasContext = context != null && !context.isEmpty();
         if (hasSummary || hasContext) {
@@ -526,27 +527,25 @@ public class PromptBuilder {
     private String generateContextDescription(ConversationContext context) {
         StringBuilder contextDesc = new StringBuilder();
 
-        String summary = conversationSummaryService.getSummary();
+        String summary = context.getPreviousSessionSummary();
         if (summary != null && !summary.isBlank()) {
-            contextDesc.append("Résumé session: ").append(summary).append("\n\n");
+            contextDesc.append("Session précédente: ").append(summary).append("\n\n");
         }
 
-        if (context != null) {
-            List<String> allRecent = context.getRecentMessages();
-            int fromIndex = Math.max(0, allRecent.size() - recentMessagesCount);
-            List<String> recent = allRecent.subList(fromIndex, allRecent.size());
-            if (!recent.isEmpty()) {
-                contextDesc.append("Derniers échanges:\n");
-                recent.forEach(msg -> contextDesc.append("- ").append(msg).append("\n"));
-                contextDesc.append("\n");
-            }
+        List<ConversationMessage> recent = context.getRecentMessages(recentMessagesCount);
+        if (!recent.isEmpty()) {
+            contextDesc.append("Derniers échanges:\n");
+            recent.forEach(msg -> contextDesc.append("- ")
+                    .append(msg.getType().name()).append(": ")
+                    .append(msg.getContent()).append("\n"));
+            contextDesc.append("\n");
+        }
 
-            if (context.getUserPreferences() != null && !context.getUserPreferences().isEmpty()) {
-                contextDesc.append("Préférences:\n");
-                context.getUserPreferences().forEach((key, value) ->
-                        contextDesc.append("- ").append(key).append(": ").append(value).append("\n"));
-                contextDesc.append("\n");
-            }
+        if (context.getUserPreferences() != null && !context.getUserPreferences().isEmpty()) {
+            contextDesc.append("Préférences:\n");
+            context.getUserPreferences().forEach((key, value) ->
+                    contextDesc.append("- ").append(key).append(": ").append(value).append("\n"));
+            contextDesc.append("\n");
         }
 
         return contextDesc.toString();
