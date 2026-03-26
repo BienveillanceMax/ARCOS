@@ -68,7 +68,10 @@ public class OpinionService {
         Prompt prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
             opinionEntry = llmClient.generateOpinionResponse(prompt);
-            opinionEntry.getAssociatedMemories().add(memoryEntry.getId());
+            if (opinionEntry == null) {
+                log.warn("LLM returned null opinion response for memory: {}", memoryEntry.getId());
+                return null;
+            }
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
             return null;
@@ -223,7 +226,6 @@ public class OpinionService {
     public OpinionEntry addOpinion(OpinionEntry opinionEntry, MemoryEntry associatedMemoryEntry) {
         opinionEntry.setId(UUID.randomUUID().toString());
         opinionEntry.setStability(calculateStabilityScore(opinionEntry));
-        opinionEntry.setAssociatedMemories(List.of(associatedMemoryEntry.getId()));
         opinionEntry.setCreatedAt(LocalDateTime.now());
         opinionEntry.setUpdatedAt(LocalDateTime.now());
 
@@ -248,7 +250,6 @@ public class OpinionService {
         opinionEntry.setPolarity(((Number) metadata.get("polarity")).doubleValue());
         opinionEntry.setConfidence(((Number) metadata.get("confidence")).doubleValue());
         opinionEntry.setStability(((Number) metadata.get("stability")).doubleValue());
-        opinionEntry.setAssociatedMemories((List<String>) metadata.get("associatedMemories"));
         opinionEntry.setAssociatedDesire((String) metadata.get("associatedDesire"));
         Object mainDimensionObj = metadata.get("mainDimension");
         if (mainDimensionObj != null) {

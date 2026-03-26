@@ -1,4 +1,4 @@
-package org.arcos.Integration;
+package org.arcos.UnitTests.Personality.Mood;
 
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;

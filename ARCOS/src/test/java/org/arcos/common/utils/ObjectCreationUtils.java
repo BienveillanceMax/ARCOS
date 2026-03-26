@@ -36,7 +36,6 @@ public class ObjectCreationUtils
         createdOpinion.setStability(0.1);
         createdOpinion.setCreatedAt(LocalDateTime.now());
         createdOpinion.setUpdatedAt(LocalDateTime.now());
-        createdOpinion.setAssociatedMemories(new ArrayList<>());
         createdOpinion.setSummary("On devrait tous s'aimer");
         createdOpinion.setPolarity(0.5);
         createdOpinion.setConfidence(0.5);
@@ -50,7 +49,6 @@ public class ObjectCreationUtils
 
         DesireEntry desireEntry = new DesireEntry();
         desireEntry.setId(UUID.randomUUID().toString());
-        desireEntry.setReasoning("J'ai envie de rendre ce monde meilleur et d'être bon");
         desireEntry.setIntensity(1.0);
         desireEntry.setStatus(DesireEntry.Status.PENDING);
         desireEntry.setCreatedAt(LocalDateTime.now());

@@ -77,7 +77,6 @@ public class InitiativeService {
 
             desireService.withDesireLock(() -> {
                 desire.setStatus(DesireEntry.Status.SATISFIED);
-                desire.setReasoning(cappedResult);
                 desire.setLastUpdated(LocalDateTime.now());
                 desireService.storeDesire(desire);
             });

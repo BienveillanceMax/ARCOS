@@ -221,7 +221,6 @@ public class DesireService
         desireEntry.setCanonicalText((String) metadata.get("canonicalText"));
         String description = (String) metadata.getOrDefault("description", document.getText());
         desireEntry.setDescription(description);
-        desireEntry.setReasoning((String) metadata.get("reasoning"));
         desireEntry.setIntensity(((Number) metadata.get("intensity")).doubleValue());
         desireEntry.setOpinionId((String) metadata.get("opinionId"));
         desireEntry.setStatus(DesireEntry.Status.valueOf((String) metadata.get("status")));

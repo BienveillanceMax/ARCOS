@@ -69,8 +69,6 @@ class OpinionServiceTest {
         MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
         OpinionEntry newOpinion = ObjectCreationUtils.createOpinionEntry();
 
-        newOpinion.getAssociatedMemories().add(memoryEntry.getId());
-
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenReturn(newOpinion);
         when(opinionRepository.search(any())).thenReturn(new ArrayList<>());

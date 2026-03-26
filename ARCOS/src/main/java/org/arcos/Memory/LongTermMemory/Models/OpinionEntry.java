@@ -39,9 +39,6 @@ public class OpinionEntry implements QdrantEntry
     @JsonProperty("stability")
     private double stability;       // [0, 1] (résistance au changement)
 
-    @JsonProperty("associatedMemories")
-    private List<String> associatedMemories; // IDs des souvenirs liés
-
     @JsonProperty("associatedDesire")
     private String associatedDesire;
 
@@ -58,7 +55,6 @@ public class OpinionEntry implements QdrantEntry
     private DimensionSchwartz mainDimension;
 
     public OpinionEntry() {
-        associatedMemories = new ArrayList<>();
         associatedDesire = "";
     }
 
@@ -71,7 +67,6 @@ public class OpinionEntry implements QdrantEntry
         entry.polarity = Math.max(-1.0, Math.min(1.0, response.getPolarity()));
         entry.confidence = Math.max(0.0, Math.min(1.0, response.getConfidence()));
         entry.stability = Math.max(0.0, Math.min(1.0, response.getStability()));
-        entry.associatedMemories = new ArrayList<>();
         entry.associatedDesire = "";
         entry.createdAt = LocalDateTime.now();
         entry.updatedAt = LocalDateTime.now();
@@ -143,14 +138,6 @@ public class OpinionEntry implements QdrantEntry
         this.stability = stability;
     }
 
-    public List<String> getAssociatedMemories() {
-        return associatedMemories;
-    }
-
-    public void setAssociatedMemories(List<String> associatedMemories) {
-        this.associatedMemories = associatedMemories;
-    }
-
     public float[] getEmbedding() {
         return embedding;
     }
@@ -194,7 +181,6 @@ public class OpinionEntry implements QdrantEntry
         payload.put("polarity", this.getPolarity());
         payload.put("confidence", this.getConfidence());
         payload.put("stability", this.getStability());
-        payload.put("associatedMemories", this.getAssociatedMemories());
         payload.put("associatedDesire", this.getAssociatedDesire());
         if (this.getMainDimension() != null) {
             payload.put("mainDimension", this.getMainDimension().name());

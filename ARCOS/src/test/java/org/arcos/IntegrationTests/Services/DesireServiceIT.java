@@ -82,7 +82,7 @@ class DesireServiceIT {
         desire.setLabel("Explorer les nouvelles technologies IA");
         desire.setCanonicalText("Je veux explorer les nouvelles technologies d'intelligence artificielle");
         desire.setDescription("Découvrir et expérimenter les derniers modèles de langage");
-        desire.setReasoning("Passion pour l'IA et curiosité technologique");
+
         desire.setIntensity(0.9);
         desire.setStatus(DesireEntry.Status.PENDING);
         desire.setOpinionId(UUID.randomUUID().toString());
@@ -108,7 +108,7 @@ class DesireServiceIT {
         desire.setLabel("Un désir déjà satisfait");
         desire.setCanonicalText("Un désir déjà satisfait et accompli");
         desire.setDescription("Ce désir a été réalisé");
-        desire.setReasoning("Test");
+
         desire.setIntensity(0.5);
         desire.setStatus(DesireEntry.Status.SATISFIED);
         desire.setOpinionId(UUID.randomUUID().toString());
@@ -136,7 +136,7 @@ class DesireServiceIT {
         existingDesire.setLabel("Apprendre la guitare");
         existingDesire.setCanonicalText("Je veux apprendre à jouer de la guitare");
         existingDesire.setDescription("Désir d'apprentissage musical");
-        existingDesire.setReasoning("Amour de la musique");
+
         existingDesire.setIntensity(0.7);
         existingDesire.setStatus(DesireEntry.Status.PENDING);
         existingDesire.setOpinionId(UUID.randomUUID().toString());

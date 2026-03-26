@@ -9,6 +9,7 @@ import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Opinions.OpinionService;
 import org.arcos.Personality.PersonalityOrchestrator;
 import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -90,8 +91,7 @@ class InitiativeServiceTest {
 
         // Then
         assertTrue(success);
-        assertTrue(desire.getReasoning().length() <= 303); // 300 + "..."
-        assertTrue(desire.getReasoning().endsWith("..."));
+        assertEquals(DesireEntry.Status.SATISFIED, desire.getStatus());
     }
 
     @Test

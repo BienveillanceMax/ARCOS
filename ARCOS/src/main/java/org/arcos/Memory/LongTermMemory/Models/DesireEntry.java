@@ -39,7 +39,6 @@ public class DesireEntry implements QdrantEntry
     private String canonicalText;   // Forme canonique pour la recherche vectorielle
     private String description;
     private double intensity;    // 0..1
-    private String reasoning;
     private Status status;
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
@@ -49,17 +48,8 @@ public class DesireEntry implements QdrantEntry
         label = "";
         canonicalText = "";
         description = "";
-        reasoning = "";
         opinionId = "";
         status = Status.PENDING;
-    }
-
-    public String getReasoning() {
-        return reasoning;
-    }
-
-    public void setReasoning(String reasoning) {
-        this.reasoning = reasoning;
     }
 
     public String getId() {
@@ -150,7 +140,6 @@ public class DesireEntry implements QdrantEntry
             payload.put("canonicalText", this.getCanonicalText());
         }
         payload.put("description", this.getDescription());
-        payload.put("reasoning", this.getReasoning());
         payload.put("intensity", this.getIntensity());
         payload.put("opinionId", this.getOpinionId());
         payload.put("status", this.getStatus().name());
