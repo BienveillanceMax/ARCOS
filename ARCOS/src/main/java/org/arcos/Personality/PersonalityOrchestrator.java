@@ -33,9 +33,11 @@ public class PersonalityOrchestrator
     public void processMemory(String conversation) {
         MemoryEntry memoryEntry = tryMemorizing(conversation);
         if (memoryEntry == null) {
+            log.info("[PERSONALITY] conversation=processed memory=null opinions=0 desires=0");
             return;
         }
-        processMemoryEntryIntoOpinion(memoryEntry);
+        int[] counts = processMemoryEntryIntoOpinion(memoryEntry);
+        log.info("[PERSONALITY] conversation=processed memory=created opinions={} desires={}", counts[0], counts[1]);
     }
 
     private MemoryEntry tryMemorizing(String conversation) {
@@ -55,14 +57,21 @@ public class PersonalityOrchestrator
         return memoryEntry;
     }
 
-    public void processMemoryEntryIntoOpinion(MemoryEntry memoryEntry) {
+    public int[] processMemoryEntryIntoOpinion(MemoryEntry memoryEntry) {
+        int opinionCount = 0;
+        int desireCount = 0;
         List<OpinionEntry> opinionEntries = tryFormingOpinion(memoryEntry);
         if (opinionEntries == null) {
-            return;
+            return new int[]{opinionCount, desireCount};
         }
+        opinionCount = opinionEntries.size();
         for (OpinionEntry opinionEntry : opinionEntries) {
-            tryFormingDesire(opinionEntry);
+            DesireEntry desire = tryFormingDesire(opinionEntry);
+            if (desire != null) {
+                desireCount++;
+            }
         }
+        return new int[]{opinionCount, desireCount};
     }
 
 
