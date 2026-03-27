@@ -11,9 +11,14 @@ import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Mood.MoodService;
 import org.arcos.Producers.DesireInitiativeProducer;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.LoggerFactory;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -43,6 +48,7 @@ class DesireInitiativeProducerTest {
 
     private PersonalityProperties personalityProperties;
     private DesireInitiativeProducer producer;
+    private ListAppender<ILoggingEvent> logAppender;
 
     @BeforeEach
     void setUp() {
@@ -53,6 +59,17 @@ class DesireInitiativeProducerTest {
                 .when(desireService).withDesireLock(any(Runnable.class));
         producer = new DesireInitiativeProducer(eventQueue, desireService,
                 centralFeedBackHandler, personalityProperties, moodService);
+
+        Logger logger = (Logger) LoggerFactory.getLogger(DesireInitiativeProducer.class);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+    }
+
+    @AfterEach
+    void tearDown() {
+        Logger logger = (Logger) LoggerFactory.getLogger(DesireInitiativeProducer.class);
+        logger.detachAppender(logAppender);
     }
 
     @Test
@@ -182,6 +199,76 @@ class DesireInitiativeProducerTest {
         verify(eventQueue, times(1)).offer(any());
         assertThat(highDesire.getStatus()).isEqualTo(DesireEntry.Status.ACTIVE);
         assertThat(lowDesire.getStatus()).isEqualTo(DesireEntry.Status.PENDING);
+    }
+
+    @Test
+    void checkDesiresAndInitiate_WhenDesireTriggered_ShouldLogStructuredTrigger() {
+        // Given
+        DesireEntry highDesire = createDesire(0.9, DesireEntry.Status.PENDING);
+        when(desireService.getPendingDesires()).thenReturn(List.of(highDesire));
+        when(moodService.getEffectiveInitiativeThreshold(0.8)).thenReturn(0.8);
+        when(eventQueue.offer(any())).thenReturn(true);
+
+        // When
+        producer.checkDesiresAndInitiate();
+
+        // Then
+        List<String> logMessages = logAppender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
+
+        assertThat(logMessages).anyMatch(msg ->
+                msg.contains("[INITIATIVE]")
+                        && msg.contains("decision=TRIGGER")
+                        && msg.contains("desire=test-desire-0.9")
+                        && msg.contains("intensity=0.9")
+                        && msg.contains("threshold=0.8/0.8")
+        );
+    }
+
+    @Test
+    void checkDesiresAndInitiate_WhenDesireBelowThreshold_ShouldLogStructuredSkip() {
+        // Given
+        DesireEntry lowDesire = createDesire(0.5, DesireEntry.Status.PENDING);
+        when(desireService.getPendingDesires()).thenReturn(List.of(lowDesire));
+        when(moodService.getEffectiveInitiativeThreshold(0.8)).thenReturn(0.8);
+
+        // When
+        producer.checkDesiresAndInitiate();
+
+        // Then
+        List<String> logMessages = logAppender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
+
+        assertThat(logMessages).anyMatch(msg ->
+                msg.contains("[INITIATIVE]")
+                        && msg.contains("decision=SKIP")
+                        && msg.contains("desire=test-desire-0.5")
+                        && msg.contains("intensity=0.5")
+        );
+    }
+
+    @Test
+    void checkDesiresAndInitiate_ShouldLogCycleSummary() {
+        // Given
+        DesireEntry highDesire = createDesire(0.9, DesireEntry.Status.PENDING);
+        DesireEntry lowDesire = createDesire(0.5, DesireEntry.Status.PENDING);
+        when(desireService.getPendingDesires()).thenReturn(List.of(highDesire, lowDesire));
+        when(moodService.getEffectiveInitiativeThreshold(0.8)).thenReturn(0.8);
+        when(eventQueue.offer(any())).thenReturn(true);
+
+        // When
+        producer.checkDesiresAndInitiate();
+
+        // Then
+        List<String> logMessages = logAppender.list.stream()
+                .map(ILoggingEvent::getFormattedMessage)
+                .toList();
+
+        assertThat(logMessages).anyMatch(msg ->
+                msg.contains("[INITIATIVE] cycle pending=2 triggered=1 skipped=1")
+        );
     }
 
     private DesireEntry createDesire(double intensity, DesireEntry.Status status) {

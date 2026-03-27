@@ -46,21 +46,34 @@ public class DesireInitiativeProducer {
 
     @Scheduled(fixedRateString = "${arcos.personality.initiative-check-interval-ms:3600000}")
     public void checkDesiresAndInitiate() {
-        log.info("Checking for high-intensity desires...");
         List<DesireEntry> pendingDesires = desireService.getPendingDesires();
-        log.info("High intensity desires found: {}", pendingDesires.size());
         double baseThreshold = personalityProperties.getInitiativeThreshold();
         double adjustedThreshold = moodService.getEffectiveInitiativeThreshold(baseThreshold);
-        log.debug("Seuil d initiative ajusté par l humeur : base={} ajusté={}", baseThreshold, adjustedThreshold);
+
+        int triggered = 0;
+        int skipped = 0;
+
         for (DesireEntry desire : pendingDesires) {
             if (desire.getIntensity() >= adjustedThreshold) {
                 if (isGoodMomentToInitiate(desire)) {
-                    log.info("High-intensity desire found, initiating... {}", desire.getLabel());
+                    log.info("[INITIATIVE] desire={} label={} intensity={} threshold={}/{} decision=TRIGGER",
+                            desire.getId(), desire.getLabel(), desire.getIntensity(), baseThreshold, adjustedThreshold);
                     centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.INITIATIVE_START));
                     initiateDesireAction(desire);
+                    triggered++;
+                } else {
+                    log.info("[INITIATIVE] desire={} label={} intensity={} threshold={}/{} decision=WRONG_TIME",
+                            desire.getId(), desire.getLabel(), desire.getIntensity(), baseThreshold, adjustedThreshold);
+                    skipped++;
                 }
+            } else {
+                log.info("[INITIATIVE] desire={} label={} intensity={} threshold={}/{} decision=SKIP",
+                        desire.getId(), desire.getLabel(), desire.getIntensity(), baseThreshold, adjustedThreshold);
+                skipped++;
             }
         }
+
+        log.info("[INITIATIVE] cycle pending={} triggered={} skipped={}", pendingDesires.size(), triggered, skipped);
     }
 
     private boolean isGoodMomentToInitiate(DesireEntry desire) {
