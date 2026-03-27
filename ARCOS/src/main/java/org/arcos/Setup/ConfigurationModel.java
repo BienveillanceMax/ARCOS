@@ -21,6 +21,10 @@ public class ConfigurationModel {
     // ── Personnalité ──────────────────────────────────────────────────────────
     private String personalityProfile = "DEFAULT";
 
+    // ── STT Backend ───────────────────────────────────────────────────────────
+    private String sttBackend = "FASTER_WHISPER";
+    private String sttWhisperCppUrl = "http://localhost:8080";
+
     // ── Statuts de validation ─────────────────────────────────────────────────
     private final Map<String, Boolean> keyValidationStatus = new HashMap<>();
 
@@ -47,6 +51,12 @@ public class ConfigurationModel {
 
     public String getPersonalityProfile() { return personalityProfile; }
     public void setPersonalityProfile(String personalityProfile) { this.personalityProfile = personalityProfile; }
+
+    public String getSttBackend() { return sttBackend; }
+    public void setSttBackend(String sttBackend) { this.sttBackend = sttBackend; }
+
+    public String getSttWhisperCppUrl() { return sttWhisperCppUrl; }
+    public void setSttWhisperCppUrl(String sttWhisperCppUrl) { this.sttWhisperCppUrl = sttWhisperCppUrl; }
 
     public void setKeyValidated(String keyName, boolean valid) { keyValidationStatus.put(keyName, valid); }
     public Boolean isKeyValidated(String keyName) { return keyValidationStatus.get(keyName); }

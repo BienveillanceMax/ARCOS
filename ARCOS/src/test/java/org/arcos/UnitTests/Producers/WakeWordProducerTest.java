@@ -1,6 +1,7 @@
 package org.arcos.UnitTests.Producers;
 
 import org.arcos.Configuration.AudioProperties;
+import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
@@ -86,7 +87,7 @@ class WakeWordProducerTest {
     private WakeWordProducer buildProducerViaDegradedPath() {
         WakeWordProducer[] holder = new WakeWordProducer[1];
         assertThatCode(() -> {
-            holder[0] = new WakeWordProducer(eventQueue, "http://localhost:9000", centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties());
+            holder[0] = new WakeWordProducer(eventQueue, centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties(), new SpeechToTextProperties());
         }).doesNotThrowAnyException();
         return holder[0];
     }

@@ -6,11 +6,12 @@ package org.arcos.Setup;
  */
 public enum StepDefinition {
 
-    NEXUS("I",   "NEXUS"),    // API key bindings
-    VOX("II",    "VOX"),      // Voice / microphone input
-    ANIMA("III", "ANIMA"),    // Personality / soul
-    CORPUS("IV", "CORPUS"),   // Service body check
-    FIAT("",     "FIAT");     // Final save — no numeral
+    NEXUS("I",    "NEXUS"),      // API key bindings
+    VOX("II",     "VOX"),        // Voice / microphone input
+    INTERPRES("III", "INTERPRES"), // STT backend selection
+    ANIMA("IV",   "ANIMA"),      // Personality / soul
+    CORPUS("V",   "CORPUS"),     // Service body check
+    FIAT("",      "FIAT");       // Final save — no numeral
 
     private final String romanNumeral;
     private final String latinName;

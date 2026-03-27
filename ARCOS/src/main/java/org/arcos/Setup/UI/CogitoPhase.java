@@ -6,12 +6,12 @@ import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Setup.Detection.ConfigurationDetector;
-import org.arcos.Setup.Health.FasterWhisperHealthChecker;
 import org.arcos.Setup.Health.HealthResult;
 import org.arcos.Setup.Health.MistralHealthChecker;
 import org.arcos.Setup.Health.PiperHealthChecker;
 import org.arcos.Setup.Health.QdrantHealthChecker;
 import org.arcos.Setup.Health.ServiceHealthCheck;
+import org.arcos.Setup.Health.SttHealthChecker;
 
 import java.io.IOException;
 import java.util.Random;
@@ -117,7 +117,7 @@ public final class CogitoPhase {
                     ServiceHealthCheck.ServiceConfig.withKey(mistralKey), true),
             new SubsystemProbe("LONG-TERM MEMORY", new QdrantHealthChecker(),
                     ServiceHealthCheck.ServiceConfig.of(qdrantHost, qdrantPort), true),
-            new SubsystemProbe("SPEECH RECOGNITION", new FasterWhisperHealthChecker(),
+            new SubsystemProbe("SPEECH RECOGNITION", new SttHealthChecker(),
                     ServiceHealthCheck.ServiceConfig.of(whisperHost, whisperPort), true),
             new SubsystemProbe("SPEECH SYNTHESIS", new PiperHealthChecker(),
                     ServiceHealthCheck.ServiceConfig.of(null, -1), false),

@@ -1,6 +1,5 @@
 package org.arcos.Setup.Steps;
 
-import org.arcos.Setup.Health.FasterWhisperHealthChecker;
 import org.arcos.Setup.Health.HealthResult;
 import org.arcos.Setup.Health.MistralHealthChecker;
 import org.arcos.Setup.Health.PiperHealthChecker;
@@ -8,6 +7,7 @@ import org.arcos.Setup.Health.PorcupineHealthChecker;
 import org.arcos.Setup.Health.QdrantHealthChecker;
 import org.arcos.Setup.Health.ServiceHealthCheck;
 import org.arcos.Setup.Health.ServiceStatus;
+import org.arcos.Setup.Health.SttHealthChecker;
 import org.arcos.Setup.StepDefinition;
 import org.arcos.Setup.UI.AnsiPalette;
 import org.arcos.Setup.UI.StatusColor;
@@ -154,8 +154,8 @@ public class ServiceCheckStep implements WizardStep {
                 new MistralHealthChecker(),
                 ServiceHealthCheck.ServiceConfig.withKey(mistralKey)));
 
-        checks.put("FASTER-WHISPER", new CheckTask(
-                new FasterWhisperHealthChecker(),
+        checks.put("SPEECH-TO-TEXT", new CheckTask(
+                new SttHealthChecker(),
                 ServiceHealthCheck.ServiceConfig.of("localhost", 8000)));
 
         checks.put("PIPER TTS", new CheckTask(

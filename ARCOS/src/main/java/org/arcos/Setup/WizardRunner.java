@@ -7,6 +7,7 @@ import org.arcos.Setup.Steps.AudioDeviceStep;
 import org.arcos.Setup.Steps.PersonalityStep;
 import org.arcos.Setup.Steps.RecapStep;
 import org.arcos.Setup.Steps.ServiceCheckStep;
+import org.arcos.Setup.Steps.SttBackendStep;
 import org.arcos.Setup.UI.FallbackRenderer;
 import org.arcos.Setup.UI.LanternaScreenManager;
 import org.arcos.Setup.UI.TerminalCapabilities;
@@ -103,8 +104,8 @@ public class WizardRunner {
     private static boolean executeWizardSteps(WizardDisplay display, WizardContext context) {
         List<StepDefinition> stepDefs = List.of(
                 StepDefinition.NEXUS, StepDefinition.VOX,
-                StepDefinition.ANIMA, StepDefinition.CORPUS,
-                StepDefinition.FIAT);
+                StepDefinition.INTERPRES, StepDefinition.ANIMA,
+                StepDefinition.CORPUS, StepDefinition.FIAT);
 
         display.initializeSteps(stepDefs);
         display.drawFrame();
@@ -112,6 +113,7 @@ public class WizardRunner {
         List<WizardStep> steps = List.of(
                 new ApiKeyStep(),
                 new AudioDeviceStep(),
+                new SttBackendStep(),
                 new PersonalityStep(),
                 new ServiceCheckStep(),
                 new RecapStep()

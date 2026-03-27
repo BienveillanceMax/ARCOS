@@ -61,7 +61,6 @@ public class Orchestrator
     private final ChatOrchestrator chatOrchestrator;
     private final PromptBuilder promptBuilder;
     private final ConversationContext context;
-    private final MemoryService memoryService;
     private final InitiativeService initiativeService;
     private final PiperEmbeddedTTSModule ttsHandler;
     private final PersonalityOrchestrator personalityOrchestrator;
@@ -108,7 +107,6 @@ public class Orchestrator
         this.chatOrchestrator = chatOrchestrator;
         this.promptBuilder = promptBuilder;
         this.context = context;
-        this.memoryService = memoryService;
         this.initiativeService = initiativeService;
         this.personalityOrchestrator = personalityOrchestrator;
         this.moodService = moodService;

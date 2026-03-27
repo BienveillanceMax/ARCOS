@@ -2,6 +2,8 @@ package org.arcos.Setup.Boot;
 
 import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Configuration.PersonalityProperties;
+import org.arcos.Configuration.SpeechToTextProperties;
+import org.arcos.IO.InputHandling.STT.SttBackendType;
 import org.arcos.Setup.Health.PiperHealthChecker;
 import org.arcos.Setup.Health.ServiceStatus;
 import org.arcos.Tools.CalendarTool.CalDavCalendarService;
@@ -36,6 +38,7 @@ public class BootReporter {
     private final ServiceStatusRegistry registry;
     private final PersonalityGreeting greeting;
     private final PersonalityProperties personalityProperties;
+    private final SpeechToTextProperties sttProperties;
     private final BraveSearchService braveSearchService;
     private final CalDavCalendarService calendarService;
     private final ApplicationContext applicationContext;
@@ -46,21 +49,20 @@ public class BootReporter {
     @Value("${qdrant.port:6334}")
     private int qdrantPort;
 
-    @Value("${faster-whisper.url:http://localhost:8000}")
-    private String fasterWhisperUrl;
-
     @Value("${spring.ai.mistralai.chat.options.model:mistral-large-2512}")
     private String mistralModel;
 
     public BootReporter(ServiceStatusRegistry registry,
                         PersonalityGreeting greeting,
                         PersonalityProperties personalityProperties,
+                        SpeechToTextProperties sttProperties,
                         BraveSearchService braveSearchService,
                         CalDavCalendarService calendarService,
                         ApplicationContext applicationContext) {
         this.registry = registry;
         this.greeting = greeting;
         this.personalityProperties = personalityProperties;
+        this.sttProperties = sttProperties;
         this.braveSearchService = braveSearchService;
         this.calendarService = calendarService;
         this.applicationContext = applicationContext;
@@ -110,8 +112,11 @@ public class BootReporter {
         }
 
         // Speech-to-Text
-        registry.register("VOIX", ServiceStatus.ONLINE,
-                "Faster Whisper (" + fasterWhisperUrl + ")", CATEGORY_INTERACTION);
+        String sttLabel = switch (sttProperties.getBackend()) {
+            case FASTER_WHISPER -> "Faster Whisper (" + sttProperties.getFasterWhisperUrl() + ")";
+            case WHISPER_CPP -> "Whisper.cpp (" + sttProperties.getWhisperCppUrl() + ")";
+        };
+        registry.register("VOIX", ServiceStatus.ONLINE, sttLabel, CATEGORY_INTERACTION);
 
         // ── OUTILS ────────────────────────────────────────────────────────────
         // Web search

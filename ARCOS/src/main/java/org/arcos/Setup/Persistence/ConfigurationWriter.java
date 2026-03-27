@@ -105,6 +105,17 @@ public class ConfigurationWriter {
             sb.append("    profile: ").append(model.getPersonalityProfile()).append("\n");
         }
 
+        // STT backend
+        if (model.getSttBackend() != null && !model.getSttBackend().isBlank()) {
+            sb.append("  stt:\n");
+            sb.append("    backend: ").append(model.getSttBackend()).append("\n");
+            if ("WHISPER_CPP".equals(model.getSttBackend())
+                    && model.getSttWhisperCppUrl() != null
+                    && !model.getSttWhisperCppUrl().isBlank()) {
+                sb.append("    whisper-cpp-url: ").append(model.getSttWhisperCppUrl()).append("\n");
+            }
+        }
+
         writeAtomically(localYamlFile.toPath(), sb.toString());
         log.info("Fichier application-local.yaml sauvegardé : {}", localYamlFile.getAbsolutePath());
     }

@@ -9,7 +9,8 @@ import org.arcos.EventBus.Events.WakeWordEvent;
 import org.arcos.IO.InputHandling.JavaSoundMicrophoneSource;
 import org.arcos.IO.InputHandling.MicrophoneSource;
 import org.arcos.IO.InputHandling.PipeWireMicrophoneSource;
-import org.arcos.IO.InputHandling.SpeechToText;
+import org.arcos.Configuration.SpeechToTextProperties;
+import org.arcos.IO.InputHandling.STT.SttGate;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -18,7 +19,6 @@ import ai.picovoice.porcupine.Porcupine;
 import ai.picovoice.porcupine.PorcupineException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.core.annotation.Order;
@@ -41,13 +41,13 @@ public class WakeWordProducer implements Runnable {
 
     private Porcupine porcupine;
     private String[] keywords;
-    private SpeechToText speechToText;
+    private SttGate sttGate;
     private MicrophoneSource micSource;
     private final EventQueue eventQueue;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final AudioCueFeedbackHandler audioCueFeedbackHandler;
     private final AudioProperties audioProperties;
-    private final String fasterWhisperUrl;
+    private final SpeechToTextProperties sttProperties;
     private volatile Thread wakeWordThread;
     private boolean porcupineEnabled = false;
     private boolean porcupineInitialized = false;
@@ -115,15 +115,16 @@ public class WakeWordProducer implements Runnable {
     }
 
     @Autowired
-    public WakeWordProducer(EventQueue eventQueue, @Value("${faster-whisper.url}") String fasterWhisperUrl,
+    public WakeWordProducer(EventQueue eventQueue,
                             CentralFeedBackHandler centralFeedBackHandler,
                             AudioCueFeedbackHandler audioCueFeedbackHandler,
-                            AudioProperties audioProperties) {
+                            AudioProperties audioProperties,
+                            SpeechToTextProperties sttProperties) {
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.audioCueFeedbackHandler = audioCueFeedbackHandler;
         this.eventQueue = eventQueue;
         this.audioProperties = audioProperties;
-        this.fasterWhisperUrl = fasterWhisperUrl;
+        this.sttProperties = sttProperties;
     }
 
     /**
@@ -157,7 +158,7 @@ public class WakeWordProducer implements Runnable {
             if (this.micSource != null && this.micSource.isAvailable()) {
                 this.silenceThreshold = micSource.recommendedSilenceThreshold();
                 log.info("Silence threshold: {} (from {})", silenceThreshold, micSource.describe());
-                this.speechToText = new SpeechToText(fasterWhisperUrl);
+                this.sttGate = SttGate.create(sttProperties.getBackend(), sttProperties);
             }
             this.porcupineEnabled = true;
             log.info("WakeWordProducer initialisé avec succès.");
@@ -373,9 +374,9 @@ public class WakeWordProducer implements Runnable {
     }
 
     private String recordAndTranscribe() {
-        log.info("Started listening for speech with Faster Whisper...");
+        log.info("Started listening for speech...");
 
-        speechToText.reset();
+        sttGate.reset();
 
         final int micSampleRate = micSource.getSampleRate();
         final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
@@ -441,7 +442,7 @@ public class WakeWordProducer implements Runnable {
                             for (int j = oldest; j < preBufferIndex - 1; j++) {
                                 byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
                                 if (frame != null) {
-                                    speechToText.processAudio(frame);
+                                    sttGate.processAudio(frame);
                                 }
                             }
                         }
@@ -449,7 +450,7 @@ public class WakeWordProducer implements Runnable {
 
                     // Only buffer audio once speech has been detected
                     if (hasDetectedSpeech) {
-                        speechToText.processAudio(whisperBuffer);
+                        sttGate.processAudio(whisperBuffer);
                     }
 
                     // Check if we should stop due to silence
@@ -477,9 +478,9 @@ public class WakeWordProducer implements Runnable {
             }
 
             // Process transcription only if speech was actually detected
-            if (hasDetectedSpeech && speechToText.hasMinimumAudio()) {
-                log.info("Processing {}ms of audio...", speechToText.getBufferedAudioDurationMs());
-                return speechToText.getTranscription();
+            if (hasDetectedSpeech && sttGate.hasMinimumAudio()) {
+                log.info("Processing {}ms of audio...", sttGate.getBufferedAudioDurationMs());
+                return sttGate.getTranscription();
             } else {
                 log.info(hasDetectedSpeech ? "Not enough audio data for transcription" : "No speech detected");
                 return "";
@@ -550,7 +551,7 @@ public class WakeWordProducer implements Runnable {
     private String recordAndTranscribeForConversation(int maxDurationMs) {
         log.info("[CONVERSATION] Écoute pendant {}ms max...", maxDurationMs);
 
-        speechToText.reset();
+        sttGate.reset();
 
         final int micSampleRate = micSource.getSampleRate();
         final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
@@ -614,7 +615,7 @@ public class WakeWordProducer implements Runnable {
                             for (int j = oldest; j < preBufferIndex - 1; j++) {
                                 byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
                                 if (frame != null) {
-                                    speechToText.processAudio(frame);
+                                    sttGate.processAudio(frame);
                                 }
                             }
                         }
@@ -622,7 +623,7 @@ public class WakeWordProducer implements Runnable {
 
                     // Only buffer audio once speech has been detected
                     if (hasDetectedSpeech) {
-                        speechToText.processAudio(whisperBuffer);
+                        sttGate.processAudio(whisperBuffer);
                     }
 
                     if (hasDetectedSpeech && isSilent) {
@@ -649,9 +650,9 @@ public class WakeWordProducer implements Runnable {
                 }
             }
 
-            if (hasDetectedSpeech && speechToText.hasMinimumAudio()) {
-                log.info("[CONVERSATION] Traitement de {}ms d'audio...", speechToText.getBufferedAudioDurationMs());
-                return speechToText.getTranscription();
+            if (hasDetectedSpeech && sttGate.hasMinimumAudio()) {
+                log.info("[CONVERSATION] Traitement de {}ms d'audio...", sttGate.getBufferedAudioDurationMs());
+                return sttGate.getTranscription();
             } else {
                 log.info(hasDetectedSpeech ? "[CONVERSATION] Pas assez d'audio pour la transcription" : "[CONVERSATION] Aucune parole détectée");
                 return "";

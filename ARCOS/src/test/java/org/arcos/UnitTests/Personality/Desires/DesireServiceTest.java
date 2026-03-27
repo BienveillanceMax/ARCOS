@@ -26,6 +26,7 @@ import org.springframework.ai.document.Document;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -217,11 +218,11 @@ class DesireServiceTest {
         desireService.processOpinion(opinionEntry);
 
         // Then
-        boolean found = logAppender.list.stream()
-                .anyMatch(event -> event.getFormattedMessage().contains("[DESIRE]")
-                        && event.getFormattedMessage().contains("decision=CREATED")
-                        && event.getFormattedMessage().contains("opinion=" + opinionEntry.getId()));
-        assertTrue(found, "Expected structured log with [DESIRE] decision=CREATED and opinion id");
+        assertThat(logAppender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(msg -> msg.contains("[DESIRE]")
+                        && msg.contains("decision=CREATED")
+                        && msg.contains("opinion=" + opinionEntry.getId()));
     }
 
     @Test
@@ -238,11 +239,11 @@ class DesireServiceTest {
         desireService.processOpinion(opinionEntry);
 
         // Then
-        boolean found = logAppender.list.stream()
-                .anyMatch(event -> event.getFormattedMessage().contains("[DESIRE]")
-                        && event.getFormattedMessage().contains("decision=SKIPPED")
-                        && event.getFormattedMessage().contains("opinion=" + opinionEntry.getId()));
-        assertTrue(found, "Expected structured log with [DESIRE] decision=SKIPPED and opinion id");
+        assertThat(logAppender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(msg -> msg.contains("[DESIRE]")
+                        && msg.contains("decision=SKIPPED")
+                        && msg.contains("opinion=" + opinionEntry.getId()));
     }
 
     @Test
@@ -261,13 +262,13 @@ class DesireServiceTest {
         desireService.processOpinion(opinionEntry);
 
         // Then
-        boolean found = logAppender.list.stream()
-                .anyMatch(event -> event.getFormattedMessage().contains("[DESIRE]")
-                        && event.getFormattedMessage().contains("oldIntensity=")
-                        && event.getFormattedMessage().contains("newIntensity=")
-                        && event.getFormattedMessage().contains("desire=" + desireEntry.getId())
-                        && event.getFormattedMessage().contains("status="));
-        assertTrue(found, "Expected structured log with [DESIRE] oldIntensity, newIntensity, desire id, and status");
+        assertThat(logAppender.list)
+                .extracting(ILoggingEvent::getFormattedMessage)
+                .anyMatch(msg -> msg.contains("[DESIRE]")
+                        && msg.contains("oldIntensity=")
+                        && msg.contains("newIntensity=")
+                        && msg.contains("desire=" + desireEntry.getId())
+                        && msg.contains("status="));
     }
 }
 
