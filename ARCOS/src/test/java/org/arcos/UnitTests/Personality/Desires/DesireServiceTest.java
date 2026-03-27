@@ -1,5 +1,8 @@
 package org.arcos.UnitTests.Personality.Desires;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Exceptions.DesireCreationException;
 import org.arcos.LLM.Client.LLMClient;
@@ -11,11 +14,13 @@ import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Values.ValueProfile;
 import org.arcos.common.utils.ObjectCreationUtils;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
 
@@ -48,12 +53,25 @@ class DesireServiceTest {
     @Mock
     private PersonalityProperties personalityProperties;
 
+    private ListAppender<ILoggingEvent> logAppender;
+
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
         when(personalityProperties.getDesireCreateThreshold()).thenReturn(0.3);
         when(personalityProperties.getDesirePendingThreshold()).thenReturn(0.7);
         when(personalityProperties.getDesireSmoothingFactor()).thenReturn(0.7);
+
+        Logger logger = (Logger) LoggerFactory.getLogger(DesireService.class);
+        logAppender = new ListAppender<>();
+        logAppender.start();
+        logger.addAppender(logAppender);
+    }
+
+    @AfterEach
+    void tearDown() {
+        Logger logger = (Logger) LoggerFactory.getLogger(DesireService.class);
+        logger.detachAppender(logAppender);
     }
 
     @Test
@@ -179,6 +197,77 @@ class DesireServiceTest {
         assertNull(result);
         verify(llmClient, times(3)).generateDesireResponse(any(Prompt.class));
         verify(desireRepository, never()).save(any());
+    }
+
+    @Test
+    void processOpinion_WhenDesireCreated_ShouldLogStructuredDecisionCreated() throws DesireCreationException {
+        // Given
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
+        opinionEntry.setAssociatedDesire(null);
+        opinionEntry.setPolarity(1);
+        opinionEntry.setStability(1);
+
+        DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(opinionEntry.getId());
+
+        when(valueProfile.averageByDimension(any())).thenReturn(80.0);
+        when(promptBuilder.buildDesirePrompt(any(OpinionEntry.class), anyDouble())).thenReturn(new Prompt("prompt"));
+        when(llmClient.generateDesireResponse(any(Prompt.class))).thenReturn(desireEntry);
+
+        // When
+        desireService.processOpinion(opinionEntry);
+
+        // Then
+        boolean found = logAppender.list.stream()
+                .anyMatch(event -> event.getFormattedMessage().contains("[DESIRE]")
+                        && event.getFormattedMessage().contains("decision=CREATED")
+                        && event.getFormattedMessage().contains("opinion=" + opinionEntry.getId()));
+        assertTrue(found, "Expected structured log with [DESIRE] decision=CREATED and opinion id");
+    }
+
+    @Test
+    void processOpinion_WhenIntensityBelowThreshold_ShouldLogStructuredDecisionSkipped() {
+        // Given
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
+        opinionEntry.setAssociatedDesire(null);
+        opinionEntry.setPolarity(0.01);
+        opinionEntry.setStability(0.01);
+
+        when(valueProfile.averageByDimension(any())).thenReturn(10.0);
+
+        // When
+        desireService.processOpinion(opinionEntry);
+
+        // Then
+        boolean found = logAppender.list.stream()
+                .anyMatch(event -> event.getFormattedMessage().contains("[DESIRE]")
+                        && event.getFormattedMessage().contains("decision=SKIPPED")
+                        && event.getFormattedMessage().contains("opinion=" + opinionEntry.getId()));
+        assertTrue(found, "Expected structured log with [DESIRE] decision=SKIPPED and opinion id");
+    }
+
+    @Test
+    void processOpinion_WhenDesireUpdated_ShouldLogStructuredEmaUpdate() {
+        // Given
+        OpinionEntry opinionEntry = ObjectCreationUtils.createOpinionEntry();
+        DesireEntry desireEntry = ObjectCreationUtils.createIntensePendingDesireEntry(opinionEntry.getId());
+        opinionEntry.setAssociatedDesire(desireEntry.getId());
+
+        Document desireDocument = new Document(desireEntry.getId(), "test", desireEntry.getPayload());
+        when(desireRepository.findById(desireEntry.getId())).thenReturn(Optional.of(desireDocument));
+        when(valueProfile.averageByDimension(any())).thenReturn(50.0);
+        when(valueProfile.calculateValueAlignment(any())).thenReturn(1.0);
+
+        // When
+        desireService.processOpinion(opinionEntry);
+
+        // Then
+        boolean found = logAppender.list.stream()
+                .anyMatch(event -> event.getFormattedMessage().contains("[DESIRE]")
+                        && event.getFormattedMessage().contains("oldIntensity=")
+                        && event.getFormattedMessage().contains("newIntensity=")
+                        && event.getFormattedMessage().contains("desire=" + desireEntry.getId())
+                        && event.getFormattedMessage().contains("status="));
+        assertTrue(found, "Expected structured log with [DESIRE] oldIntensity, newIntensity, desire id, and status");
     }
 }
 

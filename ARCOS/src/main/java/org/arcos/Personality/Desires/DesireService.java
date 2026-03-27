@@ -60,13 +60,11 @@ public class DesireService
 
     private DesireEntry processOpinionInternal(OpinionEntry opinionEntry) {
         DesireEntry createdDesire;
+        double threshold = personalityProperties.getDesireCreateThreshold();
         if (opinionEntry.getAssociatedDesire() == null || opinionEntry.getAssociatedDesire().isEmpty()) {
-            log.info("Associated desire is null or empty");
             double opinionIntensity = calculateOpinionIntensity(opinionEntry);
-            log.info("Opinion intensity: " + opinionIntensity);
-            if (opinionIntensity >= personalityProperties.getDesireCreateThreshold()) {
+            if (opinionIntensity >= threshold) {
                 try {
-                    log.info("Creating desire");
                     createdDesire = createDesire(opinionEntry, opinionIntensity);
                 } catch (DesireCreationException e) {
                     log.error("Failed to create desire for opinion {}", opinionEntry.getId(), e);
@@ -77,6 +75,8 @@ public class DesireService
                     desireRepository.save(toDocument(createdDesire));
                     opinionEntry.setAssociatedDesire(createdDesire.getId());
                     opinionRepository.save(toDocument(opinionEntry));
+                    log.info("[DESIRE] opinion={} intensity={} threshold={} decision=CREATED",
+                            opinionEntry.getId(), opinionIntensity, threshold);
                     return createdDesire;
                 } catch (Exception e) {
                     log.error("Failed to store desire or update opinion for opinion {}. Deleting desire to prevent orphan.", opinionEntry.getId(), e);
@@ -84,6 +84,9 @@ public class DesireService
                     return null;
                 }
 
+            } else {
+                log.info("[DESIRE] opinion={} intensity={} threshold={} decision=SKIPPED",
+                        opinionEntry.getId(), opinionIntensity, threshold);
             }
         } else {
             createdDesire = updateDesire(opinionEntry);
@@ -173,11 +176,14 @@ public class DesireService
         if (opinionEntry != null) {
             double newIntensity = calculateDesireIntensityUpdate(opinionEntry, desireEntry);
             double smoothingFactor = personalityProperties.getDesireSmoothingFactor();
-            double updatedIntensity = (smoothingFactor * desireEntry.getIntensity()) +
+            double oldIntensity = desireEntry.getIntensity();
+            double updatedIntensity = (smoothingFactor * oldIntensity) +
                     ((1 - smoothingFactor) * newIntensity);
             updatedIntensity = Math.max(0.0, Math.min(1.0, updatedIntensity));
             desireEntry.setIntensity(updatedIntensity);
             desireEntry.setLastUpdated(java.time.LocalDateTime.now());
+            log.info("[DESIRE] desire={} oldIntensity={} newIntensity={} status={}",
+                    desireEntry.getId(), oldIntensity, updatedIntensity, desireEntry.getStatus());
 
             if (updatedIntensity >= personalityProperties.getDesirePendingThreshold() &&
                     desireEntry.getStatus() != DesireEntry.Status.SATISFIED &&
