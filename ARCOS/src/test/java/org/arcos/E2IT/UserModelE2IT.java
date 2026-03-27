@@ -1,10 +1,8 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.arcos.UserModel.BatchPipeline.BatchPipelineOrchestrator;
 import org.arcos.UserModel.BatchPipeline.MemListenerReadinessCheck;
-import org.arcos.UserModel.BatchPipeline.Queue.ConversationPair;
 import org.arcos.UserModel.BatchPipeline.Queue.ConversationQueueService;
-import org.arcos.UserModel.BatchPipeline.Queue.QueuedConversation;
 import org.arcos.UserModel.DfsNavigator.CrossEncoderService;
 import org.arcos.UserModel.DfsNavigator.DfsNavigatorService;
 import org.arcos.UserModel.DfsNavigator.DfsResult;
@@ -20,15 +18,13 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+@Tag("e2e")
 class UserModelE2IT extends BaseE2IT {
 
     @Autowired private PersonaTreeGate personaTreeGate;
@@ -240,14 +236,6 @@ class UserModelE2IT extends BaseE2IT {
     }
 
     // ======== Batch Pipeline (T12–T15) — requires Ollama ========
-
-    private QueuedConversation makeConversation(String... pairs) {
-        List<ConversationPair> pairList = new ArrayList<>();
-        for (int i = 0; i < pairs.length - 1; i += 2) {
-            pairList.add(new ConversationPair(pairs[i], pairs[i + 1]));
-        }
-        return new QueuedConversation(UUID.randomUUID().toString(), pairList, LocalDateTime.now(), false);
-    }
 
     @Test
     @Tag("requires-ollama")

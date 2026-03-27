@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;

@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.springframework.ai.transformers.TransformersEmbeddingModel;
 import org.springframework.boot.test.context.TestConfiguration;

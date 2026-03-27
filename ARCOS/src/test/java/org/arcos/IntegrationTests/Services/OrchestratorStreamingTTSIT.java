@@ -1,7 +1,7 @@
 package org.arcos.IntegrationTests.Services;
 
-import org.arcos.E2E.E2ETestConfig;
-import org.arcos.E2E.MockTTSCapture;
+import org.arcos.E2IT.E2ETestConfig;
+import org.arcos.E2IT.MockTTSCapture;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.LLM.Client.ChatOrchestrator;

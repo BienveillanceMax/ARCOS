@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
@@ -15,6 +15,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("e2e")
 class MemoryE2IT extends BaseE2IT {
 
     @Autowired private MemoryService memoryService;

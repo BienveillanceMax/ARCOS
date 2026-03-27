@@ -1,7 +1,7 @@
 package org.arcos.IntegrationTests.Services;
 
-import org.arcos.E2E.E2ETestConfig;
-import org.arcos.E2E.MockTTSCapture;
+import org.arcos.E2IT.E2ETestConfig;
+import org.arcos.E2IT.MockTTSCapture;
 import org.arcos.Orchestrator.Orchestrator;
 import org.arcos.UserModel.BatchPipeline.BatchPipelineOrchestrator;
 import org.arcos.UserModel.BatchPipeline.MemListenerClient;

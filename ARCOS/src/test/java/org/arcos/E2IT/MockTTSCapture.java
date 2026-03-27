@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
 
@@ -44,6 +44,7 @@ public class MockTTSCapture extends PiperEmbeddedTTSModule {
     public void shutdown() { /* no-op in tests */ }
 
     public List<String> getSpokenTexts() { return Collections.unmodifiableList(spokenTexts); }
+    public String getAllSpokenLower() { return String.join(" ", spokenTexts).toLowerCase(); }
     public String getLastSpokenText() { return spokenTexts.isEmpty() ? null : spokenTexts.get(spokenTexts.size() - 1); }
     public boolean hasSpoken() { return !spokenTexts.isEmpty(); }
     public void clear() { spokenTexts.clear(); }

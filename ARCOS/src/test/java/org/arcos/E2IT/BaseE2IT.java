@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import io.qdrant.client.grpc.Points;
 import org.arcos.Memory.ConversationContext;
@@ -14,7 +14,13 @@ import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 
+import org.arcos.UserModel.BatchPipeline.Queue.ConversationPair;
+import org.arcos.UserModel.BatchPipeline.Queue.QueuedConversation;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -66,6 +72,14 @@ public abstract class BaseE2IT {
                 // Collection may not exist yet on first run — that's fine
             }
         }
+    }
+
+    protected static QueuedConversation makeConversation(String... pairs) {
+        List<ConversationPair> pairList = new ArrayList<>();
+        for (int i = 0; i < pairs.length - 1; i += 2) {
+            pairList.add(new ConversationPair(pairs[i], pairs[i + 1]));
+        }
+        return new QueuedConversation(UUID.randomUUID().toString(), pairList, LocalDateTime.now(), false);
     }
 
     @BeforeEach

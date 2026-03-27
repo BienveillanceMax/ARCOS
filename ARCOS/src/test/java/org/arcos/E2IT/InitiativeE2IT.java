@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.Event;
@@ -18,6 +18,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("e2e")
 class InitiativeE2IT extends BaseE2IT {
 
     @Autowired private DesireService desireService;

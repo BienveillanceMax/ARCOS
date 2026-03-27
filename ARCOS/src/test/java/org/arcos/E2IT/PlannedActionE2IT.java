@@ -1,4 +1,4 @@
-package org.arcos.E2E;
+package org.arcos.E2IT;
 
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
@@ -10,6 +10,7 @@ import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.arcos.PlannedAction.PlannedActionExecutor;
 import org.arcos.PlannedAction.PlannedActionRepository;
 import org.arcos.PlannedAction.PlannedActionService;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +22,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("e2e")
 class PlannedActionE2IT extends BaseE2IT {
 
     @Autowired private PlannedActionService plannedActionService;

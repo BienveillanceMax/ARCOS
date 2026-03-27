@@ -1,6 +1,6 @@
 package org.arcos.IntegrationTests.Services;
 
-import org.arcos.E2E.E2ETestConfig;
+import org.arcos.E2IT.E2ETestConfig;
 import org.arcos.UserModel.DfsNavigator.*;
 import org.arcos.UserModel.PersonaTree.PersonaTreeGate;
 import org.arcos.UserModel.PersonaTree.PersonaTreeService;
