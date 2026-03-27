@@ -1,4 +1,4 @@
-package org.arcos.IntegrationTests.Tools;
+package org.arcos.UnitTests.Tools;
 
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.CalendarActions;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
  * - AC6 : Radicale indisponible => degradation gracieuse
  */
 @ExtendWith(MockitoExtension.class)
-class CalendarToolIT {
+class CalendarToolTest {
 
     @Mock
     private CalDavCalendarService calendarService;

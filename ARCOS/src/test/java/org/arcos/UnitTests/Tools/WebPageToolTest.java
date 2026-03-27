@@ -1,4 +1,4 @@
-package org.arcos.IntegrationTests.Tools;
+package org.arcos.UnitTests.Tools;
 
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
@@ -27,7 +27,7 @@ import static org.mockito.Mockito.*;
  * - AC6 : service indisponible (timeout, IOException) => degradation gracieuse
  */
 @ExtendWith(MockitoExtension.class)
-class WebPageToolIT {
+class WebPageToolTest {
 
     @Mock
     private WebPageService webPageService;

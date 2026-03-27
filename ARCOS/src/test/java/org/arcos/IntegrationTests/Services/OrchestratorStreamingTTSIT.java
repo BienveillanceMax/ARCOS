@@ -19,6 +19,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 import reactor.core.publisher.Flux;
@@ -47,6 +48,7 @@ import static org.mockito.Mockito.when;
 @Import(E2ETestConfig.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class OrchestratorStreamingTTSIT {
 
     @Autowired private Orchestrator orchestrator;
@@ -368,16 +370,15 @@ class OrchestratorStreamingTTSIT {
     @Test
     @Order(12)
     void streaming_markdownOnlyContent_notSentToTTS() {
-        // Given: chunk that is only markdown, cleaning produces empty string
-        // "***" after cleanForTTS becomes "" and should not be spoken
-        // But the sentence with content after it should still be spoken
+        // Given: first chunk is markdown-only ("***"), cleaning produces empty string
+        // and should NOT be spoken; the second chunk is a real sentence and should be spoken
         when(mockChatOrchestrator.generateStreamingChatResponse(any(Prompt.class)))
-                .thenReturn(Flux.just("Voici la reponse."));
+                .thenReturn(Flux.just("***", " ", "### ", "Voici la reponse."));
 
         // When
         orchestrator.dispatch(new Event<>(EventType.WAKEWORD, "Test nettoyage complet", "test"));
 
-        // Then
+        // Then: only the real sentence should be spoken, no blank entries
         Awaitility.await().atMost(Duration.ofSeconds(5))
                 .until(() -> mockTTS.hasSpoken());
 
@@ -385,6 +386,12 @@ class OrchestratorStreamingTTSIT {
         for (String text : spoken) {
             assertFalse(text.isBlank(), "Aucun texte vide ne devrait etre envoye au TTS");
         }
+        assertTrue(spoken.stream().anyMatch(s -> s.contains("Voici la reponse")),
+                "La phrase reelle devrait etre prononcee par le TTS");
+        assertTrue(spoken.stream().noneMatch(s -> s.contains("***")),
+                "Le markdown '***' ne devrait pas etre envoye au TTS");
+        assertTrue(spoken.stream().noneMatch(s -> s.trim().equals("###")),
+                "Le markdown '###' ne devrait pas etre envoye au TTS");
     }
 
     // ========================================================================

@@ -9,6 +9,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.*;
 })
 @ActiveProfiles("test-e2e")
 @Import(E2ETestConfig.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class DfsNavigatorIT {
@@ -54,6 +56,9 @@ class DfsNavigatorIT {
     @Autowired private PersonaTreeGate personaTreeGate;
     @Autowired private PersonaTreeService personaTreeService;
 
+    // Nombre de branches L1, derive dynamiquement du registry
+    private int l1BranchCount;
+
     // Sauvegarde du vrai CrossEncoderService pour restauration
     private CrossEncoderService realCrossEncoder;
 
@@ -63,6 +68,8 @@ class DfsNavigatorIT {
      */
     @BeforeAll
     void populateTestData() {
+        l1BranchCount = registry.getL1Descriptions().size();
+
         // Remplir quelques feuilles dans Physical_Appearance
         safeSetLeaf("1_Biological_Characteristics.Physical_Appearance.Body_Build.Height", "180cm");
         safeSetLeaf("1_Biological_Characteristics.Physical_Appearance.Body_Build.Weight", "75kg");
@@ -101,19 +108,19 @@ class DfsNavigatorIT {
         CrossEncoderService mockCrossEncoder = Mockito.mock(CrossEncoderService.class);
         when(mockCrossEncoder.isAvailable()).thenReturn(true);
 
-        // 29 branches L1 — on fait scorer Physical_Appearance, Cognitive_Abilities et Social_Identity
+        // Branches L1 — on fait scorer Physical_Appearance, Cognitive_Abilities et Social_Identity
         // comme les 3 plus pertinents (top-N = 3)
-        float[] l1Scores = new float[29];
+        float[] l1Scores = new float[l1BranchCount];
         l1Scores[0] = 5.0f;   // Physical_Appearance (index 0)
         l1Scores[4] = 4.0f;   // Cognitive_Abilities (index 4)
         l1Scores[14] = 3.0f;  // Social_Identity (index 14)
         // Tous les autres restent a 0.0
 
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == l1BranchCount)))
                 .thenReturn(l1Scores);
 
         // Scores L2 : retourner des scores positifs pour toutes les sous-branches
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != l1BranchCount)))
                 .thenAnswer(invocation -> {
                     List<String> descriptions = invocation.getArgument(1);
                     float[] scores = new float[descriptions.size()];
@@ -143,31 +150,31 @@ class DfsNavigatorIT {
         assertEquals("Physical_Appearance", result.selectedL1Branches().get(0),
                 "Physical_Appearance devrait etre en premiere position (score 5.0)");
 
-        // Verification que le cross-encoder a ete appele avec les 29 descriptions L1
+        // Verification que le cross-encoder a ete appele avec toutes les descriptions L1
         verify(mockCrossEncoder).score(
                 eq("je fais du sport et je travaille en informatique"),
-                argThat(list -> list != null && list.size() == 29));
+                argThat(list -> list != null && list.size() == l1BranchCount));
     }
 
     @Test
     @Order(2)
-    void navigate_shouldScoreAll29L1Branches() {
-        // Given: verifier que le registry contient bien 29 branches L1
+    void navigate_shouldScoreAllL1Branches() {
+        // Given: verifier que le registry contient les branches L1 attendues
         List<String> l1Descriptions = registry.getL1Descriptions();
-        assertEquals(29, l1Descriptions.size(),
-                "Le registry devrait contenir 29 branches L1");
+        assertEquals(l1BranchCount, l1Descriptions.size(),
+                "Le registry devrait contenir " + l1BranchCount + " branches L1");
 
         // Avec un mock cross-encoder qui retourne des scores
         CrossEncoderService mockCrossEncoder = Mockito.mock(CrossEncoderService.class);
         when(mockCrossEncoder.isAvailable()).thenReturn(true);
 
-        float[] l1Scores = new float[29];
+        float[] l1Scores = new float[l1BranchCount];
         // Un seul score haut pour verifier la selection
         l1Scores[2] = 10.0f; // Biological_Rhythms
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == l1BranchCount)))
                 .thenReturn(l1Scores);
         // Scores L2 par defaut
-        lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != 29)))
+        lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != l1BranchCount)))
                 .thenReturn(new float[0]);
 
         ReflectionTestUtils.setField(dfsNavigatorService, "crossEncoder", mockCrossEncoder);
@@ -193,9 +200,9 @@ class DfsNavigatorIT {
         CrossEncoderService mockCrossEncoder = Mockito.mock(CrossEncoderService.class);
         when(mockCrossEncoder.isAvailable()).thenReturn(true);
 
-        float[] l1Scores = new float[29];
+        float[] l1Scores = new float[l1BranchCount];
         l1Scores[0] = 10.0f; // Physical_Appearance (a 4 sous-branches L2)
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == l1BranchCount)))
                 .thenReturn(l1Scores);
 
         // L2 de Physical_Appearance : Body_Build (1.0), Facial (-1.0), Skin (-1.0), Hair (2.0)
@@ -204,7 +211,7 @@ class DfsNavigatorIT {
                 .thenReturn(new float[]{1.0f, -1.0f, -1.0f, 2.0f});
 
         // L2 pour les 2 autres branches top-3 (scores a 0, donc ils apparaissent)
-        lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != 29 && list.size() != 4)))
+        lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != l1BranchCount && list.size() != 4)))
                 .thenAnswer(invocation -> {
                     List<String> descs = invocation.getArgument(1);
                     float[] scores = new float[descs.size()];
@@ -243,13 +250,13 @@ class DfsNavigatorIT {
         CrossEncoderService mockCrossEncoder = Mockito.mock(CrossEncoderService.class);
         when(mockCrossEncoder.isAvailable()).thenReturn(true);
 
-        float[] l1Scores = new float[29];
+        float[] l1Scores = new float[l1BranchCount];
         l1Scores[2] = 10.0f; // Biological_Rhythms — pas de L2
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == l1BranchCount)))
                 .thenReturn(l1Scores);
 
         // Les autres branches L1 en top-3 auront des L2 — scores negatifs
-        lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != 29)))
+        lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != l1BranchCount)))
                 .thenAnswer(invocation -> {
                     List<String> descs = invocation.getArgument(1);
                     float[] scores = new float[descs.size()];
@@ -286,9 +293,9 @@ class DfsNavigatorIT {
         ReflectionTestUtils.setField(dfsNavigatorService, "crossEncoder", mockCrossEncoder);
 
         try {
-            float[] l1Scores = new float[29];
+            float[] l1Scores = new float[l1BranchCount];
             l1Scores[0] = 10.0f; // Physical_Appearance
-            when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == 29)))
+            when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == l1BranchCount)))
                     .thenReturn(l1Scores);
 
             // L2 scores: seul Hair (2.0) depasse le seuil de 1.5
@@ -296,7 +303,7 @@ class DfsNavigatorIT {
                     .thenReturn(new float[]{0.5f, 0.2f, -0.3f, 2.0f});
 
             // Autres branches L2
-            lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != 29 && list.size() != 4)))
+            lenient().when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != l1BranchCount && list.size() != 4)))
                     .thenAnswer(invocation -> {
                         List<String> descs = invocation.getArgument(1);
                         float[] scores = new float[descs.size()];
@@ -511,13 +518,13 @@ class DfsNavigatorIT {
         CrossEncoderService mockCrossEncoder = Mockito.mock(CrossEncoderService.class);
         when(mockCrossEncoder.isAvailable()).thenReturn(true);
 
-        float[] l1Scores = new float[29];
+        float[] l1Scores = new float[l1BranchCount];
         l1Scores[0] = 10.0f; // Physical_Appearance
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() == l1BranchCount)))
                 .thenReturn(l1Scores);
 
         // Tous les L2 au-dessus du seuil
-        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != 29)))
+        when(mockCrossEncoder.score(anyString(), argThat(list -> list != null && list.size() != l1BranchCount)))
                 .thenAnswer(invocation -> {
                     List<String> descs = invocation.getArgument(1);
                     float[] scores = new float[descs.size()];

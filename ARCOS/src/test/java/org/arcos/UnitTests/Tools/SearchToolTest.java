@@ -1,4 +1,4 @@
-package org.arcos.IntegrationTests.Tools;
+package org.arcos.UnitTests.Tools;
 
 import org.arcos.Exceptions.SearchException;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
@@ -17,6 +17,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -29,7 +30,7 @@ import static org.mockito.Mockito.*;
  * - AC6 : service indisponible => dégradation gracieuse sans crash
  */
 @ExtendWith(MockitoExtension.class)
-class SearchToolIT {
+class SearchToolTest {
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SearchActions — action layer
@@ -160,12 +161,10 @@ class SearchToolIT {
 
             // When/Then — SearchActions wraps SearchException in RuntimeException
             // The circuit breaker fallback would catch this in production
-            try {
-                searchActions.searchTheWeb("test");
-            } catch (RuntimeException e) {
-                assertThat(e.getMessage()).contains("Erreur de recherche Brave");
-                assertThat(e.getCause()).isInstanceOf(SearchException.class);
-            }
+            assertThatThrownBy(() -> searchActions.searchTheWeb("test"))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessageContaining("Erreur de recherche Brave")
+                    .hasCauseInstanceOf(SearchException.class);
         }
 
         @Test

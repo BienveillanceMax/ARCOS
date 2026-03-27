@@ -1,4 +1,4 @@
-package org.arcos.IntegrationTests.Tools;
+package org.arcos.UnitTests.Tools;
 
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.WeatherActions;
@@ -29,7 +29,7 @@ import static org.mockito.Mockito.*;
  * HTTP layer tested in WeatherServiceHttpTest (same package as WeatherService).
  */
 @ExtendWith(MockitoExtension.class)
-class WeatherToolIT {
+class WeatherToolTest {
 
     // ═══════════════════════════════════════════════════════════════════════════
     // WeatherActions — action layer

@@ -1,6 +1,7 @@
 package org.arcos.IntegrationTests.Services;
 
 import io.qdrant.client.grpc.Points;
+import org.arcos.Exceptions.ResponseParsingException;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Models.Subject;
@@ -143,7 +144,7 @@ class OpinionServiceIT {
     @Test
     @Order(10)
     @Tag("requires-llm")
-    void processInteraction_shouldFormOpinionFromMemory() {
+    void processInteraction_shouldFormOpinionFromMemory() throws ResponseParsingException {
         // given
         MemoryEntry mem = storedMemory(
                 "Pierre trouve que l'IA générative est une révolution pour la productivité des développeurs");
@@ -164,7 +165,7 @@ class OpinionServiceIT {
     @Test
     @Order(11)
     @Tag("requires-llm")
-    void processInteraction_shouldProduceDistinctCanonicalText() {
+    void processInteraction_shouldProduceDistinctCanonicalText() throws ResponseParsingException {
         // given
         MemoryEntry mem = storedMemory(
                 "Pierre pense que le vélo électrique est un excellent moyen de transport en ville");
@@ -185,7 +186,7 @@ class OpinionServiceIT {
     @Test
     @Order(12)
     @Tag("requires-llm")
-    void processInteraction_similarTopic_shouldUpdateNotDuplicate() {
+    void processInteraction_similarTopic_shouldUpdateNotDuplicate() throws ResponseParsingException {
         // given — seed an opinion on AI
         MemoryEntry seedMem = storedMemory("seed memory for deduplication test");
         OpinionEntry seed = buildOpinion(

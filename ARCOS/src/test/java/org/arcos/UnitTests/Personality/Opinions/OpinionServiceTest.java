@@ -1,5 +1,6 @@
 package org.arcos.UnitTests.Personality.Opinions;
 
+import org.arcos.Exceptions.ResponseParsingException;
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
@@ -64,7 +65,7 @@ class OpinionServiceTest {
     }
 
     @Test
-    void processInteraction_WhenNoSimilarOpinions_ShouldAddNewOpinion() {
+    void processInteraction_WhenNoSimilarOpinions_ShouldAddNewOpinion() throws ResponseParsingException {
         // Given
         MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
         OpinionEntry newOpinion = ObjectCreationUtils.createOpinionEntry();
@@ -83,23 +84,20 @@ class OpinionServiceTest {
     }
 
     @Test
-    void processInteraction_WhenLLMFails_ShouldReturnNull() {
+    void processInteraction_WhenLLMFails_ShouldThrowResponseParsingException() {
         // Given
         MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
 
         when(promptBuilder.buildOpinionPrompt(any(MemoryEntry.class))).thenReturn(new Prompt("prompt"));
         when(llmClient.generateOpinionResponse(any(Prompt.class))).thenThrow(new RuntimeException("LLM failed"));
 
-        // When
-        List<OpinionEntry> result = opinionService.processInteraction(memoryEntry);
-
-        // Then
-        assertNull(result);
+        // When / Then
+        assertThrows(ResponseParsingException.class, () -> opinionService.processInteraction(memoryEntry));
         verify(opinionRepository, never()).save(any());
     }
 
     @Test
-    void processInteraction_WhenUpdateFails_ShouldReturnEmptyList() {
+    void processInteraction_WhenUpdateFails_ShouldReturnEmptyList() throws ResponseParsingException {
         // Given
         MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
 
@@ -141,7 +139,7 @@ class OpinionServiceTest {
     }
 
     @Test
-    void processInteraction_WhenSimilarOpinionDiesOnUpdate_ShouldReturnEmptyListWithNoNulls() {
+    void processInteraction_WhenSimilarOpinionDiesOnUpdate_ShouldReturnEmptyListWithNoNulls() throws ResponseParsingException {
         // Given
         MemoryEntry memoryEntry = ObjectCreationUtils.createMemoryEntry();
 

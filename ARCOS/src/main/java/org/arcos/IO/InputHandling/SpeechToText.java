@@ -29,8 +29,9 @@ public class SpeechToText {
     public SpeechToText(String remoteUrl) {
         this.remoteUrl = remoteUrl;
         this.httpClient = new OkHttpClient.Builder()
-                .callTimeout(30, TimeUnit.SECONDS)
-                .readTimeout(30, TimeUnit.SECONDS)
+                .callTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(60, TimeUnit.SECONDS)
+                .connectTimeout(10, TimeUnit.SECONDS)
                 .build();
         this.gson = new Gson();
         this.audioBuffer = new ByteArrayOutputStream();

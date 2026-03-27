@@ -1,4 +1,4 @@
-package org.arcos.IntegrationTests.Tools;
+package org.arcos.UnitTests.Tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
@@ -39,7 +39,7 @@ import static org.mockito.Mockito.*;
  * - HTTP layer (GdeltDocClient avec HttpClient mocke)
  */
 @ExtendWith(MockitoExtension.class)
-class GdeltToolIT {
+class GdeltToolTest {
 
     // ═══════════════════════════════════════════════════════════════════════════
     // GdeltActions — action layer

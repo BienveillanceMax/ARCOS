@@ -30,13 +30,15 @@ services:
       - WHISPER__MODEL=deepdml/faster-whisper-large-v3-turbo-ct2
       - WHISPER__DEVICE=cpu
       - WHISPER__COMPUTE_TYPE=int8
+      - WHISPER__TTL=-1
+      - PRELOAD_MODELS=["deepdml/faster-whisper-large-v3-turbo-ct2"]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 60s
+      retries: 5
+      start_period: 180s
 
   ollama:
     image: ollama/ollama:latest

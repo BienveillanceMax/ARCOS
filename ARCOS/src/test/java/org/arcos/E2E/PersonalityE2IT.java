@@ -1,5 +1,6 @@
 package org.arcos.E2E;
 
+import org.arcos.Exceptions.ResponseParsingException;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.OpinionEntry;
 import org.arcos.Memory.LongTermMemory.Models.Subject;
@@ -48,7 +49,7 @@ class PersonalityE2IT extends BaseE2IT {
 
     @Test
     @Tag("requires-llm")
-    void t1_opinionFormationFromMemory() {
+    void t1_opinionFormationFromMemory() throws ResponseParsingException {
         MemoryEntry mem = storedMemory(
             "Pierre trouve l'évolution des IA très stimulante, il suit l'actualité tech avec enthousiasme");
 
@@ -65,7 +66,7 @@ class PersonalityE2IT extends BaseE2IT {
 
     @Test
     @Tag("requires-llm")
-    void t2_opinionReinforcementNoDuplicate() {
+    void t2_opinionReinforcementNoDuplicate() throws ResponseParsingException {
         // Store a known opinion directly
         OpinionEntry seed = highConfidenceOpinion(
             "L'intelligence artificielle est une avancée stimulante");

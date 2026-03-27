@@ -12,19 +12,20 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
-# Installe Tailscale via le script officiel
+# Installe Tailscale — snap si disponible, sinon script officiel
 if command -v tailscale &> /dev/null; then
     echo "Tailscale est déjà installé."
     tailscale version
+elif command -v snap &> /dev/null; then
+    echo "Installation de Tailscale via snap..."
+    snap install tailscale
 else
-    echo "Installation de Tailscale..."
+    echo "Installation de Tailscale via le script officiel..."
     curl -fsSL https://tailscale.com/install.sh | sh
+    systemctl enable --now tailscaled
 fi
 
-# Active et démarre le service
-systemctl enable --now tailscaled
-
-# Lance l'authentification
+# Lance la connexion
 echo ""
 echo "=== Authentification Tailscale ==="
 echo "Un lien va s'afficher. Ouvrez-le sur un appareil avec navigateur pour connecter ce Pi."
@@ -40,7 +41,7 @@ TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || echo "non disponible")
 echo "IP Tailscale: ${TAILSCALE_IP}"
 echo ""
 echo "=== Configuration DAVx5 (téléphone) ==="
-echo "1. Installez DAVx5 depuis le Play Store / F-Droid"
+echo "1. Installez DAVx5 (gratuit sur F-Droid, payant sur Play Store)"
 echo "2. Ajoutez un compte CalDAV avec l'URL: http://${TAILSCALE_IP}:5232/arcos/calendar/"
 echo "3. Identifiants: arcos / arcos"
 echo "4. Synchronisez et le calendrier apparaîtra dans votre app calendrier"

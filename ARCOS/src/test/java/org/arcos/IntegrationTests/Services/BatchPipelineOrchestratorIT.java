@@ -16,6 +16,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.*;
 })
 @ActiveProfiles("test-e2e")
 @Import(E2ETestConfig.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class BatchPipelineOrchestratorIT {
@@ -99,6 +101,15 @@ class BatchPipelineOrchestratorIT {
         }
     }
 
+    /** Leaf paths that tests 4-8 may write to; cleared after every test for isolation. */
+    private static final List<String> TEST_LEAF_PATHS = List.of(
+            "1_Biological_Characteristics.Physical_Appearance.Body_Build.Height",
+            "1_Biological_Characteristics.Physical_Appearance.Body_Build.Weight",
+            "1_Biological_Characteristics.Physical_Appearance.Skin.Skin_Color",
+            "1_Biological_Characteristics.Physical_Appearance.Facial_Features.Eyes",
+            "1_Biological_Characteristics.Physical_Appearance.Hair.Scalp_Hair"
+    );
+
     @AfterEach
     void restoreReal() {
         ReflectionTestUtils.setField(batchOrchestrator, "memListenerClient", realMemListenerClient);
@@ -106,6 +117,11 @@ class BatchPipelineOrchestratorIT {
 
         // Reset interrupted flag
         ReflectionTestUtils.setField(batchOrchestrator, "interrupted", false);
+
+        // Clean up any PersonaTree leaves modified by tests to ensure isolation
+        for (String path : TEST_LEAF_PATHS) {
+            personaTreeGate.applyRawOperations("DELETE(" + path + ", None)");
+        }
     }
 
     // ========================================================================
@@ -382,13 +398,15 @@ class BatchPipelineOrchestratorIT {
 
         CountDownLatch firstCallStarted = new CountDownLatch(1);
         CountDownLatch interruptSent = new CountDownLatch(1);
+        CountDownLatch interruptFlagSet = new CountDownLatch(1);
 
         when(mockMemListenerClient.generate(anyString())).thenAnswer(invocation -> {
             firstCallStarted.countDown();
             // Wait until interrupt is sent
             interruptSent.await(5, TimeUnit.SECONDS);
-            // Small delay to allow the interrupted flag to be checked
-            Thread.sleep(50);
+            // Wait until the interrupted flag is confirmed set before returning,
+            // so the batch loop sees the flag on its next iteration
+            interruptFlagSet.await(5, TimeUnit.SECONDS);
             return "NO_OP()";
         });
 
@@ -425,15 +443,25 @@ class BatchPipelineOrchestratorIT {
         batchOrchestrator.interrupt();
         interruptSent.countDown();
 
+        // Confirm the interrupted flag is visible before letting generate() return,
+        // so the batch loop will see it on the next iteration check.
+        Awaitility.await().atMost(Duration.ofSeconds(5))
+                .untilAsserted(() -> assertTrue(
+                        (boolean) ReflectionTestUtils.getField(batchOrchestrator, "interrupted"),
+                        "Le flag interrupted devrait etre positionne"));
+        interruptFlagSet.countDown();
+
         // Wait for batch to complete
         Awaitility.await().atMost(Duration.ofSeconds(10))
                 .untilTrue(batchCompleted);
 
         executor.shutdown();
 
-        // Then: some conversations should have been re-enqueued
-        // The first conversation was being processed when interrupt happened,
-        // so at least conv2 and conv3 (or all 3) should be re-enqueued
+        // Then: some conversations should have been re-enqueued.
+        // We cannot assert an exact count because the race between interrupt timing
+        // and conversation processing is non-deterministic: the first conversation's
+        // chunk may or may not finish before the interrupted flag is checked, so
+        // between 1 and 3 conversations may be re-enqueued.
         assertTrue(conversationQueueService.size() >= 1,
                 "Au moins 1 conversation devrait etre re-enqueuee apres interruption, "
                         + "taille actuelle: " + conversationQueueService.size());

@@ -10,6 +10,7 @@ import org.arcos.Memory.LongTermMemory.Repositories.DesireRepository;
 import org.arcos.Memory.LongTermMemory.Repositories.OpinionRepository;
 import org.arcos.Personality.Values.Entities.DimensionSchwartz;
 import org.arcos.Personality.Values.ValueProfile;
+import org.arcos.Exceptions.ResponseParsingException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
@@ -63,28 +64,24 @@ public class OpinionService {
         return 0;
     }
 
-    private OpinionEntry getOpinionFromMemoryEntry(MemoryEntry memoryEntry) {
+    private OpinionEntry getOpinionFromMemoryEntry(MemoryEntry memoryEntry) throws ResponseParsingException {
         OpinionEntry opinionEntry;
         Prompt prompt = promptBuilder.buildOpinionPrompt(memoryEntry);
         try {
             opinionEntry = llmClient.generateOpinionResponse(prompt);
-            if (opinionEntry == null) {
-                log.warn("LLM returned null opinion response for memory: {}", memoryEntry.getId());
-                return null;
-            }
         } catch (Exception e) {
             log.error("Erreur de parsing d'opinion", e);
-            return null;
+            throw new ResponseParsingException("Erreur de parsing d'opinion", e);
+        }
+        if (opinionEntry == null) {
+            throw new ResponseParsingException("LLM returned null opinion response for memory: " + memoryEntry.getId());
         }
         return opinionEntry;
     }
 
-    public List<OpinionEntry> processInteraction(MemoryEntry memory) {
+    public List<OpinionEntry> processInteraction(MemoryEntry memory) throws ResponseParsingException {
         OpinionEntry opinionEntry = getOpinionFromMemoryEntry(memory);
         List<OpinionEntry> opinionEntries = new ArrayList<>();
-        if (opinionEntry == null) {
-            return null;
-        }
 
         // Use canonicalText for search if available, otherwise fallback to subject
         String searchQuery = opinionEntry.getCanonicalText() != null && !opinionEntry.getCanonicalText().isEmpty()
