@@ -1,11 +1,13 @@
 package org.arcos.E2E;
 
 import io.qdrant.client.grpc.Points;
+import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.LongTermMemory.Qdrant.QdrantClientProvider;
 import org.arcos.Orchestrator.Orchestrator;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -13,6 +15,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Base class for all E2E integration tests.
@@ -26,15 +29,28 @@ import java.util.List;
  *   is new'd inside Orchestrator's constructor, not injected by Spring.
  * - @BeforeAll clears Qdrant collections (empty filter = matches all points).
  *   This preserves collection schema while wiping data.
+ *
+ * Tagging convention:
+ * - All E2E test classes MUST use @Tag("e2e") at class level.
+ * - Individual @Tag("requires-llm") on methods is deprecated for E2E —
+ *   migrate to class-level @Tag("e2e") when touching each class.
+ * - Both tags are excluded from standard `mvn test` via surefire excludedGroups.
+ *
+ * Boundaries (NOT "zero mock"):
+ * - TTS: intercepted by MockTTSCapture (captures text, no audio playback).
+ * - Embeddings: local all-MiniLM-L6-v2 (384 dims) via E2ETestConfig.
+ * - Everything else is real: LLM Mistral, Qdrant, personality pipeline.
  */
 @SpringBootTest
 @ActiveProfiles("test-e2e")
 @Import(E2ETestConfig.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 public abstract class BaseE2IT {
 
     @Autowired protected Orchestrator orchestrator;
     @Autowired protected QdrantClientProvider qdrantClientProvider;
+    @Autowired protected ConversationContext conversationContext;
 
     protected final MockTTSCapture mockTTS = new MockTTSCapture();
 
@@ -56,5 +72,6 @@ public abstract class BaseE2IT {
     void injectMockTTSAndClear() {
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", mockTTS);
         mockTTS.clear();
+        conversationContext.startNewSession();
     }
 }

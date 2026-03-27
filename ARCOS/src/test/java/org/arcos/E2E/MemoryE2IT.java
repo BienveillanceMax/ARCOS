@@ -1,7 +1,6 @@
 package org.arcos.E2E;
 
 import org.arcos.LLM.Prompts.PromptBuilder;
-import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.Models.Subject;
 import org.arcos.Memory.LongTermMemory.service.MemoryService;
@@ -20,7 +19,6 @@ class MemoryE2IT extends BaseE2IT {
 
     @Autowired private MemoryService memoryService;
     @Autowired private PromptBuilder promptBuilder;
-    @Autowired private ConversationContext context;
 
     private static final String JAZZ_CONTENT =
         "Hier soir, on a parlé de sa passion pour Miles Davis — " +
@@ -70,7 +68,7 @@ class MemoryE2IT extends BaseE2IT {
         memoryService.storeMemory(jazz);
 
         // buildConversationnalPrompt assembles personality/mood/opinions inline (no RAG advisor)
-        Prompt prompt = promptBuilder.buildConversationnalPrompt(context,
+        Prompt prompt = promptBuilder.buildConversationnalPrompt(conversationContext,
             "Qu'est-ce que j'aime écouter comme musique ?");
 
         assertNotNull(prompt, "Prompt should be built without error");

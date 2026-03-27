@@ -1,0 +1,66 @@
+{
+  "24908558-0551-401b-b62d-fe39c7b7605d" : {
+    "id" : "24908558-0551-401b-b62d-fe39c7b7605d",
+    "label" : "Rappel salle de sport — parce que ton corps est un temple, mais visiblement un temple abandonné",
+    "actionType" : "TODO",
+    "status" : "ACTIVE",
+    "triggerDatetime" : "2026-04-24T08:00:00",
+    "cronExpression" : null,
+    "executionPlan" : {
+      "steps" : [ {
+        "stepId" : 1,
+        "toolName" : "Chercher_dans_ma_memoire",
+        "parameters" : {
+          "query" : "préférences salle de sport",
+          "type" : "DESIR"
+        },
+        "outputVariable" : "preferencesSport",
+        "description" : "Récupérer les préférences de salle de sport"
+      }, {
+        "stepId" : 2,
+        "toolName" : "Lister_les_evenements_a_venir",
+        "parameters" : {
+          "maxResults" : 10
+        },
+        "outputVariable" : "agenda",
+        "description" : "Lister les événements à venir pour identifier les créneaux disponibles"
+      }, {
+        "stepId" : 3,
+        "toolName" : "Executer_du_code",
+        "parameters" : {
+          "code" : "def trouver_creneaux_libres(agenda, duree=60):\n    from datetime import datetime, timedelta\n    now = datetime.now()\n    creneaux = []\n    # Simuler des créneaux libres (ex: 7h-8h, 12h-13h, 18h-19h)\n    for h in [7, 12, 18]:\n        start = now.replace(hour=h, minute=0, second=0, microsecond=0)\n        end = start + timedelta(minutes=duree)\n        creneaux.append({'start': start.isoformat(), 'end': end.isoformat()})\n    return creneaux"
+        },
+        "outputVariable" : "creneauxLibres",
+        "description" : "Identifier des créneaux libres pour la salle de sport"
+      }, {
+        "stepId" : 4,
+        "toolName" : "Ajouter_un_evenement_au_calendrier",
+        "parameters" : {
+          "title" : "Séance de sport - Réveil du temple !",
+          "description" : "Ton corps est un temple, et aujourd'hui, on le nettoie ! \uD83D\uDCAA Basé sur tes préférences : {preferencesSport}",
+          "location" : "$preferencesSport.sallePreferee",
+          "startDateTimeStr" : "$creneauxLibres[0].start",
+          "endDateTimeStr" : "$creneauxLibres[0].end"
+        },
+        "outputVariable" : "rappelSport",
+        "description" : "Ajouter un rappel pour la séance de sport"
+      }, {
+        "stepId" : 5,
+        "toolName" : "Chercher_sur_Internet",
+        "parameters" : {
+          "query" : "bienfaits sport motivation"
+        },
+        "outputVariable" : "motivation",
+        "description" : "Trouver des conseils motivationnels pour la séance de sport"
+      } ]
+    },
+    "synthesisPromptTemplate" : "\uD83D\uDD14 Rappel important : J’ai planifié ta séance de sport aujourd’hui à {rappelSport.startTime} ! {motivation} N’oublie pas : ton corps est un temple, et aujourd’hui, c’est jour de grand ménage. \uD83D\uDCAA Tu as tout ce qu’il faut pour réussir. À toi de jouer !",
+    "createdAt" : "2026-03-23T16:42:00.337949866",
+    "lastExecutedAt" : null,
+    "executionCount" : 0,
+    "lastExecutionResult" : null,
+    "context" : "Vérifier si l'événement n'existe pas déjà dans l'agenda avant de l'ajouter. Si c'est le cas, ne pas le recréer. Sinon, l'ajouter avec les détails suivants : Titre: 'Séance de sport', Description: 'Aller à la salle de sport pour éviter de transformer ton admiration pour Django en simple nostalgie d'une époque où tu pouvais encore bouger sans gémir.', Location: 'Salle de sport (celle que tu fréquentes, pas celle que tu évites)', début: 2026-04-24 à 18:00, fin: 2026-04-24 à 19:30.",
+    "deadlineDatetime" : null,
+    "reminderDatetimes" : null
+  }
+}
