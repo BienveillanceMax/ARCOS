@@ -1,4 +1,4 @@
-package org.arcos.Mood;
+package org.arcos.UnitTests.Personality.Mood;
 
 import org.arcos.Personality.Mood.MoodVoiceMapper;
 import org.arcos.Personality.Mood.PadState;

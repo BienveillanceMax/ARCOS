@@ -58,7 +58,7 @@ public class WeatherService {
     }
 
     // Constructor for testing
-    WeatherService(HttpClient httpClient, ObjectMapper objectMapper) {
+    public WeatherService(HttpClient httpClient, ObjectMapper objectMapper) {
         this.httpClient = httpClient;
         this.objectMapper = objectMapper;
     }

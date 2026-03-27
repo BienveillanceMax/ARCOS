@@ -20,7 +20,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(MockitoExtension.class)
-public class MoodIntegrationTest {
+public class MoodServiceContextTest {
 
     @Mock LLMClient llmClient;
     @Mock ConversationSummaryService conversationSummaryService;

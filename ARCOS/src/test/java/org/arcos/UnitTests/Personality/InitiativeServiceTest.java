@@ -1,4 +1,4 @@
-package org.arcos.Personality.Initiative;
+package org.arcos.UnitTests.Personality;
 
 import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Prompts.PromptBuilder;
@@ -6,6 +6,7 @@ import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;
 import org.arcos.Memory.LongTermMemory.service.MemoryService;
 import org.arcos.Personality.Desires.DesireService;
+import org.arcos.Personality.Initiative.InitiativeService;
 import org.arcos.Personality.Opinions.OpinionService;
 import org.arcos.Personality.PersonalityOrchestrator;
 import org.junit.jupiter.api.Test;

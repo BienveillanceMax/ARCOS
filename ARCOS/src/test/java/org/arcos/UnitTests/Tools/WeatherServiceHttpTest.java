@@ -1,6 +1,7 @@
-package org.arcos.Tools.WeatherTool;
+package org.arcos.UnitTests.Tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.arcos.Tools.WeatherTool.WeatherService;
 import org.arcos.Tools.WeatherTool.WeatherService.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -21,13 +22,11 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
- * Tests pour WeatherService au niveau HTTP (HttpClient mocke).
- *
- * Place dans le meme package que WeatherService pour acceder au constructeur package-private.
+ * Tests pour WeatherService au niveau HTTP (HttpClient mocké).
  *
  * Valide :
- * - AC4 : geocoding + meteo Open-Meteo => donnees parsees
- * - AC6 : erreurs reseau => propagation propre (IOException)
+ * - AC4 : geocoding + météo Open-Meteo => données parsées
+ * - AC6 : erreurs réseau => propagation propre (IOException)
  */
 @ExtendWith(MockitoExtension.class)
 class WeatherServiceHttpTest {

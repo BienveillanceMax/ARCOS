@@ -1,6 +1,7 @@
-package org.arcos.Tools.WeatherTool;
+package org.arcos.UnitTests.Tools;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.arcos.Tools.WeatherTool.WeatherService;
 import org.arcos.Tools.WeatherTool.WeatherService.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

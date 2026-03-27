@@ -30,8 +30,8 @@ public class QdrantClientProvider {
                 qdrantProperties.getMaxBackoffMs());
     }
 
-    // Constructeur package-private pour les tests, permettant de réduire les délais de retry
-    QdrantClientProvider(String host, int port, int maxRetries, long initialBackoffMs, long maxBackoffMs) {
+    // Constructeur pour les tests, permettant de réduire les délais de retry
+    public QdrantClientProvider(String host, int port, int maxRetries, long initialBackoffMs, long maxBackoffMs) {
         this.client = createClientWithRetry(host, port, maxRetries, initialBackoffMs, maxBackoffMs);
     }
 

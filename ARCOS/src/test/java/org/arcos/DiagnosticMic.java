@@ -10,10 +10,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * Standalone diagnostic: tests the full pipeline pw-record → Porcupine.
- * Run with: mvn exec:java -Dexec.mainClass=org.arcos.DiagnosticMicTest -Dexec.classpathScope=test
+ * Standalone diagnostic tool (NOT a JUnit test): validates the full pipeline pw-record → Porcupine.
+ * Run with: mvn exec:java -Dexec.mainClass=org.arcos.DiagnosticMic -Dexec.classpathScope=test
  */
-public class DiagnosticMicTest {
+public class DiagnosticMic {
 
     public static void main(String[] args) throws Exception {
         String accessKey = System.getenv("PORCUPINE_ACCESS_KEY");
@@ -121,7 +121,7 @@ public class DiagnosticMicTest {
     }
 
     private static String extractResource(String name) throws Exception {
-        try (InputStream in = DiagnosticMicTest.class.getClassLoader().getResourceAsStream(name)) {
+        try (InputStream in = DiagnosticMic.class.getClassLoader().getResourceAsStream(name)) {
             if (in == null) throw new IllegalArgumentException("Resource not found: " + name);
             Path tmp = Files.createTempFile(name, "");
             tmp.toFile().deleteOnExit();
