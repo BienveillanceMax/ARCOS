@@ -106,10 +106,10 @@ public class ConfigurationWriter {
         }
 
         // STT backend
-        if (model.getSttBackend() != null && !model.getSttBackend().isBlank()) {
+        if (model.getSttBackend() != null) {
             sb.append("  stt:\n");
-            sb.append("    backend: ").append(model.getSttBackend()).append("\n");
-            if ("WHISPER_CPP".equals(model.getSttBackend())
+            sb.append("    backend: ").append(model.getSttBackend().name()).append("\n");
+            if (model.getSttBackend() == org.arcos.IO.InputHandling.STT.SttBackendType.WHISPER_CPP
                     && model.getSttWhisperCppUrl() != null
                     && !model.getSttWhisperCppUrl().isBlank()) {
                 sb.append("    whisper-cpp-url: ").append(model.getSttWhisperCppUrl()).append("\n");

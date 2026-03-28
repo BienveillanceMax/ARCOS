@@ -1,5 +1,7 @@
 package org.arcos.Setup;
 
+import org.arcos.IO.InputHandling.STT.SttBackendType;
+
 import java.util.HashMap;
 import java.util.Map;
 
@@ -22,8 +24,8 @@ public class ConfigurationModel {
     private String personalityProfile = "DEFAULT";
 
     // ── STT Backend ───────────────────────────────────────────────────────────
-    private String sttBackend = "FASTER_WHISPER";
-    private String sttWhisperCppUrl = "http://localhost:8080";
+    private SttBackendType sttBackend = SttBackendType.FASTER_WHISPER;
+    private String sttWhisperCppUrl = "http://localhost:8090";
 
     // ── Statuts de validation ─────────────────────────────────────────────────
     private final Map<String, Boolean> keyValidationStatus = new HashMap<>();
@@ -52,8 +54,8 @@ public class ConfigurationModel {
     public String getPersonalityProfile() { return personalityProfile; }
     public void setPersonalityProfile(String personalityProfile) { this.personalityProfile = personalityProfile; }
 
-    public String getSttBackend() { return sttBackend; }
-    public void setSttBackend(String sttBackend) { this.sttBackend = sttBackend; }
+    public SttBackendType getSttBackend() { return sttBackend; }
+    public void setSttBackend(SttBackendType sttBackend) { this.sttBackend = sttBackend; }
 
     public String getSttWhisperCppUrl() { return sttWhisperCppUrl; }
     public void setSttWhisperCppUrl(String sttWhisperCppUrl) { this.sttWhisperCppUrl = sttWhisperCppUrl; }

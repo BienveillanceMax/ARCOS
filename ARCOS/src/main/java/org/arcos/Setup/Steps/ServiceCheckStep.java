@@ -154,9 +154,12 @@ public class ServiceCheckStep implements WizardStep {
                 new MistralHealthChecker(),
                 ServiceHealthCheck.ServiceConfig.withKey(mistralKey)));
 
+        int sttPort = context.getModel().getSttBackend() == org.arcos.IO.InputHandling.STT.SttBackendType.WHISPER_CPP
+                ? parsePort(context.getModel().getSttWhisperCppUrl(), 8090)
+                : 8000;
         checks.put("SPEECH-TO-TEXT", new CheckTask(
                 new SttHealthChecker(),
-                ServiceHealthCheck.ServiceConfig.of("localhost", 8000)));
+                ServiceHealthCheck.ServiceConfig.of("localhost", sttPort)));
 
         checks.put("PIPER TTS", new CheckTask(
                 new PiperHealthChecker(),
@@ -167,6 +170,15 @@ public class ServiceCheckStep implements WizardStep {
                 ServiceHealthCheck.ServiceConfig.withKey(context.getModel().getPorcupineAccessKey())));
 
         return checks;
+    }
+
+    private static int parsePort(String url, int defaultPort) {
+        if (url == null || url.isBlank()) return defaultPort;
+        try {
+            return java.net.URI.create(url).getPort();
+        } catch (Exception e) {
+            return defaultPort;
+        }
     }
 
     private record CheckTask(ServiceHealthCheck checker, ServiceHealthCheck.ServiceConfig config) {}

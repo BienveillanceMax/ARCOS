@@ -41,27 +41,23 @@ services:
       start_period: 180s
 
   # ── GPU-accelerated STT (Vulkan) ────────────────────────────────────────────
-  # whisper.cpp v1.8.4+ with Vulkan — AMD iGPU (Radeon 780M), dGPUs, Intel Arc.
-  # Uncomment and set arcos.stt.backend=WHISPER_CPP in application-local.yaml.
+  # whisper.cpp v1.8.4+ with Vulkan — AMD iGPU, dGPUs, Intel Arc.
   # Model is downloaded at docker build time (~1.5 GB).
   #
-  # whisper-cpp:
-  #   image: saririus/whisper-cpp-vulkan:latest
-  #   container_name: whisper-cpp-container
-  #   ports:
-  #     - "8080:8080"
-  #   devices:
-  #     - /dev/dri:/dev/dri
-  #   group_add:
-  #     - video
-  #     - render
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8080/"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 5
-  #     start_period: 30s
+  whisper-cpp:
+     image: saririus/whisper-cpp-vulkan:latest
+     container_name: whisper-cpp-container
+     ports:
+       - "8090:8080"
+     devices:
+       - /dev/dri:/dev/dri
+     restart: unless-stopped
+     healthcheck:
+       test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+       interval: 30s
+       timeout: 10s
+       retries: 5
+       start_period: 30s
 
   ollama:
     image: ollama/ollama:latest
