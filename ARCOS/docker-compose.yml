@@ -41,7 +41,7 @@ services:
       start_period: 180s
 
   # ── GPU-accelerated STT (Vulkan) ────────────────────────────────────────────
-  # whisper.cpp v1.8.4+ with Vulkan — AMD iGPU, dGPUs, Intel Arc.
+  # whisper.cpp v1.8.4+ with Vulkan — AMD iGPU, dGPUs, Intel Arc
   # Model is downloaded at docker build time (~1.5 GB).
   #
   whisper-cpp:
