@@ -1,3 +1,8 @@
+# NOTE: Non utilisé pour le run standard.
+# L'app ARCOS tourne nativement (audio/Bluetooth/TUI nécessitent un accès direct
+# à l'hôte) — cf. CLAUDE.md. Ce Dockerfile est conservé pour CI ou une
+# re-containerisation future, mais ne fait plus partie du chemin de déploiement.
+#
 # Phase 1: Build the application
 FROM eclipse-temurin:21-jdk-jammy as builder
 

@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   qdrant:
     image: qdrant/qdrant:v1.11.4
@@ -59,35 +57,6 @@ services:
        retries: 5
        start_period: 30s
 
-  ollama:
-    image: ollama/ollama:latest
-    container_name: ollama
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  memlistener-init:
-    image: ollama/ollama:latest
-    container_name: memlistener_init
-    depends_on:
-      ollama:
-        condition: service_healthy
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-    entrypoint: ["/bin/sh", "-c", "ollama pull pierrewagniart/memlistener:q4_k_m"]
-    restart: "no"
 
   radicale:
     image: tomsquest/docker-radicale:latest
@@ -106,65 +75,19 @@ services:
       retries: 3
       start_period: 10s
 
-  arcos-app:
-    build:
-      context: .
-      args:
-        USER_ID: ${UID:-1000}
-        GROUP_ID: ${GID:-1000}
-    container_name: arcos_app
-    restart: unless-stopped
-    depends_on:
-      qdrant:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-
-    tty: true
-    stdin_open: true
-
-    env_file:
-      - path: .env
-        required: false
-
-    network_mode: "host"
-    privileged: true
-
-    environment:
-      - PULSE_SERVER=unix:/run/user/${UID:-1000}/pulse/native
-      - PIPEWIRE_SOCKET=/run/user/${UID:-1000}/pipewire-0
-      - HOST_UID=${UID:-1000}
-      - HOST_GID=${GID:-1000}
-      - PULSE_NO_AUTOSPAWN=1
-      # Variables pour D-Bus (nécessaire pour Bluetooth)
-      - DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${UID:-1000}/bus
-
-    volumes:
-      - ./src/main/resources/upmc-model:/app/src/main/resources/upmc-model:ro
-
-      # D-Bus - CRITIQUE pour Bluetooth
-      - /var/run/dbus:/var/run/dbus
-      - /run/user/${UID:-1000}/bus:/run/user/${UID:-1000}/bus
-
-      # PipeWire/PulseAudio
-      - /run/user/${UID:-1000}/pipewire-0:/run/user/${UID:-1000}/pipewire-0
-      - /run/user/${UID:-1000}/pulse:/run/user/${UID:-1000}/pulse
-
-      # Devices audio
-      - /dev/snd:/dev/snd
-
-      # USB pour périphériques Bluetooth USB
-      - /dev/bus/usb:/dev/bus/usb
-
-    devices:
-      - /dev/snd:/dev/snd
-
-    # Ajouter les groupes nécessaires
-    group_add:
-      - audio
-      - ${BLUETOOTH_GID:-996}  # GID du groupe bluetooth de l'hôte
+# ── Note de déploiement ───────────────────────────────────────────────────────
+# L'app ARCOS tourne NATIVEMENT (hors Docker), pas dans ce compose.
+# Elle a besoin d'un accès direct au matériel de l'hôte : audio (PipeWire/
+# PulseAudio), Bluetooth (D-Bus système) et un terminal interactif (TUI Lanterna).
+# Containeriser l'app forçait privileged + network_mode host + montage des
+# sockets audio/D-Bus — beaucoup de complexité pour zéro isolation réelle.
+# Ce compose ne fournit donc que les services réseau dont l'app dépend ; elle les
+# joint via localhost:<port> (ports publiés ci-dessus).
+#
+# Lancement :
+#   docker compose up -d        # services réseau (qdrant, whisper, radicale)
+#   mvn spring-boot:run         # app ARCOS, dans un vrai terminal
 
 volumes:
   qdrant_storage:
-  ollama_data:
   radicale_data:
