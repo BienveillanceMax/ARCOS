@@ -188,6 +188,33 @@ class PlannedActionExecutorTest {
     }
 
     @Test
+    void resolveParameters_referencingStructuredData_shouldResolveToDataNotMessage() {
+        ReWOOPlan.ReWOOStep step1 = new ReWOOPlan.ReWOOStep(
+                1, "Chercher_sur_Internet", Map.of("query", "actualités"), "actus", "Search");
+        ReWOOPlan.ReWOOStep step2 = new ReWOOPlan.ReWOOStep(
+                2, "Executer_du_code", Map.of("code", "$actus"), "processed", "Process");
+
+        PlannedActionEntry entry = new PlannedActionEntry();
+        entry.setLabel("structured resolution");
+        entry.setActionType(ActionType.TODO);
+        entry.setExecutionPlan(new ReWOOPlan(List.of(step1, step2)));
+        entry.setSynthesisPromptTemplate(null);
+
+        when(searchActions.searchTheWeb("actualités"))
+                .thenReturn(ActionResult.success(List.of("Titre A", "Titre B"), "Recherche effectuée"));
+        when(pythonActions.executePythonCode(anyString()))
+                .thenReturn(ActionResult.successWithMessage("done"));
+
+        executor.execute(entry);
+
+        org.mockito.ArgumentCaptor<String> captor = org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(pythonActions).executePythonCode(captor.capture());
+        assertTrue(captor.getValue().contains("Titre A"));
+        assertTrue(captor.getValue().contains("Titre B"));
+        assertFalse(captor.getValue().equals("Recherche effectuée"));
+    }
+
+    @Test
     void execute_SimpleReminderWithContext_ShouldIncludeContext() {
         // Given
         PlannedActionEntry entry = ObjectCreationUtils.createSimpleReminderWithContextEntry();

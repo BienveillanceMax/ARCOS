@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -160,7 +161,13 @@ public class PlannedActionExecutor {
                 String varName = strValue.substring(1);
                 ActionResult previousResult = stepResults.get(varName);
                 if (previousResult != null) {
-                    resolved.put(entry.getKey(), previousResult.getMessage());
+                    // Structured data, not prose — and not List.toString() ("[a, b]"), which is
+                    // barely better than prose: join items on newlines for machine consumption.
+                    Object data = previousResult.getData();
+                    String resolvedValue = (data instanceof List<?> list && !list.isEmpty())
+                            ? list.stream().map(String::valueOf).collect(Collectors.joining("\n"))
+                            : previousResult.getMessage();
+                    resolved.put(entry.getKey(), resolvedValue);
                 } else {
                     log.warn("Unresolved variable reference: {}", strValue);
                     resolved.put(entry.getKey(), strValue);
