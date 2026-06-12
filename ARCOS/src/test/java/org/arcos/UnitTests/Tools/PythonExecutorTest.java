@@ -125,6 +125,32 @@ class PythonExecutorTest {
         assertThat(result.getStderr()).contains("bubblewrap");
     }
 
+    // ===== SEC-2: fail-closed network isolation =====
+
+    @Test
+    void execute_whenNetIsolationUnavailable_shouldRefuseAndNotRun() {
+        // Given — sandbox present but net isolation cannot be guaranteed
+        PythonExecutor testExecutor = new PythonExecutor() {
+            @Override public boolean isSandboxAvailable() { return true; }
+            @Override protected boolean isNetworkIsolationAvailable() { return false; }
+        };
+
+        // When
+        PythonExecutor.ExecutionResult result =
+                testExecutor.execute("import socket; print(socket.gethostbyname('example.com'))");
+
+        // Then — refused, code never ran
+        assertThat(result.isSuccess()).isFalse();
+        assertThat(result.getExitCode()).isEqualTo(-1);
+        assertThat(result.getStderr()).contains("isolation réseau");
+    }
+
+    @Test
+    void buildSandboxCommand_shouldAlwaysRequestUnshareNet() {
+        List<String> cmd = executor.buildSandboxCommand(Path.of("/tmp/x.py"));
+        assertThat(cmd).contains("--unshare-net");
+    }
+
     // ===== readOutput =====
 
     @Test

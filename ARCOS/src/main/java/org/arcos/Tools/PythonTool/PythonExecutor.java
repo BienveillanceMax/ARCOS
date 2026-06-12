@@ -67,6 +67,11 @@ public class PythonExecutor {
         if (!isSandboxAvailable()) {
             return new ExecutionResult(-1, "", "Sandbox indisponible : bubblewrap (bwrap) non installé.");
         }
+        if (!isNetworkIsolationAvailable()) {
+            log.warn("Refus d'exécution Python : isolation réseau (--unshare-net) indisponible — fail-closed");
+            return new ExecutionResult(-1, "",
+                    "Exécution refusée : isolation réseau indisponible sur cet hôte.");
+        }
 
         Path scriptFile = null;
         Process process = null;
@@ -131,11 +136,9 @@ public class PythonExecutor {
         cmd.addAll(List.of("--dev", "/dev"));
         cmd.addAll(List.of("--proc", "/proc"));
 
-        // Isolation
+        // Isolation — net isolation is mandatory (verified by execute() before we get here)
         cmd.add("--unshare-pid");
-        if (canUnshareNet()) {
-            cmd.add("--unshare-net");
-        }
+        cmd.add("--unshare-net");
         if (canUnshareUser()) {
             cmd.add("--unshare-user");
         }
@@ -169,6 +172,10 @@ public class PythonExecutor {
 
     private boolean canUnshareNet() {
         return probeBwrapCapability("--unshare-net");
+    }
+
+    protected boolean isNetworkIsolationAvailable() {
+        return canUnshareNet();
     }
 
     private boolean canUnshareUser() {
