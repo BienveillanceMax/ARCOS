@@ -28,6 +28,9 @@ public class PlannedActionProperties {
     /** Nombre par défaut de résultats calendrier dans les plans d'exécution. */
     private int defaultCalendarMaxResults = 5;
 
+    /** Nombre maximum d'entrées d'historique d'exécution conservées (les plus anciennes sont supprimées). */
+    private int maxHistoryEntries = 500;
+
     public String getStoragePath() {
         return storagePath;
     }
@@ -66,5 +69,13 @@ public class PlannedActionProperties {
 
     public void setDefaultCalendarMaxResults(int defaultCalendarMaxResults) {
         this.defaultCalendarMaxResults = defaultCalendarMaxResults;
+    }
+
+    public int getMaxHistoryEntries() {
+        return maxHistoryEntries;
+    }
+
+    public void setMaxHistoryEntries(int maxHistoryEntries) {
+        this.maxHistoryEntries = maxHistoryEntries;
     }
 }

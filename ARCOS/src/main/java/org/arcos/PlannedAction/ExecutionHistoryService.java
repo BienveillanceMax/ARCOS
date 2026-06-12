@@ -30,9 +30,11 @@ public class ExecutionHistoryService {
     private final Path storageFile;
     private final ObjectMapper objectMapper;
     private final List<ExecutionHistoryEntry> history;
+    private final int maxEntries;
 
     public ExecutionHistoryService(PlannedActionProperties properties) {
         this.storageFile = Paths.get(properties.getHistoryStoragePath());
+        this.maxEntries = properties.getMaxHistoryEntries();
         this.objectMapper = new ObjectMapper();
         this.objectMapper.registerModule(new JavaTimeModule());
         this.objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
@@ -53,6 +55,7 @@ public class ExecutionHistoryService {
                 action.hasContext() ? action.getContext() : null
         );
         history.add(entry);
+        trimToCap();
         persistToFile();
         log.info("Recorded execution for '{}': success={}", action.getLabel(), success);
     }
@@ -72,6 +75,14 @@ public class ExecutionHistoryService {
                 .sorted(Comparator.comparing(ExecutionHistoryEntry::getExecutedAt).reversed())
                 .limit(limit)
                 .collect(Collectors.toList());
+    }
+
+    private void trimToCap() {
+        synchronized (history) {
+            while (history.size() > maxEntries) {
+                history.remove(0); // drop oldest (insertion order)
+            }
+        }
     }
 
     private void persistToFile() {
@@ -111,6 +122,7 @@ public class ExecutionHistoryService {
                     new TypeReference<List<ExecutionHistoryEntry>>() {}
             );
             history.addAll(loaded);
+            trimToCap();
             log.info("Loaded {} execution history entries from file", history.size());
         } catch (IOException e) {
             log.error("Failed to load execution history from {}, starting with empty list", storageFile, e);

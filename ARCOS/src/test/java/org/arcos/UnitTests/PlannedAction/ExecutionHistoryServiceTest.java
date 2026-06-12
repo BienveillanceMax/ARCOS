@@ -93,6 +93,26 @@ class ExecutionHistoryServiceTest {
     }
 
     @Test
+    void recordExecution_shouldCapHistorySizeAndDropOldest() {
+        PlannedActionProperties props = new PlannedActionProperties();
+        props.setHistoryStoragePath(tempDir.resolve("capped-history.json").toString());
+        props.setMaxHistoryEntries(3);
+        ExecutionHistoryService capped = new ExecutionHistoryService(props);
+        capped.init();
+        PlannedActionEntry action = ObjectCreationUtils.createSimpleReminderEntry();
+
+        for (int i = 1; i <= 5; i++) {
+            capped.recordExecution(action, "exec-" + i, true);
+        }
+
+        List<ExecutionHistoryEntry> history = capped.getHistoryForAction(action.getId(), 100);
+        assertEquals(3, history.size());
+        assertEquals("exec-5", history.get(0).getResult()); // latest first
+        assertTrue(history.stream().noneMatch(e -> e.getResult().equals("exec-1")));
+        assertTrue(history.stream().noneMatch(e -> e.getResult().equals("exec-2")));
+    }
+
+    @Test
     void persistence_ShouldSurviveReload() {
         // Given
         PlannedActionEntry action = ObjectCreationUtils.createSimpleReminderEntry();
