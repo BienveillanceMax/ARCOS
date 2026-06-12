@@ -12,9 +12,12 @@ import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.springframework.stereotype.Repository;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -78,7 +81,22 @@ public class PlannedActionRepository {
     private void persistToFile() {
         try {
             Files.createDirectories(storageFile.getParent());
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(storageFile.toFile(), actions);
+            Path tmp = Files.createTempFile(storageFile.getParent(), "planned-actions-", ".tmp");
+            try {
+                objectMapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), actions);
+                try (FileChannel ch = FileChannel.open(tmp, StandardOpenOption.WRITE)) {
+                    ch.force(true); // fsync AVANT le rename : sans ça, une coupure de courant
+                                    // peut laisser un fichier vide malgré le move atomique
+                }
+                try {
+                    Files.move(tmp, storageFile,
+                            StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(tmp, storageFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(tmp);
+            }
             log.debug("Persisted {} planned actions to {}", actions.size(), storageFile);
         } catch (IOException e) {
             log.error("Failed to persist planned actions to {}", storageFile, e);

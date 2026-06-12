@@ -12,9 +12,12 @@ import org.arcos.PlannedAction.Models.PlannedActionEntry;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -74,7 +77,22 @@ public class ExecutionHistoryService {
     private void persistToFile() {
         try {
             Files.createDirectories(storageFile.getParent());
-            objectMapper.writerWithDefaultPrettyPrinter().writeValue(storageFile.toFile(), history);
+            Path tmp = Files.createTempFile(storageFile.getParent(), "execution-history-", ".tmp");
+            try {
+                objectMapper.writerWithDefaultPrettyPrinter().writeValue(tmp.toFile(), history);
+                try (FileChannel ch = FileChannel.open(tmp, StandardOpenOption.WRITE)) {
+                    ch.force(true); // fsync AVANT le rename : sans ça, une coupure de courant
+                                    // peut laisser un fichier vide malgré le move atomique
+                }
+                try {
+                    Files.move(tmp, storageFile,
+                            StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                    Files.move(tmp, storageFile, StandardCopyOption.REPLACE_EXISTING);
+                }
+            } finally {
+                Files.deleteIfExists(tmp);
+            }
             log.debug("Persisted {} execution history entries to {}", history.size(), storageFile);
         } catch (IOException e) {
             log.error("Failed to persist execution history to {}", storageFile, e);
