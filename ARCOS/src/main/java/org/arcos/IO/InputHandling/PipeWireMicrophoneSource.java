@@ -19,16 +19,24 @@ public class PipeWireMicrophoneSource implements MicrophoneSource {
     private InputStream audioStream;
 
     public PipeWireMicrophoneSource() {
+        startProcess();
+    }
+
+    protected Process launch() throws IOException {
+        ProcessBuilder pb = new ProcessBuilder(
+                "pw-record",
+                "--format", "s16",
+                "--rate", String.valueOf(SAMPLE_RATE),
+                "--channels", "1",
+                "-"   // output to stdout
+        );
+        pb.redirectErrorStream(false);
+        return pb.start();
+    }
+
+    private void startProcess() {
         try {
-            ProcessBuilder pb = new ProcessBuilder(
-                    "pw-record",
-                    "--format", "s16",
-                    "--rate", String.valueOf(SAMPLE_RATE),
-                    "--channels", "1",
-                    "-"   // output to stdout
-            );
-            pb.redirectErrorStream(false);
-            this.process = pb.start();
+            this.process = launch();
             this.audioStream = process.getInputStream();
 
             // Verify the process started (give it a moment to fail if pw-record is missing)
@@ -48,14 +56,30 @@ public class PipeWireMicrophoneSource implements MicrophoneSource {
         }
     }
 
+    /** One relaunch attempt. No backoff — the WakeWordProducer supervisor owns retry pacing. */
+    private synchronized boolean reinit() {
+        close();
+        startProcess();
+        return process != null && process.isAlive() && audioStream != null;
+    }
+
     @Override
     public int read(byte[] buffer, int offset, int length) {
-        if (audioStream == null) return -1;
+        if (audioStream == null || (process != null && !process.isAlive())) {
+            log.warn("pw-record dead (alive={}), one in-stream reinit", process != null && process.isAlive());
+            if (!reinit()) return -1;          // give up THIS call; the supervisor loop retries with backoff
+        }
         try {
-            return audioStream.read(buffer, offset, length);
+            int n = audioStream.read(buffer, offset, length);
+            if (n == -1) {                      // EOF => subprocess died mid-stream
+                log.warn("pw-record stream EOF; one in-stream reinit");
+                return reinit() ? audioStream.read(buffer, offset, length) : -1;
+            }
+            return n;
         } catch (IOException e) {
-            log.error("Error reading from pw-record", e);
-            return -1;
+            log.error("Error reading from pw-record; one in-stream reinit", e);
+            reinit();
+            return -1;                          // surface failure; do not loop here
         }
     }
 

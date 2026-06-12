@@ -55,6 +55,7 @@ public class WakeWordProducer implements Runnable {
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
     private int silenceThreshold;
+    private int micFailureCount = 0;
 
     /**
      * 21-tap low-pass FIR filter (Hamming window, fc=7200Hz at 44100Hz).
@@ -343,8 +344,19 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
                 } else if (bytesRead < 0) {
-                    log.error("Audio source returned -1 (stream ended). Stopping wake word detection.");
-                    break;
+                    micFailureCount++;
+                    long backoff = backoffMillis(micFailureCount);
+                    log.error("Source audio PipeWire morte (échec #{}). Nouvelle tentative dans {}ms (on reste sur PipeWire).",
+                            micFailureCount, backoff);
+                    centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
+                    Thread.sleep(backoff);                 // interruptible — InterruptedException exits via the loop's catch
+                    recreatePipeWireSource();
+                    if (micSource.isAvailable()) {         // micSource is never null — see recreatePipeWireSource()
+                        this.silenceThreshold = micSource.recommendedSilenceThreshold();
+                        log.info("Source PipeWire rétablie après {} échec(s).", micFailureCount);
+                        micFailureCount = 0;               // recovered: reset
+                    }
+                    // do NOT break — never give up; next loop iteration re-reads (or backs off again)
                 }
             } catch (PorcupineException e) {
                 log.error("Error processing audio with Porcupine", e);
@@ -355,6 +367,26 @@ public class WakeWordProducer implements Runnable {
         }
 
         log.info("WakeWordProducer thread finished.");
+    }
+
+    /** Bounded exponential backoff: 1s, 2s, 4s … capped at 30s. Never 0, never unbounded. */
+    private long backoffMillis(int failureCount) {
+        return Math.min(30_000L, 1000L * (1L << Math.min(failureCount - 1, 5)));
+    }
+
+    /** Recreate a PipeWire source ONLY — never downgrade to JavaSound (owner decision: stay on PipeWire). */
+    private void recreatePipeWireSource() {
+        PipeWireMicrophoneSource pw = new PipeWireMicrophoneSource();
+        if (pw.isAvailable()) {
+            if (micSource != null) micSource.close();
+            this.micSource = pw;
+        } else {
+            pw.close();
+            // NEVER set micSource to null: the loop top calls micSource.read() with NO null
+            // guard, and an NPE there lands in the outer catch(Exception) which break;s —
+            // killing the producer for good. Keeping the old (dead) source means the next
+            // read() returns -1 → back into the backoff branch, which is the retry we want.
+        }
     }
 
     private void downsample(short[] input, int inputLength, short[] output, int outputLength) {
