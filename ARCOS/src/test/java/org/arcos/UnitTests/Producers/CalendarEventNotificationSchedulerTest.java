@@ -3,6 +3,7 @@ package org.arcos.UnitTests.Producers;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.Producers.CalendarEventNotificationScheduler;
 import org.arcos.Tools.CalendarTool.CalDavCalendarService;
+import org.arcos.Tools.CalendarTool.model.CalendarEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -11,7 +12,9 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -71,6 +74,58 @@ class CalendarEventNotificationSchedulerTest {
 
             // Then
             verify(calendarService, never()).listUpcomingEvents(anyInt());
+        }
+    }
+
+    @Test
+    void scheduleEventNotifications_SameEventOnConsecutivePolls_ShouldEmitOnlyOnce() {
+        // Given — an event sitting in the 1-hour window across two hourly polls
+        LocalDateTime pollTime = LocalDateTime.now().withHour(10).withMinute(0).withSecond(0).withNano(0);
+        CalendarEvent event = CalendarEvent.builder()
+                .id("evt-1").title("Réunion")
+                .startDateTime(pollTime.plusMinutes(30))
+                .build();
+        when(calendarService.isAvailable()).thenReturn(true);
+        when(calendarService.listUpcomingEvents(10)).thenReturn(List.of(event));
+
+        try (MockedStatic<LocalDateTime> mockedLocalDateTime = mockStatic(LocalDateTime.class, CALLS_REAL_METHODS)) {
+            mockedLocalDateTime.when(LocalDateTime::now).thenReturn(pollTime);
+
+            // When — two polls see the same upcoming event
+            scheduler.scheduleEventNotifications();
+            scheduler.scheduleEventNotifications();
+
+            // Then — only one notification is emitted
+            verify(eventQueue, times(1)).offer(any());
+        }
+    }
+
+    @Test
+    void scheduleEventNotifications_RescheduledEvent_ShouldNotifyAgain() {
+        // Given — the same event id comes back with a NEW start time (rescheduled)
+        LocalDateTime pollTime = LocalDateTime.now().withHour(10).withMinute(0).withSecond(0).withNano(0);
+        CalendarEvent original = CalendarEvent.builder()
+                .id("evt-1").title("Réunion")
+                .startDateTime(pollTime.plusMinutes(20))
+                .build();
+        CalendarEvent rescheduled = CalendarEvent.builder()
+                .id("evt-1").title("Réunion")
+                .startDateTime(pollTime.plusMinutes(50))
+                .build();
+        when(calendarService.isAvailable()).thenReturn(true);
+        when(calendarService.listUpcomingEvents(10))
+                .thenReturn(List.of(original))
+                .thenReturn(List.of(rescheduled));
+
+        try (MockedStatic<LocalDateTime> mockedLocalDateTime = mockStatic(LocalDateTime.class, CALLS_REAL_METHODS)) {
+            mockedLocalDateTime.when(LocalDateTime::now).thenReturn(pollTime);
+
+            // When
+            scheduler.scheduleEventNotifications();
+            scheduler.scheduleEventNotifications();
+
+            // Then — both the original and the rescheduled slot are announced
+            verify(eventQueue, times(2)).offer(any());
         }
     }
 

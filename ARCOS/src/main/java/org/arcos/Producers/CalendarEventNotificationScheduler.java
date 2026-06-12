@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Slf4j
 @Service
@@ -18,6 +20,13 @@ public class CalendarEventNotificationScheduler {
 
     private final CalDavCalendarService calendarService;
     private final EventQueue eventQueue;
+
+    /**
+     * Événements déjà notifiés (clé id|début → heure de début), pour ne pas ré-annoncer
+     * le même événement à chaque poll horaire tant qu'il reste dans la fenêtre d'une heure.
+     * Un événement replanifié change de clé et est donc ré-annoncé.
+     */
+    private final Map<String, LocalDateTime> notifiedEvents = new ConcurrentHashMap<>();
 
     public CalendarEventNotificationScheduler(CalDavCalendarService calendarService, EventQueue eventQueue) {
         this.calendarService = calendarService;
@@ -39,6 +48,9 @@ public class CalendarEventNotificationScheduler {
             return;
         }
 
+        // Purge des entrées dont l'événement a déjà commencé (sorties de fenêtre pour de bon)
+        notifiedEvents.values().removeIf(start -> !start.isAfter(now));
+
         try {
             List<CalendarEvent> upcomingEvents = calendarService.listUpcomingEvents(10);
             for (CalendarEvent event : upcomingEvents) {
@@ -46,6 +58,11 @@ public class CalendarEventNotificationScheduler {
                 if (eventStartTime == null) continue;
 
                 if (eventStartTime.isAfter(now) && eventStartTime.isBefore(now.plusHours(1))) {
+                    String dedupKey = dedupKey(event);
+                    if (notifiedEvents.putIfAbsent(dedupKey, eventStartTime) != null) {
+                        log.debug("Événement déjà notifié, ignoré : {}", dedupKey);
+                        continue;
+                    }
                     org.arcos.EventBus.Events.Event<CalendarEvent> pushedEvent = new org.arcos.EventBus.Events.Event<>(
                             EventType.CALENDAR_EVENT_SCHEDULER, EventPriority.HIGH, event, "Calendar event scheduler");
                     eventQueue.offer(pushedEvent);
@@ -54,5 +71,10 @@ public class CalendarEventNotificationScheduler {
         } catch (Exception e) {
             log.error("Erreur lors de la vérification des événements calendrier", e);
         }
+    }
+
+    private static String dedupKey(CalendarEvent event) {
+        String id = event.getId() != null ? event.getId() : event.getTitle();
+        return id + "|" + event.getStartDateTime();
     }
 }
