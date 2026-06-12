@@ -28,6 +28,9 @@ public class GdeltThemeIndexService {
 
     private ConcurrentHashMap<String, GdeltLeafThemes> index;
 
+    private final Set<String> batchBuffer = ConcurrentHashMap.newKeySet();
+    private volatile boolean batchActive = false;
+
     public GdeltThemeIndexService(GdeltThemeIndexRepository repository,
                                   GdeltThemeExtractor extractor,
                                   GdeltThemeIndexProperties properties,
@@ -92,8 +95,63 @@ public class GdeltThemeIndexService {
                 extracted, toExtract.size() - extracted, toRemove.size(), index.size());
     }
 
+    /** Open a batch: subsequent onLeafMutated calls buffer relevant paths instead of extracting/saving. */
+    public void beginBatch() {
+        batchBuffer.clear();
+        batchActive = true;
+    }
+
+    /** Close the batch: run ONE extraction/persist pass over the buffered paths. */
+    public void endBatchAndReconcile() {
+        batchActive = false;
+        Set<String> paths = Set.copyOf(batchBuffer);
+        batchBuffer.clear();
+        if (paths.isEmpty()) {
+            log.debug("GDELT batch closed with no buffered paths, nothing to reconcile");
+            return;
+        }
+        reconcilePaths(paths);
+    }
+
+    /** Targeted reconcile: hash-diff + extract + single save over a known set of paths. */
+    private void reconcilePaths(Set<String> paths) {
+        Path indexPath = Paths.get(properties.getPath());
+        Map<String, String> currentLeaves = personaTreeService.getNonEmptyLeaves();
+        int extracted = 0;
+        int removed = 0;
+
+        for (String path : paths) {
+            if (!isGdeltRelevantPath(path)) continue;
+            String value = currentLeaves.get(path);
+            if (value == null) {
+                if (index.remove(path) != null) removed++;
+                continue;
+            }
+            String currentHash = hashValue(value);
+            GdeltLeafThemes existing = index.get(path);
+            if (existing != null && existing.sourceHash().equals(currentHash)) {
+                continue;
+            }
+            List<GdeltKeyword> keywords = extractor.extract(path, value);
+            if (!keywords.isEmpty()) {
+                index.put(path, new GdeltLeafThemes(path, currentHash, keywords, Instant.now()));
+                extracted++;
+            }
+        }
+
+        if (extracted > 0 || removed > 0) {
+            repository.save(index, indexPath);
+        }
+        log.info("GDELT batch reconcile: {} extracted, {} removed, {} buffered paths",
+                extracted, removed, paths.size());
+    }
+
     public void onLeafMutated(String path, String value, TreeOperationType type) {
         if (!isGdeltRelevantPath(path)) {
+            return;
+        }
+        if (batchActive) {
+            batchBuffer.add(path);   // defer: extraction/persist happen in endBatchAndReconcile()
             return;
         }
 

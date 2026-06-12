@@ -315,4 +315,69 @@ class GdeltThemeIndexServiceTest {
         // Then — entry NOT in index, so next reconcile will retry
         assertThat(service.getIndex()).doesNotContainKey(path);
     }
+
+    // ========== UM-1: batch buffering ==========
+
+    @Test
+    void duringBatch_mutationsAreBufferedNotExtractedOrSaved() {
+        String path = "4_Identity_Characteristics.Life_Beliefs.Political_Stance";
+        service.beginBatch();
+        service.onLeafMutated(path, "écologie", TreeOperationType.ADD);
+        service.onLeafMutated(path, "écologie radicale", TreeOperationType.UPDATE);
+        verify(extractor, never()).extract(any(), any());
+        verify(repository, never()).save(any(), any());
+    }
+
+    @Test
+    void endBatchAndReconcile_extractsAtMostOncePerUniquePath_andSavesOnce() {
+        String pathA = "4_Identity_Characteristics.Life_Beliefs.Political_Stance";
+        String pathB = "5_Behavioral_Characteristics.Interests_and_Skills.Interests_and_Hobbies";
+        when(personaTreeService.getNonEmptyLeaves())
+                .thenReturn(Map.of(pathA, "écologie", pathB, "programmation"));
+        when(extractor.extract(pathA, "écologie"))
+                .thenReturn(List.of(new GdeltKeyword("écologie", KeywordLanguage.FR)));
+        when(extractor.extract(pathB, "programmation"))
+                .thenReturn(List.of(new GdeltKeyword("dev", KeywordLanguage.EN)));
+
+        service.beginBatch();
+        service.onLeafMutated(pathA, "x", TreeOperationType.ADD);
+        service.onLeafMutated(pathA, "y", TreeOperationType.UPDATE);
+        service.onLeafMutated(pathB, "z", TreeOperationType.ADD);
+        service.endBatchAndReconcile();
+
+        verify(extractor, times(1)).extract(eq(pathA), any());
+        verify(extractor, times(1)).extract(eq(pathB), any());
+        verifyNoMoreInteractions(extractor);
+        verify(repository, times(1)).save(any(), any());
+        assertThat(service.getIndex()).containsKeys(pathA, pathB);
+    }
+
+    @Test
+    void endBatchAndReconcile_irrelevantPathsAreNeverBuffered() {
+        service.beginBatch();
+        service.onLeafMutated(
+                "1_Biological_Characteristics.Physical_Appearance.Hair.Scalp_Hair",
+                "brun", TreeOperationType.ADD);
+        service.endBatchAndReconcile();
+        verify(extractor, never()).extract(any(), any());
+        verify(repository, never()).save(any(), any());
+    }
+
+    @Test
+    void endBatchAndReconcile_withNoBufferedPaths_doesNotSave() {
+        service.beginBatch();
+        service.endBatchAndReconcile();
+        verify(repository, never()).save(any(), any());
+    }
+
+    @Test
+    void outsideBatch_onLeafMutated_remainsEager() {
+        String path = "4_Identity_Characteristics.Life_Beliefs.Political_Stance";
+        when(extractor.extract(path, "écologie"))
+                .thenReturn(List.of(new GdeltKeyword("écologie", KeywordLanguage.FR)));
+        service.onLeafMutated(path, "écologie", TreeOperationType.ADD);
+        verify(extractor, times(1)).extract(path, "écologie");
+        verify(repository, times(1)).save(any(), any());
+        assertThat(service.getIndex()).containsKey(path);
+    }
 }

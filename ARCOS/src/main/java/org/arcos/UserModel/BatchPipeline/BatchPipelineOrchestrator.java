@@ -4,7 +4,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.arcos.UserModel.BatchPipeline.Queue.ConversationChunk;
 import org.arcos.UserModel.BatchPipeline.Queue.ConversationQueueService;
 import org.arcos.UserModel.BatchPipeline.Queue.QueuedConversation;
+import org.arcos.UserModel.GdeltThemeIndex.GdeltThemeIndexService;
 import org.arcos.UserModel.PersonaTree.PersonaTreeGate;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,6 +21,8 @@ public class BatchPipelineOrchestrator {
     private final MemListenerPromptBuilder promptBuilder;
     private final PersonaTreeGate personaTreeGate;
     private final MemListenerReadinessCheck readinessCheck;
+    @Nullable
+    private final GdeltThemeIndexService gdeltThemeIndexService; // absent when arcos.gdelt.enabled=false
 
     private volatile boolean interrupted = false;
 
@@ -27,13 +31,15 @@ public class BatchPipelineOrchestrator {
                                      MemListenerClient memListenerClient,
                                      MemListenerPromptBuilder promptBuilder,
                                      PersonaTreeGate personaTreeGate,
-                                     MemListenerReadinessCheck readinessCheck) {
+                                     MemListenerReadinessCheck readinessCheck,
+                                     @Nullable GdeltThemeIndexService gdeltThemeIndexService) {
         this.queueService = queueService;
         this.chunker = chunker;
         this.memListenerClient = memListenerClient;
         this.promptBuilder = promptBuilder;
         this.personaTreeGate = personaTreeGate;
         this.readinessCheck = readinessCheck;
+        this.gdeltThemeIndexService = gdeltThemeIndexService;
     }
 
     public void runBatch() {
@@ -47,27 +53,36 @@ public class BatchPipelineOrchestrator {
         }
         interrupted = false;
         personaTreeGate.createSnapshot();
+        if (gdeltThemeIndexService != null) {
+            gdeltThemeIndexService.beginBatch(); // defer GDELT extraction out of the batch hot path
+        }
 
         List<QueuedConversation> conversations = queueService.drainAll();
         log.info("Batch pipeline processing {} conversations", conversations.size());
 
-        for (int i = 0; i < conversations.size(); i++) {
-            if (interrupted) {
-                log.info("Batch pipeline interrupted, re-enqueuing {} remaining conversations",
-                        conversations.size() - i);
-                for (int j = i; j < conversations.size(); j++) {
-                    queueService.enqueue(conversations.get(j));
+        try {
+            for (int i = 0; i < conversations.size(); i++) {
+                if (interrupted) {
+                    log.info("Batch pipeline interrupted, re-enqueuing {} remaining conversations",
+                            conversations.size() - i);
+                    for (int j = i; j < conversations.size(); j++) {
+                        queueService.enqueue(conversations.get(j));
+                    }
+                    personaTreeGate.persist();
+                    return;
                 }
-                personaTreeGate.persist();
-                return;
+
+                QueuedConversation conversation = conversations.get(i);
+                processConversation(conversation);
             }
 
-            QueuedConversation conversation = conversations.get(i);
-            processConversation(conversation);
+            personaTreeGate.persist();
+            log.info("Batch pipeline completed successfully");
+        } finally {
+            if (gdeltThemeIndexService != null) {
+                gdeltThemeIndexService.endBatchAndReconcile(); // one extraction/persist pass
+            }
         }
-
-        personaTreeGate.persist();
-        log.info("Batch pipeline completed successfully");
     }
 
     public void interrupt() {
