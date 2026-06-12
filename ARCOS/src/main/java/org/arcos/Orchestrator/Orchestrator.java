@@ -82,6 +82,7 @@ public class Orchestrator
     private volatile boolean inConversationMode = false;
 
     private volatile boolean running = true;
+    private volatile Thread consumerThread;
     private DesireService desireService;
     static final int MIN_MESSAGES_FOR_SUMMARY = 6;
     static final String LLM_UNAVAILABLE_MESSAGE =
@@ -187,12 +188,11 @@ public class Orchestrator
 
     public void start() {
         log.info("Orchestrator starting");
-        while (running) {
+        this.consumerThread = Thread.currentThread();
+        while (running && !Thread.currentThread().isInterrupted()) {
             try {
-                Event<?> event = eventQueue.poll(500);
-                if (event != null) {
-                    dispatch(event);
-                }
+                Event<?> event = eventQueue.take();   // blocking, no 500ms latency
+                dispatch(event);
             } catch (InterruptedException e) {
                 log.info("Orchestrator interrupted, stopping");
                 Thread.currentThread().interrupt();
@@ -206,6 +206,9 @@ public class Orchestrator
     public void stop() {
         log.info("Orchestrator shutdown requested");
         running = false;
+        if (consumerThread != null) {
+            consumerThread.interrupt();   // unblock a thread parked in take()
+        }
         moodExecutor.shutdownNow();
         personalityExecutor.shutdownNow();
         ttsHandler.shutdown();
