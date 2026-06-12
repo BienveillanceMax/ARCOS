@@ -113,18 +113,21 @@ class PersonaTreeGateTest {
         String rawOutput = "ADD(path1, \"value1\")\nUPDATE(path2, \"value2\")";
         TreeOperation op1 = new TreeOperation(TreeOperationType.ADD, "path1", "value1");
         TreeOperation op2 = new TreeOperation(TreeOperationType.UPDATE, "path2", "value2");
+        List<TreeOperation> parsedOps = List.of(op1, op2);
         List<TreeOperationResult> expectedResults = List.of(
                 new TreeOperationResult(op1, true, null),
                 new TreeOperationResult(op2, true, null)
         );
-        when(operationService.parseAndApply(rawOutput)).thenReturn(expectedResults);
+        when(operationService.parseOperations(rawOutput)).thenReturn(parsedOps);
+        when(operationService.applyOperations(parsedOps, true)).thenReturn(expectedResults);
 
         // When
         List<TreeOperationResult> results = gate.applyRawOperations(rawOutput);
 
         // Then
         assertEquals(expectedResults, results);
-        verify(operationService).parseAndApply(rawOutput);
+        verify(operationService).parseOperations(rawOutput);
+        verify(operationService).applyOperations(parsedOps, true);
     }
 
     @Test

@@ -12,7 +12,6 @@ public class UserModelProperties {
     private String storagePath = "data/user-tree.json";
     private String personaTreeSchemaPath = "persona-tree-schema.json";
     private String personaTreePath = "data/persona-tree.json";
-    private long debounceSaveMs = 500;
 
     // Batch pipeline (Epic 2)
     private int sessionEndThresholdMinutes = 5;

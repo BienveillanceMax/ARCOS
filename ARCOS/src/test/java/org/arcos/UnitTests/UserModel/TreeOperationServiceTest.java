@@ -36,7 +36,6 @@ class TreeOperationServiceTest {
         properties = new UserModelProperties();
         properties.setPersonaTreeSchemaPath("persona-tree-schema.json");
         properties.setPersonaTreePath("data/persona-tree.json");
-        properties.setDebounceSaveMs(100);
 
         schemaLoader = new PersonaTreeSchemaLoader(properties);
         schemaLoader.init();

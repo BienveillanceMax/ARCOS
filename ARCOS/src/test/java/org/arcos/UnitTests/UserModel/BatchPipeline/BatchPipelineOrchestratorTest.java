@@ -68,7 +68,7 @@ class BatchPipelineOrchestratorTest {
         verify(chunker).chunk(conv);
         verify(promptBuilder).buildPrompt(chunk);
         verify(memListenerClient).generate("test prompt");
-        verify(personaTreeGate).applyRawOperations("ADD(\"path\", \"value\")");
+        verify(personaTreeGate).applyRawOperations("ADD(\"path\", \"value\")", false);
         verify(personaTreeGate).persist();
     }
 
@@ -103,7 +103,7 @@ class BatchPipelineOrchestratorTest {
         // Then: conv2 and conv3 should be re-enqueued
         verify(queueService).enqueue(conv2);
         verify(queueService).enqueue(conv3);
-        // persist should NOT be called since we were interrupted
-        verify(personaTreeGate, never()).persist();
+        // persist should be called to durably save mutations applied before the interrupt
+        verify(personaTreeGate).persist();
     }
 }

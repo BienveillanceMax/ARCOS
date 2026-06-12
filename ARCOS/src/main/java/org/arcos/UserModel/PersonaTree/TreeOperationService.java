@@ -82,6 +82,13 @@ public class TreeOperationService {
      * @return list of results (success/failure per operation)
      */
     public List<TreeOperationResult> applyOperations(List<TreeOperation> operations) {
+        return applyOperations(operations, true);
+    }
+
+    /**
+     * @param persistAfter if false, caller is responsible for calling persist()
+     */
+    public List<TreeOperationResult> applyOperations(List<TreeOperation> operations, boolean persistAfter) {
         List<TreeOperationResult> results = new ArrayList<>();
 
         for (TreeOperation op : operations) {
@@ -89,8 +96,9 @@ public class TreeOperationService {
             results.add(result);
         }
 
-        // Persist after batch
-        treeService.persist();
+        if (persistAfter) {
+            treeService.persist();
+        }
 
         return results;
     }

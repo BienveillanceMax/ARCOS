@@ -11,7 +11,6 @@ import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.concurrent.*;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -23,8 +22,6 @@ public class PersonaTreeService {
     private final PersonaTreeRepository repository;
     private final UserModelProperties properties;
     private final ReadWriteLock lock = new ReentrantReadWriteLock();
-    private final ScheduledExecutorService scheduler;
-    private volatile ScheduledFuture<?> pendingSave;
 
     private PersonaTree tree;
 
@@ -34,12 +31,6 @@ public class PersonaTreeService {
         this.schemaLoader = schemaLoader;
         this.repository = repository;
         this.properties = properties;
-        ThreadFactory daemonFactory = r -> {
-            Thread t = new Thread(r, "persona-tree-persistence");
-            t.setDaemon(true);
-            return t;
-        };
-        this.scheduler = Executors.newSingleThreadScheduledExecutor(daemonFactory);
     }
 
     /**
@@ -215,19 +206,6 @@ public class PersonaTreeService {
     // ========== Persistence ==========
 
     /**
-     * Schedule a persist with debounce.
-     * Cancels any pending persist and schedules a new one.
-     */
-    public void schedulePersist() {
-        ScheduledFuture<?> existing = pendingSave;
-        if (existing != null) {
-            existing.cancel(false);
-        }
-        pendingSave = scheduler.schedule(this::persist,
-                properties.getDebounceSaveMs(), TimeUnit.MILLISECONDS);
-    }
-
-    /**
      * Persist the current tree to disk.
      * Creates a deep copy under ReadLock, then saves outside the lock.
      */
@@ -267,17 +245,9 @@ public class PersonaTreeService {
         return snapshotPath;
     }
 
-    /**
-     * Flush any pending save and shut down the scheduler on context close.
-     */
     @PreDestroy
     public void shutdown() {
-        ScheduledFuture<?> pending = pendingSave;
-        if (pending != null) {
-            pending.cancel(false);
-        }
         persist();
-        scheduler.shutdown();
     }
 
     // ========== Internal Helpers ==========

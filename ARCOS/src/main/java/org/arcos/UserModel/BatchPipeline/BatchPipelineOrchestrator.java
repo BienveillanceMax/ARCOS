@@ -58,6 +58,7 @@ public class BatchPipelineOrchestrator {
                 for (int j = i; j < conversations.size(); j++) {
                     queueService.enqueue(conversations.get(j));
                 }
+                personaTreeGate.persist();
                 return;
             }
 
@@ -88,7 +89,7 @@ public class BatchPipelineOrchestrator {
                 String response = memListenerClient.generate(prompt);
 
                 if (!response.isEmpty()) {
-                    personaTreeGate.applyRawOperations(response);
+                    personaTreeGate.applyRawOperations(response, false);
                     log.debug("Applied operations from chunk of conversation {}", conversation.id());
                 } else {
                     log.debug("Empty response from MemListener for chunk of conversation {}", conversation.id());

@@ -90,7 +90,15 @@ public class PersonaTreeGate {
      * @return list of results (success/failure per operation)
      */
     public List<TreeOperationResult> applyRawOperations(String rawOutput) {
-        return operationService.parseAndApply(rawOutput);
+        return applyRawOperations(rawOutput, true);
+    }
+
+    /**
+     * @param persistAfter if false, caller is responsible for calling persist()
+     */
+    public List<TreeOperationResult> applyRawOperations(String rawOutput, boolean persistAfter) {
+        List<TreeOperation> operations = operationService.parseOperations(rawOutput);
+        return operationService.applyOperations(operations, persistAfter);
     }
 
     /**

@@ -206,6 +206,13 @@ class PersonaTreeServiceTest {
         assertEquals("gris", newService.getLeafValue(PATH_HAIR_SCALP), "Should load leaf value");
     }
 
+    @Test
+    void shutdownPersistsTree() {
+        service.setLeafValue(PATH_HAIR_SCALP, "auburn");
+        service.shutdown();
+        verify(repository).save(any(PersonaTree.class), any(Path.class));
+    }
+
     // Helper to navigate to a leaf in a tree for testing
     private PersonaNode navigateToLeafInTree(PersonaTree tree, String dotPath) {
         String[] segments = dotPath.split("\\.");
