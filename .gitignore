@@ -5,6 +5,5 @@ ARCOS/target/
 ARCOS/src/main/resources/client_secrets.json
 ARCOS/data/
 ARCOS/qdrant_storage/
-ARCOS/src/main/java/org/arcos/Docker/qdrant_storage/
 ARCOS/tokens/
 ARCOS/application-local.yaml
