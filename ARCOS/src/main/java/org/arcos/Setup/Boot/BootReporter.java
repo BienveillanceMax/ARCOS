@@ -4,8 +4,12 @@ import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Configuration.PersonalityProperties;
 import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.IO.InputHandling.STT.SttBackendType;
+import org.arcos.Setup.Health.HealthResult;
 import org.arcos.Setup.Health.PiperHealthChecker;
+import org.arcos.Setup.Health.QdrantHealthChecker;
+import org.arcos.Setup.Health.ServiceHealthCheck;
 import org.arcos.Setup.Health.ServiceStatus;
+import org.arcos.Setup.Health.SttHealthChecker;
 import org.arcos.Tools.CalendarTool.CalDavCalendarService;
 import org.arcos.Tools.SearchTool.BraveSearchService;
 import org.arcos.Setup.UI.BootPhaseRenderer;
@@ -20,6 +24,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
+import java.net.URI;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -42,6 +47,14 @@ public class BootReporter {
     private final BraveSearchService braveSearchService;
     private final CalDavCalendarService calendarService;
     private final ApplicationContext applicationContext;
+
+    private ServiceHealthCheck qdrantChecker = new QdrantHealthChecker();
+    private ServiceHealthCheck sttChecker = new SttHealthChecker();
+
+    public void setHealthCheckers(ServiceHealthCheck qdrant, ServiceHealthCheck stt) { // test seam
+        this.qdrantChecker = qdrant;
+        this.sttChecker = stt;
+    }
 
     @Value("${qdrant.host:localhost}")
     private String qdrantHost;
@@ -75,7 +88,7 @@ public class BootReporter {
         renderReport();
     }
 
-    private void collectServiceStatuses() {
+    public void collectServiceStatuses() {
         // ── PERSONNALITÉ ──────────────────────────────────────────────────────
         registry.register("Profil", ServiceStatus.ONLINE,
                 personalityProperties.getProfile(), CATEGORY_PERSONALITY);
@@ -90,9 +103,11 @@ public class BootReporter {
                     "No ChatModel bean", CATEGORY_CORE);
         }
 
-        // Qdrant — si Spring a démarré, Qdrant est forcément connecté
-        registry.register("VECTOR DB", ServiceStatus.ONLINE,
-                "Qdrant (" + qdrantHost + ":" + qdrantPort + ")", CATEGORY_CORE);
+        // Qdrant — sonde réelle (TCP), pas de statut fabriqué
+        HealthResult qdrant = qdrantChecker.check(ServiceHealthCheck.ServiceConfig.of(qdrantHost, qdrantPort));
+        registry.register("VECTOR DB", qdrant.status(),
+                qdrant.isOnline() ? "Qdrant (" + qdrantHost + ":" + qdrantPort + ")" : qdrant.message(),
+                CATEGORY_CORE);
 
         // TTS Piper
         ServiceStatusEntry piperStatus = checkPiperStatus();
@@ -111,12 +126,23 @@ public class BootReporter {
                     "PORCUPINE_ACCESS_KEY absent", CATEGORY_INTERACTION);
         }
 
-        // Speech-to-Text
-        String sttLabel = switch (sttProperties.getBackend()) {
-            case FASTER_WHISPER -> "Faster Whisper (" + sttProperties.getFasterWhisperUrl() + ")";
-            case WHISPER_CPP -> "Whisper.cpp (" + sttProperties.getWhisperCppUrl() + ")";
+        // Speech-to-Text — sonde réelle sur l'URL du backend sélectionné
+        String sttUrl = switch (sttProperties.getBackend()) {
+            case FASTER_WHISPER -> sttProperties.getFasterWhisperUrl();
+            case WHISPER_CPP -> sttProperties.getWhisperCppUrl();
         };
-        registry.register("VOIX", ServiceStatus.ONLINE, sttLabel, CATEGORY_INTERACTION);
+        URI u = URI.create(sttUrl);
+        int sttPort = u.getPort() > 0 ? u.getPort()
+                : (sttProperties.getBackend() == SttBackendType.WHISPER_CPP ? 8090 : 8000);
+        HealthResult stt = sttChecker.check(
+                ServiceHealthCheck.ServiceConfig.of(u.getHost() != null ? u.getHost() : "localhost", sttPort));
+        String sttLabel = switch (sttProperties.getBackend()) {
+            case FASTER_WHISPER -> "Faster Whisper (" + sttUrl + ")";
+            case WHISPER_CPP -> "Whisper.cpp (" + sttUrl + ")";
+        };
+        registry.register("VOIX", stt.status(),
+                stt.isOnline() ? sttLabel : sttLabel + " — " + stt.message(),
+                CATEGORY_INTERACTION);
 
         // ── OUTILS ────────────────────────────────────────────────────────────
         // Web search
