@@ -90,10 +90,11 @@ public class ChatOrchestrator {
                 .content()
                 .onErrorResume(e -> {
                     if (e instanceof CallNotPermittedException || e instanceof RequestNotPermitted) {
-                        return Flux.error(e);
+                        return Flux.error(e); // routed to the @CircuitBreaker fallback
                     }
-                    log.warn("Streaming content error (likely tool-call chunk): {}", e.getMessage());
-                    return Flux.empty();
+                    log.error("Erreur en cours de streaming, réponse tronquée: {}", e.getMessage(), e);
+                    feedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
+                    return Flux.just(" Désolé, j'ai eu un problème et j'ai été coupé en pleine réponse. Réessaie.");
                 });
     }
 
