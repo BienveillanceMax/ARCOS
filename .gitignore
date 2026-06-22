@@ -7,3 +7,5 @@ ARCOS/data/
 ARCOS/qdrant_storage/
 ARCOS/tokens/
 ARCOS/application-local.yaml
+# autoresearch transient run log
+autoresearch.last.log

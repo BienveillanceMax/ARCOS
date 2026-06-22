@@ -290,11 +290,11 @@ class EouLatencyBench {
         AudioProperties p = new AudioProperties();
         p.setSampleRate(44100);
         p.setSilenceThreshold(1000);
-        p.setSilenceDurationMs(1200);
+        p.setSilenceDurationMs(600);
         p.setMaxRecordingSeconds(30);
         p.setMultiTurnEnabled(true);
         p.setPostResponseListeningWindowMs(4000);
-        p.setConversationSilenceMs(1500);
+        p.setConversationSilenceMs(800);
         // Override from env if present (so iterations can sweep these without code edits)
         String thr = System.getenv("ARCOS_BENCH_SILENCE_THRESHOLD");
         if (thr != null) p.setSilenceThreshold(Integer.parseInt(thr));
