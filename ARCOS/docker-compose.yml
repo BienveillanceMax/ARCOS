@@ -49,6 +49,18 @@ services:
        - "8090:8080"
      devices:
        - /dev/dri:/dev/dri
+     # Encoder mel-context cap. Default is 1500 mel-frames (30s) regardless of input length;
+     # 500 (10s) covers any realistic single-utterance query while cutting encoder attention
+     # complexity (O(n^2) in audio-ctx). For utterances >10s the audio is truncated, which is
+     # acceptable for ARCOS's interactive voice-query workload.
+     command: [
+       "--host", "0.0.0.0",
+       "--port", "8080",
+       "--model", "/models/ggml-large-v3-turbo.bin",
+       "--language", "fr",
+       "--no-timestamps",
+       "--audio-ctx", "500"
+     ]
      restart: unless-stopped
      healthcheck:
        test: ["CMD", "curl", "-f", "http://localhost:8080/"]
