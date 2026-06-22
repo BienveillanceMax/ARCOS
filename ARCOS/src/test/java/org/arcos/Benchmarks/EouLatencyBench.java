@@ -2,6 +2,7 @@ package org.arcos.Benchmarks;
 
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.Configuration.SpeechToTextProperties;
+import org.arcos.IO.InputHandling.AudioFraming;
 import org.arcos.IO.InputHandling.STT.SttBackendType;
 import org.arcos.IO.InputHandling.STT.SttGate;
 import org.junit.jupiter.api.Test;
@@ -56,23 +57,7 @@ class EouLatencyBench {
     private static final int BYTES_PER_SAMPLE = 2;
     private static final int WHISPER_FRAME_SIZE = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20; // 1600 bytes = 50ms @ 16kHz
 
-    /** 21-tap low-pass FIR (Hamming, fc=7200Hz at 44100Hz) — mirrors WakeWordProducer.LP_FILTER */
-    private static final double[] LP_FILTER;
-    static {
-        int N = 21;
-        double fc = 7200.0 / 44100.0;
-        LP_FILTER = new double[N];
-        double sum = 0;
-        int M = N / 2;
-        for (int i = 0; i < N; i++) {
-            double n = i - M;
-            double sinc = (n == 0) ? 2 * Math.PI * fc : Math.sin(2 * Math.PI * fc * n) / (Math.PI * n);
-            double hamming = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (N - 1));
-            LP_FILTER[i] = sinc * hamming;
-            sum += LP_FILTER[i];
-        }
-        for (int i = 0; i < N; i++) LP_FILTER[i] /= sum;
-    }
+    /** 21-tap low-pass FIR — now lives in {@link AudioFraming#LP_FILTER}. Kept symbol-deleted; this is a marker comment only. */
 
     @Test
     void bench_eou_latency() throws Exception {
@@ -195,7 +180,7 @@ class EouLatencyBench {
                     ByteBuffer.wrap(micBuffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(micSamples);
                     int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
                     short[] downsampled = new short[whisperSamples];
-                    downsample(micSamples, samplesRead, downsampled, whisperSamples);
+                    AudioFraming.downsample(micSamples, samplesRead, downsampled, whisperSamples);
                     ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
                     bb.clear();
                     for (short s : downsampled) bb.putShort(s);
@@ -208,7 +193,7 @@ class EouLatencyBench {
                     preBufferIndex++;
                 }
 
-                boolean isSilent = isSilence(whisperBuffer, silenceThreshold);
+                boolean isSilent = AudioFraming.isSilence(whisperBuffer, silenceThreshold);
 
                 if (!isSilent) {
                     lastSoundTime = System.currentTimeMillis();
@@ -221,7 +206,8 @@ class EouLatencyBench {
                         }
                     }
                 }
-                if (hasDetectedSpeech) {
+                // Mirror WakeWordProducer: only buffer non-silent frames once speech has been detected.
+                if (hasDetectedSpeech && !isSilent) {
                     gate.processAudio(whisperBuffer);
                 }
 
@@ -256,34 +242,7 @@ class EouLatencyBench {
         }
     }
 
-    /** Mirrors WakeWordProducer.isSilence — RMS over signed-16-bit little-endian samples. */
-    private static boolean isSilence(byte[] audioData, int silenceThreshold) {
-        long sum = 0;
-        int sampleCount = audioData.length / 2;
-        for (int i = 0; i < audioData.length - 1; i += 2) {
-            short sample = (short) ((audioData[i + 1] << 8) | (audioData[i] & 0xFF));
-            sum += (long) sample * sample;
-        }
-        double rms = Math.sqrt((double) sum / sampleCount);
-        return rms < silenceThreshold;
-    }
-
-    /** Mirrors WakeWordProducer.downsample — FIR-filtered point picker. */
-    private static void downsample(short[] input, int inputLength, short[] output, int outputLength) {
-        double ratio = (double) inputLength / outputLength;
-        int halfTaps = LP_FILTER.length / 2;
-        for (int i = 0; i < outputLength; i++) {
-            int center = (int) (i * ratio);
-            double acc = 0;
-            for (int t = 0; t < LP_FILTER.length; t++) {
-                int idx = center - halfTaps + t;
-                if (idx >= 0 && idx < inputLength) {
-                    acc += input[idx] * LP_FILTER[t];
-                }
-            }
-            output[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(acc)));
-        }
-    }
+    // --- (audio framing helpers now live in IO.InputHandling.AudioFraming; LP_FILTER + downsample + isSilence removed from bench) ---
 
     /** Load main/resources/application.properties so the bench tracks production config automatically. */
     private static Properties loadAppProperties() throws IOException {

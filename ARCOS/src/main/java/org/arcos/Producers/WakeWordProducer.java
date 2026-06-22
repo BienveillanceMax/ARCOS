@@ -6,6 +6,7 @@ import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.EventBus.Events.WakeWordEvent;
+import org.arcos.IO.InputHandling.AudioFraming;
 import org.arcos.IO.InputHandling.JavaSoundMicrophoneSource;
 import org.arcos.IO.InputHandling.MicrophoneSource;
 import org.arcos.IO.InputHandling.PipeWireMicrophoneSource;
@@ -59,25 +60,13 @@ public class WakeWordProducer implements Runnable {
 
     /**
      * 21-tap low-pass FIR filter (Hamming window, fc=7200Hz at 44100Hz).
-     * Provides ~44dB stopband attenuation to prevent aliasing when downsampling to 16kHz.
-     * Only active on the JavaSound fallback path (PipeWire captures at 16kHz natively).
+     * Moved to {@link org.arcos.IO.InputHandling.AudioFraming}; kept as a deprecated alias
+     * so any external code that still depends on this constant continues to resolve.
+     *
+     * @deprecated use {@link org.arcos.IO.InputHandling.AudioFraming#LP_FILTER}
      */
-    private static final double[] LP_FILTER;
-    static {
-        int N = 21;
-        double fc = 7200.0 / 44100.0;
-        LP_FILTER = new double[N];
-        double sum = 0;
-        int M = N / 2;
-        for (int i = 0; i < N; i++) {
-            double n = i - M;
-            double sinc = (n == 0) ? 2 * Math.PI * fc : Math.sin(2 * Math.PI * fc * n) / (Math.PI * n);
-            double hamming = 0.54 - 0.46 * Math.cos(2 * Math.PI * i / (N - 1));
-            LP_FILTER[i] = sinc * hamming;
-            sum += LP_FILTER[i];
-        }
-        for (int i = 0; i < N; i++) LP_FILTER[i] /= sum;
-    }
+    @Deprecated
+    private static final double[] LP_FILTER = AudioFraming.LP_FILTER;
 
     private volatile boolean suspended = false;
     private volatile boolean needsDrain = false;
@@ -390,19 +379,7 @@ public class WakeWordProducer implements Runnable {
     }
 
     private void downsample(short[] input, int inputLength, short[] output, int outputLength) {
-        double ratio = (double) inputLength / outputLength;
-        int halfTaps = LP_FILTER.length / 2;
-        for (int i = 0; i < outputLength; i++) {
-            int center = (int) (i * ratio);
-            double acc = 0;
-            for (int t = 0; t < LP_FILTER.length; t++) {
-                int idx = center - halfTaps + t;
-                if (idx >= 0 && idx < inputLength) {
-                    acc += input[idx] * LP_FILTER[t];
-                }
-            }
-            output[i] = (short) Math.max(Short.MIN_VALUE, Math.min(Short.MAX_VALUE, Math.round(acc)));
-        }
+        AudioFraming.downsample(input, inputLength, output, outputLength);
     }
 
     private String recordAndTranscribe() {
@@ -480,8 +457,12 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    // Only buffer audio once speech has been detected
-                    if (hasDetectedSpeech) {
+                    // Only buffer audio once speech has been detected.
+                    // Skip trailing-silence frames — they add audio that the STT model
+                    // has to process for no information gain. Inter-word brief pauses
+                    // typically remain non-silent thanks to ambient/breath noise; pure
+                    // tail-silence after the utterance is what gets dropped here.
+                    if (hasDetectedSpeech && !isSilent) {
                         sttGate.processAudio(whisperBuffer);
                     }
 
@@ -525,16 +506,7 @@ public class WakeWordProducer implements Runnable {
     }
 
     private boolean isSilence(byte[] audioData) {
-        long sum = 0;
-        int sampleCount = audioData.length / 2;
-
-        for (int i = 0; i < audioData.length - 1; i += 2) {
-            short sample = (short) ((audioData[i + 1] << 8) | (audioData[i] & 0xFF));
-            sum += sample * sample;
-        }
-
-        double rms = Math.sqrt((double) sum / sampleCount);
-        return rms < silenceThreshold;
+        return AudioFraming.isSilence(audioData, silenceThreshold);
     }
 
     /**
@@ -653,8 +625,8 @@ public class WakeWordProducer implements Runnable {
                         }
                     }
 
-                    // Only buffer audio once speech has been detected
-                    if (hasDetectedSpeech) {
+                    // Only buffer audio once speech has been detected; skip trailing silence (see initial loop).
+                    if (hasDetectedSpeech && !isSilent) {
                         sttGate.processAudio(whisperBuffer);
                     }
 
