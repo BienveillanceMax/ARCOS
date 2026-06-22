@@ -20,6 +20,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * End-of-Utterance latency benchmark.
@@ -124,6 +129,11 @@ class EouLatencyBench {
     /** Single benchmark run: replay WAV in real-time through silence detector + STT. */
     private long runOne(Wav wav, AudioProperties audio, SpeechToTextProperties stt, SttBackendType backend) throws InterruptedException {
         SttGate gate = SttGate.create(backend, stt);
+        ExecutorService speculationExecutor = Executors.newSingleThreadExecutor(r -> {
+            Thread t = new Thread(r, "stt-speculation-bench");
+            t.setDaemon(true);
+            return t;
+        });
         try {
             gate.reset();
 
@@ -148,6 +158,8 @@ class EouLatencyBench {
             int wavPos = 0;
             int silenceThreshold = audio.getSilenceThreshold();
             long silenceDurationMs = audio.getSilenceDurationMs();
+            // Mirrors WakeWordProducer.recordAndTranscribe(): speculative STT launched at silence-onset.
+            Future<String> speculation = null;
 
             long startNs = System.nanoTime();
             long t0Ms = System.currentTimeMillis();
@@ -205,6 +217,11 @@ class EouLatencyBench {
                             if (frame != null) gate.processAudio(frame);
                         }
                     }
+                    if (speculation != null) speculation = null; // orphan; speaker resumed
+                } else if (hasDetectedSpeech && speculation == null) {
+                    // First silent frame after speech — launch speculative STT now to overlap with silence-wait.
+                    final SttGate g = gate;
+                    speculation = speculationExecutor.submit(g::getTranscription);
                 }
                 // Mirror WakeWordProducer: only buffer non-silent frames once speech has been detected.
                 if (hasDetectedSpeech && !isSilent) {
@@ -214,8 +231,20 @@ class EouLatencyBench {
                 if (hasDetectedSpeech && isSilent) {
                     long silenceDuration = System.currentTimeMillis() - lastSoundTime;
                     if (silenceDuration >= silenceDurationMs) {
-                        // Silence triggered — fire STT and stop the loop
-                        gate.getTranscription();
+                        // Silence confirmed — await speculative STT (in-flight since silence-onset),
+                        // or fall back to a sync call if none was launched.
+                        if (speculation != null) {
+                            try {
+                                speculation.get(10, TimeUnit.SECONDS);
+                            } catch (TimeoutException te) {
+                                speculation.cancel(true);
+                                gate.getTranscription();
+                            } catch (Exception e) {
+                                gate.getTranscription();
+                            }
+                        } else {
+                            gate.getTranscription();
+                        }
                         sttResultMs = System.currentTimeMillis();
                         break;
                     }
@@ -239,6 +268,7 @@ class EouLatencyBench {
             return sttResultMs - endOfSpeechMs;
         } finally {
             gate.close();
+            speculationExecutor.shutdownNow();
         }
     }
 

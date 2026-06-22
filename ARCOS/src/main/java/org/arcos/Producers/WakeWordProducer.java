@@ -35,6 +35,11 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Component
 @Slf4j
@@ -49,6 +54,20 @@ public class WakeWordProducer implements Runnable {
     private final AudioCueFeedbackHandler audioCueFeedbackHandler;
     private final AudioProperties audioProperties;
     private final SpeechToTextProperties sttProperties;
+
+    /**
+     * Single-thread executor that runs speculative STT calls launched the moment silence is
+     * first detected. The blocking HTTP round-trip runs concurrently with the
+     * {@code silenceDurationMs} confirmation wait, so end-of-utterance latency drops to
+     * {@code max(silenceDurationMs, sttRoundTrip)} instead of {@code silenceDurationMs + sttRoundTrip}.
+     * If the speaker resumes within the silence window, the in-flight future is orphaned
+     * (compute is wasted but no extra user-perceived latency is incurred).
+     */
+    private final ExecutorService speculationExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "stt-speculation");
+        t.setDaemon(true);
+        return t;
+    });
     private volatile Thread wakeWordThread;
     private boolean porcupineEnabled = false;
     private boolean porcupineInitialized = false;
@@ -102,6 +121,7 @@ public class WakeWordProducer implements Runnable {
         if (porcupine != null) {
             porcupine.delete();
         }
+        speculationExecutor.shutdownNow();
     }
 
     @Autowired
@@ -406,6 +426,9 @@ public class WakeWordProducer implements Runnable {
         long lastSoundTime = System.currentTimeMillis();
         long recordingStartTime = System.currentTimeMillis();
         boolean hasDetectedSpeech = false;
+        // Speculative STT: launched on the first silent frame after speech, awaited at loop exit.
+        // null = no speculation in flight (either we never started or the speaker resumed and we orphaned it).
+        Future<String> speculation = null;
 
         try {
             while (true) {
@@ -455,6 +478,17 @@ public class WakeWordProducer implements Runnable {
                                 }
                             }
                         }
+                        // Speaker resumed — orphan any in-flight speculative STT.
+                        // We do not cancel the OkHttp call (saves complexity); its result is just discarded.
+                        if (speculation != null) {
+                            log.debug("Speech resumed; orphaning speculative STT");
+                            speculation = null;
+                        }
+                    } else if (hasDetectedSpeech && speculation == null) {
+                        // First silent frame after speech — launch the speculative STT call now,
+                        // so its HTTP round-trip overlaps with the silenceDurationMs confirmation wait.
+                        log.debug("Silence-onset; launching speculative STT");
+                        speculation = speculationExecutor.submit(sttGate::getTranscription);
                     }
 
                     // Only buffer audio once speech has been detected.
@@ -490,11 +524,13 @@ public class WakeWordProducer implements Runnable {
                 }
             }
 
-            // Process transcription only if speech was actually detected
+            // Process transcription only if speech was actually detected.
+            // If we launched a speculative call at silence-onset, await it instead of a fresh blocking call.
             if (hasDetectedSpeech && sttGate.hasMinimumAudio()) {
                 log.info("Processing {}ms of audio...", sttGate.getBufferedAudioDurationMs());
-                return sttGate.getTranscription();
+                return awaitSpeculationOrTranscribe(speculation);
             } else {
+                if (speculation != null) speculation.cancel(true);
                 log.info(hasDetectedSpeech ? "Not enough audio data for transcription" : "No speech detected");
                 return "";
             }
@@ -507,6 +543,27 @@ public class WakeWordProducer implements Runnable {
 
     private boolean isSilence(byte[] audioData) {
         return AudioFraming.isSilence(audioData, silenceThreshold);
+    }
+
+    /**
+     * If a speculative STT call was launched at silence-onset, await its result; otherwise
+     * fall back to a synchronous {@code sttGate.getTranscription()}. Any exception or timeout
+     * from the speculative path also falls back, so the request still completes.
+     */
+    private String awaitSpeculationOrTranscribe(Future<String> speculation) {
+        if (speculation == null) {
+            return sttGate.getTranscription();
+        }
+        try {
+            return speculation.get(10, TimeUnit.SECONDS);
+        } catch (TimeoutException te) {
+            log.warn("Speculative STT timed out after 10s; cancelling and falling back to sync call");
+            speculation.cancel(true);
+            return sttGate.getTranscription();
+        } catch (Exception e) {
+            log.warn("Speculative STT failed; falling back to sync call: {}", e.toString());
+            return sttGate.getTranscription();
+        }
     }
 
     /**
@@ -575,6 +632,8 @@ public class WakeWordProducer implements Runnable {
         long lastSoundTime = System.currentTimeMillis();
         long recordingStartTime = System.currentTimeMillis();
         boolean hasDetectedSpeech = false;
+        // Speculative STT — see recordAndTranscribe() for rationale.
+        Future<String> speculation = null;
 
         try {
             while (true) {
@@ -623,6 +682,13 @@ public class WakeWordProducer implements Runnable {
                                 }
                             }
                         }
+                        if (speculation != null) {
+                            log.debug("[CONVERSATION] Speech resumed; orphaning speculative STT");
+                            speculation = null;
+                        }
+                    } else if (hasDetectedSpeech && speculation == null) {
+                        log.debug("[CONVERSATION] Silence-onset; launching speculative STT");
+                        speculation = speculationExecutor.submit(sttGate::getTranscription);
                     }
 
                     // Only buffer audio once speech has been detected; skip trailing silence (see initial loop).
@@ -656,8 +722,9 @@ public class WakeWordProducer implements Runnable {
 
             if (hasDetectedSpeech && sttGate.hasMinimumAudio()) {
                 log.info("[CONVERSATION] Traitement de {}ms d'audio...", sttGate.getBufferedAudioDurationMs());
-                return sttGate.getTranscription();
+                return awaitSpeculationOrTranscribe(speculation);
             } else {
+                if (speculation != null) speculation.cancel(true);
                 log.info(hasDetectedSpeech ? "[CONVERSATION] Pas assez d'audio pour la transcription" : "[CONVERSATION] Aucune parole détectée");
                 return "";
             }
