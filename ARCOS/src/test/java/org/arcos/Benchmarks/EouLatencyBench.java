@@ -18,6 +18,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * End-of-Utterance latency benchmark.
@@ -78,14 +79,17 @@ class EouLatencyBench {
         int warmup = envInt("ARCOS_BENCH_WARMUP", 3);
         int measured = envInt("ARCOS_BENCH_MEASURED", 10);
         String fixturePath = env("ARCOS_BENCH_FIXTURE", "ARCOS/src/test/resources/audio/eou_fixture.wav");
-        String sttUrl = env("ARCOS_BENCH_STT_URL", "http://localhost:8000");
-        String sttModel = env("ARCOS_BENCH_STT_MODEL", "deepdml/faster-whisper-large-v3-turbo-ct2");
-        String lang = env("ARCOS_BENCH_LANG", "fr");
+
+        // Load production config from application.properties so the bench tracks prod automatically.
+        Properties appProps = loadAppProperties();
+        AudioProperties audio = audioFromAppProps(appProps);
+        SpeechToTextProperties stt = sttFromAppProps(appProps);
+        SttBackendType backend = SttBackendType.valueOf(
+                appProps.getProperty("arcos.stt.backend", "FASTER_WHISPER").trim());
 
         // Resolve fixture relative to either the repo root or the ARCOS module dir
         Path fixture = Paths.get(fixturePath);
         if (!Files.exists(fixture)) {
-            // Try without the ARCOS/ prefix in case we're already inside the module dir
             String alt = fixturePath.startsWith("ARCOS/") ? fixturePath.substring("ARCOS/".length()) : fixturePath;
             fixture = Paths.get(alt);
         }
@@ -97,25 +101,21 @@ class EouLatencyBench {
         System.out.printf("BENCH fixture: %s | sampleRate=%d ch=%d duration=%.3fs%n",
                 fixture, wav.sampleRate, wav.channels, wav.durationSec());
 
-        AudioProperties audio = baselineAudioProps();
-        SpeechToTextProperties stt = new SpeechToTextProperties();
-        stt.setFasterWhisperUrl(sttUrl);
-        stt.setFasterWhisperModel(sttModel);
-        stt.setLanguage(lang);
-
-        System.out.printf("BENCH config: silenceThreshold=%d silenceDurationMs=%d sttUrl=%s model=%s lang=%s%n",
-                audio.getSilenceThreshold(), audio.getSilenceDurationMs(), sttUrl, sttModel, lang);
+        String sttUrl = backend == SttBackendType.WHISPER_CPP ? stt.getWhisperCppUrl() : stt.getFasterWhisperUrl();
+        System.out.printf("BENCH config: backend=%s silenceThreshold=%d silenceDurationMs=%d sttUrl=%s model=%s lang=%s%n",
+                backend, audio.getSilenceThreshold(), audio.getSilenceDurationMs(),
+                sttUrl, stt.getFasterWhisperModel(), stt.getLanguage());
 
         // Warmup
         for (int i = 0; i < warmup; i++) {
-            long t = runOne(wav, audio, stt);
+            long t = runOne(wav, audio, stt, backend);
             System.out.printf("BENCH warmup[%d]=%dms%n", i, t);
         }
 
         // Measured
         List<Long> latencies = new ArrayList<>(measured);
         for (int i = 0; i < measured; i++) {
-            long t = runOne(wav, audio, stt);
+            long t = runOne(wav, audio, stt, backend);
             latencies.add(t);
             System.out.printf("BENCH measured[%d]=%dms%n", i, t);
         }
@@ -137,8 +137,8 @@ class EouLatencyBench {
     }
 
     /** Single benchmark run: replay WAV in real-time through silence detector + STT. */
-    private long runOne(Wav wav, AudioProperties audio, SpeechToTextProperties stt) throws InterruptedException {
-        SttGate gate = SttGate.create(SttBackendType.FASTER_WHISPER, stt);
+    private long runOne(Wav wav, AudioProperties audio, SpeechToTextProperties stt, SttBackendType backend) throws InterruptedException {
+        SttGate gate = SttGate.create(backend, stt);
         try {
             gate.reset();
 
@@ -285,22 +285,54 @@ class EouLatencyBench {
         }
     }
 
-    /** Baseline AudioProperties matching application.properties shipped values. */
-    private static AudioProperties baselineAudioProps() {
-        AudioProperties p = new AudioProperties();
-        p.setSampleRate(44100);
-        p.setSilenceThreshold(1000);
-        p.setSilenceDurationMs(300);
-        p.setMaxRecordingSeconds(30);
-        p.setMultiTurnEnabled(true);
-        p.setPostResponseListeningWindowMs(4000);
-        p.setConversationSilenceMs(500);
-        // Override from env if present (so iterations can sweep these without code edits)
+    /** Load main/resources/application.properties so the bench tracks production config automatically. */
+    private static Properties loadAppProperties() throws IOException {
+        Properties p = new Properties();
+        // Try classpath first (test runtime classpath includes main resources)
+        try (InputStream in = EouLatencyBench.class.getResourceAsStream("/application.properties")) {
+            if (in != null) {
+                p.load(in);
+                return p;
+            }
+        }
+        // Fallback: read from disk relative to repo layout
+        Path[] candidates = new Path[] {
+                Paths.get("ARCOS/src/main/resources/application.properties"),
+                Paths.get("src/main/resources/application.properties")
+        };
+        for (Path c : candidates) {
+            if (Files.exists(c)) {
+                try (InputStream in = Files.newInputStream(c)) { p.load(in); }
+                return p;
+            }
+        }
+        throw new IOException("application.properties not found on classpath or under ARCOS/src/main/resources");
+    }
+
+    private static AudioProperties audioFromAppProps(Properties p) {
+        AudioProperties a = new AudioProperties();
+        a.setSampleRate(Integer.parseInt(p.getProperty("arcos.audio.sample-rate", "44100").trim()));
+        a.setSilenceThreshold(Integer.parseInt(p.getProperty("arcos.audio.silence-threshold", "1000").trim()));
+        a.setSilenceDurationMs(Integer.parseInt(p.getProperty("arcos.audio.silence-duration-ms", "1200").trim()));
+        a.setMaxRecordingSeconds(Integer.parseInt(p.getProperty("arcos.audio.max-recording-seconds", "30").trim()));
+        a.setMultiTurnEnabled(Boolean.parseBoolean(p.getProperty("arcos.audio.multi-turn-enabled", "true").trim()));
+        a.setPostResponseListeningWindowMs(Integer.parseInt(p.getProperty("arcos.audio.post-response-listening-window-ms", "4000").trim()));
+        a.setConversationSilenceMs(Integer.parseInt(p.getProperty("arcos.audio.conversation-silence-ms", "1500").trim()));
+        // Env-var overrides (still supported, for sweep experiments without source edits)
         String thr = System.getenv("ARCOS_BENCH_SILENCE_THRESHOLD");
-        if (thr != null) p.setSilenceThreshold(Integer.parseInt(thr));
+        if (thr != null) a.setSilenceThreshold(Integer.parseInt(thr));
         String dur = System.getenv("ARCOS_BENCH_SILENCE_DURATION_MS");
-        if (dur != null) p.setSilenceDurationMs(Integer.parseInt(dur));
-        return p;
+        if (dur != null) a.setSilenceDurationMs(Integer.parseInt(dur));
+        return a;
+    }
+
+    private static SpeechToTextProperties sttFromAppProps(Properties p) {
+        SpeechToTextProperties s = new SpeechToTextProperties();
+        s.setFasterWhisperUrl(p.getProperty("arcos.stt.faster-whisper-url", "http://localhost:8000").trim());
+        s.setWhisperCppUrl(p.getProperty("arcos.stt.whisper-cpp-url", "http://localhost:8090").trim());
+        s.setFasterWhisperModel(p.getProperty("arcos.stt.faster-whisper-model", "deepdml/faster-whisper-large-v3-turbo-ct2").trim());
+        s.setLanguage(p.getProperty("arcos.stt.language", "fr").trim());
+        return s;
     }
 
     // --- WAV helpers (RIFF/WAVE PCM mono/stereo, 16-bit LE) ---

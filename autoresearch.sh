@@ -14,21 +14,24 @@ cd "$REPO_ROOT"
 LOG="${REPO_ROOT}/autoresearch.last.log"
 : > "$LOG"
 
-echo "[autoresearch] ensuring faster-whisper container is up..." | tee -a "$LOG"
+echo "[autoresearch] ensuring STT containers are up..." | tee -a "$LOG"
+# Always bring up both — application.properties chooses which one the bench hits.
+(cd ARCOS && docker compose up -d faster-whisper whisper-cpp) 2>&1 | tee -a "$LOG" >/dev/null
+# Wait up to 180s for faster-whisper if it's still booting (model preload)
+for i in {1..60}; do
+    if curl -fsS --max-time 3 http://localhost:8000/health >/dev/null 2>&1; then break; fi
+    sleep 3
+done
+for i in {1..30}; do
+    code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:8090/ 2>&1)
+    if [[ "$code" =~ ^[234] ]]; then break; fi
+    sleep 2
+done
 if ! curl -fsS --max-time 3 http://localhost:8000/health >/dev/null 2>&1; then
-    (cd ARCOS && docker compose up -d faster-whisper) 2>&1 | tee -a "$LOG"
-    # Wait up to 180s for healthy
-    for i in {1..60}; do
-        if curl -fsS --max-time 3 http://localhost:8000/health >/dev/null 2>&1; then
-            echo "[autoresearch] faster-whisper healthy" | tee -a "$LOG"
-            break
-        fi
-        sleep 3
-    done
-    if ! curl -fsS --max-time 3 http://localhost:8000/health >/dev/null 2>&1; then
-        echo "[autoresearch] FATAL: faster-whisper never became healthy" | tee -a "$LOG"
-        exit 2
-    fi
+    echo "[autoresearch] WARN: faster-whisper not reachable at :8000" | tee -a "$LOG"
+fi
+if ! curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://localhost:8090/ 2>&1 | grep -qE "^[234]"; then
+    echo "[autoresearch] WARN: whisper-cpp not reachable at :8090" | tee -a "$LOG"
 fi
 
 echo "[autoresearch] running EouLatencyBench..." | tee -a "$LOG"

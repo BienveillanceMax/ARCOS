@@ -36,6 +36,8 @@
 |---:|:--|---:|---:|---:|:--|
 | 0 (baseline) | kept | **6800** | — | — | shipped defaults; min=6679 max=6926 mean=6797 |
 | 1 | kept | **6008** | -792 (-11.6%) | -792 (-11.6%) | silence-duration 1200→600, conversation 1500→800 |
+| 2 | kept | **5761** | -247 (-4.1%) | -1039 (-15.3%) | silence-duration 600→300, conversation 800→500 |
+| 3 | kept | **2057** | **-3704 (-64.3%)** | **-4743 (-69.7%)** | STT backend FASTER_WHISPER → WHISPER_CPP (Vulkan iGPU) |
 
 ## Baseline decomposition (per timestamps in run log)
 
@@ -74,3 +76,28 @@ Detailed entries appended per iteration in `autoresearch.jsonl`. This file is th
 - **Δ vs prev:** −0.792 s (−11.6%)
 - **Decision:** **keep**. Result slightly better than predicted (warmer STT cache likely).
 - **Note:** STT inference now ~5.4 s of total — dominant cost is firmly the STT model, not the silence wait.
+
+### Iteration 2 — further trim silence wait
+
+- **Hypothesis:** 300 ms is consistent with commercial voice assistants; should save another ~300 ms.
+- **Edits:**
+  - `application.properties`: `arcos.audio.silence-duration-ms` 600 → 300
+  - `application.properties`: `arcos.audio.conversation-silence-ms` 800 → 500
+- **EOU median:** 5761 ms (n=10, min=5687, max=5900, mean=5766, σ≈65)
+- **Δ vs prev:** −247 ms (−4.1%)
+- **Δ vs baseline:** −1039 ms (−15.3%)
+- **Decision:** **keep**. Silence-wait knob essentially exhausted; STT is now ~94% of total.
+- **Risk note:** at 300 ms, in production, very slow speakers may experience occasional premature cut-offs. Consider re-validating with a real-speech fixture before shipping.
+
+### Iteration 3 — switch STT backend to whisper.cpp Vulkan
+
+- **Hypothesis:** Raw HTTP round-trip benchmark on the same 16 kHz WAV: faster-whisper CPU int8 = ~5.83 s; whisper.cpp Vulkan on AMD Radeon 780M iGPU = ~1.80 s. **3.24× speedup.** If it carries to the full bench, EOU should drop to ~2.25 s.
+- **Edits:**
+  - `application.properties`: `arcos.stt.backend` FASTER_WHISPER → WHISPER_CPP
+  - `EouLatencyBench`: refactor to load `AudioProperties` and `SpeechToTextProperties` directly from `application.properties` on classpath. Kills the bench/prod drift problem — all future property edits are picked up automatically by the bench.
+  - `autoresearch.sh`: also bring up `whisper-cpp` container (port 8090).
+- **EOU median:** 2057 ms (n=10, min=2037, max=2079, mean=2059, σ≈14)
+- **Δ vs prev:** −3704 ms (−64.3%)
+- **Δ vs baseline:** **−4743 ms (−69.7%)** — acceptance target (≤ 2000 ms) essentially hit.
+- **Decision:** **keep**. Major win. Variance also tightened ~5× (Vulkan path is more deterministic than CPU).
+- **Decomposition:** silence wait ~450 ms + STT ~1600 ms = 2057 ms. STT still dominant but no longer pathologically so.
