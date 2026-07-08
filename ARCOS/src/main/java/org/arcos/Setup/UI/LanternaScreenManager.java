@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.IntConsumer;
 
 /**
  * Full-screen Lanterna implementation of WizardDisplay.
@@ -33,6 +34,7 @@ public class LanternaScreenManager implements WizardDisplay {
     private final List<StepIndicator.Status> stepStatuses = new ArrayList<>();
     private int activeStepIndex = -1;
     private int currentPanelRow = 0;
+    private String keyHints = "";
 
     public LanternaScreenManager(Screen screen) {
         this.screen = screen;
@@ -57,6 +59,7 @@ public class LanternaScreenManager implements WizardDisplay {
         writeLock.lock();
         try {
             LanternaComponents.drawBorders(tg, layout, palette);
+            LanternaComponents.drawFooter(tg, layout, palette, keyHints);
             drawStepIndex();
             refresh();
         } finally {
@@ -66,6 +69,7 @@ public class LanternaScreenManager implements WizardDisplay {
 
     @Override
     public void activateStep(int i) {
+        recalculateLayout();
         activeStepIndex = i;
         if (i < stepStatuses.size()) {
             stepStatuses.set(i, StepIndicator.Status.ACTIVE);
@@ -80,6 +84,13 @@ public class LanternaScreenManager implements WizardDisplay {
             writeLock.unlock();
         }
         currentPanelRow = 0;
+    }
+
+    @Override
+    public void resetStep(int i) {
+        if (i >= 0 && i < stepStatuses.size()) {
+            stepStatuses.set(i, StepIndicator.Status.PENDING);
+        }
     }
 
     @Override
@@ -129,6 +140,11 @@ public class LanternaScreenManager implements WizardDisplay {
     }
 
     @Override
+    public void setRow(int row) {
+        currentPanelRow = Math.max(0, row);
+    }
+
+    @Override
     public void statusLine(String label, String value, String detail, StatusColor statusColor) {
         int absRow = layout.panelContentStart() + currentPanelRow;
         if (absRow > layout.panelContentEnd()) return;
@@ -145,7 +161,13 @@ public class LanternaScreenManager implements WizardDisplay {
 
     @Override
     public void gauge(String label, int value, int labelWidth) {
-        int absRow = layout.panelContentStart() + currentPanelRow;
+        gauge(currentPanelRow, label, value, labelWidth);
+        currentPanelRow++;
+    }
+
+    @Override
+    public void gauge(int row, String label, int value, int labelWidth) {
+        int absRow = layout.panelContentStart() + row;
         if (absRow > layout.panelContentEnd()) return;
         writeLock.lock();
         try {
@@ -154,12 +176,42 @@ public class LanternaScreenManager implements WizardDisplay {
         } finally {
             writeLock.unlock();
         }
-        currentPanelRow++;
     }
 
     @Override
     public String gaugeCompact(String abbreviation, int value) {
         return LanternaComponents.gaugeCompactText(abbreviation, value);
+    }
+
+    @Override
+    public int selectMenu(List<MenuItem> items, int defaultIndex, IntConsumer onHighlight) {
+        int startRow = layout.panelContentStart() + currentPanelRow;
+        int choice = LanternaMenu.run(screen, tg, layout, palette, writeLock,
+                startRow, items, defaultIndex < 0 ? 0 : defaultIndex, onHighlight);
+        currentPanelRow += items.size();
+        return choice;
+    }
+
+    @Override
+    public void reveal(String text) {
+        int absRow = layout.panelContentStart() + currentPanelRow;
+        if (absRow > layout.panelContentEnd()) return;
+        int x = layout.leftMargin() + 4;
+        Animations.scrambleDecode(tg, screen, x, absRow,
+                text, palette.dim(), palette.bright(), 500, writeLock);
+        currentPanelRow++;
+    }
+
+    @Override
+    public void setKeyHints(String hints) {
+        this.keyHints = hints != null ? hints : "";
+        writeLock.lock();
+        try {
+            LanternaComponents.drawFooter(tg, layout, palette, keyHints);
+            refresh();
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     @Override
@@ -293,7 +345,7 @@ public class LanternaScreenManager implements WizardDisplay {
         writeLock.lock();
         try {
             tg.setForegroundColor(palette.muted());
-            tg.putString(inputX, absRow, "[Enter] ");
+            tg.putString(inputX, absRow, "[ ↵ ] ");
             refresh();
         } finally {
             writeLock.unlock();
@@ -341,16 +393,13 @@ public class LanternaScreenManager implements WizardDisplay {
 
     private void drawStepIndex() {
         List<StepState> states = new ArrayList<>();
-        int count = Math.min(5, stepDefs != null ? stepDefs.size() : 0);
+        int count = stepDefs != null ? stepDefs.size() : 0;
         for (int i = 0; i < count; i++) {
             StepDefinition def = stepDefs.get(i);
             StepIndicator.Status status = i < stepStatuses.size()
                     ? stepStatuses.get(i)
                     : StepIndicator.Status.PENDING;
             states.add(new StepState(def.romanNumeral(), def.latinName(), status));
-        }
-        while (states.size() < 4) {
-            states.add(new StepState("", "---", StepIndicator.Status.PENDING));
         }
         LanternaComponents.drawStepIndex(tg, layout, states, palette);
     }
@@ -415,7 +464,7 @@ public class LanternaScreenManager implements WizardDisplay {
                         input.append(key.getCharacter());
                         writeLock.lock();
                         try {
-                            String display = masked ? "*" : String.valueOf(key.getCharacter());
+                            String display = masked ? "●" : String.valueOf(key.getCharacter());
                             tg.setForegroundColor(palette.text());
                             tg.putString(startX + input.length() - 1, row, display);
                             screen.setCursorPosition(new TerminalPosition(startX + input.length(), row));

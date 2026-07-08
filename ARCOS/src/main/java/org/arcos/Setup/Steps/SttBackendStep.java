@@ -2,10 +2,13 @@ package org.arcos.Setup.Steps;
 
 import org.arcos.IO.InputHandling.STT.SttBackendType;
 import org.arcos.Setup.StepDefinition;
-import org.arcos.Setup.UI.AnsiPalette;
+import org.arcos.Setup.UI.StatusColor;
 import org.arcos.Setup.UI.WizardDisplay;
+import org.arcos.Setup.UI.WizardDisplay.MenuItem;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
+
+import java.util.List;
 
 /**
  * Step III — INTERPRES: STT backend selection.
@@ -14,14 +17,14 @@ import org.arcos.Setup.WizardStep;
  */
 public class SttBackendStep implements WizardStep {
 
-    private record BackendOption(SttBackendType type, String description) {}
-
-    private static final BackendOption[] BACKENDS = {
-            new BackendOption(SttBackendType.FASTER_WHISPER,
-                    "Local CPU inference — Raspberry Pi compatible"),
-            new BackendOption(SttBackendType.WHISPER_CPP,
-                    "GPU inference (ROCm/Vulkan) — server with iGPU/dGPU")
+    private static final SttBackendType[] BACKENDS = {
+            SttBackendType.FASTER_WHISPER,
+            SttBackendType.WHISPER_CPP
     };
+
+    private static final List<MenuItem> BACKEND_ITEMS = List.of(
+            new MenuItem("FASTER-WHISPER", "CPU inference · Raspberry Pi class"),
+            new MenuItem("WHISPER-CPP", "GPU inference · ROCm/Vulkan server"));
 
     @Override
     public String getName() {
@@ -45,78 +48,40 @@ public class SttBackendStep implements WizardStep {
 
     @Override
     public StepResult execute(WizardDisplay display, WizardContext context) {
-        boolean color = display.isColorSupported();
-
-        display.printLine("Select speech-to-text backend:");
-        display.printLine("");
-
-        for (int i = 0; i < BACKENDS.length; i++) {
-            BackendOption b = BACKENDS[i];
-            String nameColor = color ? AnsiPalette.BRIGHT : "";
-            String reset = color ? AnsiPalette.RESET : "";
-
-            display.printLine("[" + (i + 1) + "]  " + nameColor + b.type().name() + reset
-                    + " \u2014 " + b.description());
-        }
-
-        display.printLine("");
+        display.setKeyHints("↑↓ NAV · ↵ SELECT · ESC BACK");
 
         SttBackendType currentBackend = context.getModel().getSttBackend();
-        String defaultHint = " [current: " + currentBackend.name() + "]";
+        int defaultIndex = currentBackend == SttBackendType.WHISPER_CPP ? 1 : 0;
 
-        while (true) {
-            String input = display.readLine("\u25b8 (1-2 or 's' to skip)" + defaultHint + " ");
+        display.printLine("SPEECH-TO-TEXT ENGINE");
+        display.printLine("");
 
-            if (input == null || input.isBlank()) {
-                display.printLine(okText("Backend kept: " + currentBackend.name(), color));
-                return StepResult.success("Backend kept: " + currentBackend.name());
-            }
-
-            if ("s".equalsIgnoreCase(input.trim()) || "skip".equalsIgnoreCase(input.trim())) {
-                return StepResult.skipped("STT backend skipped — default: " + currentBackend.name());
-            }
-
-            try {
-                int choice = Integer.parseInt(input.trim());
-                if (choice >= 1 && choice <= BACKENDS.length) {
-                    BackendOption chosen = BACKENDS[choice - 1];
-                    context.getModel().setSttBackend(chosen.type());
-
-                    if (chosen.type() == SttBackendType.WHISPER_CPP) {
-                        String currentUrl = context.getModel().getSttWhisperCppUrl();
-                        if (currentUrl == null || currentUrl.isBlank()) {
-                            currentUrl = "http://localhost:8090";
-                        }
-                        String urlHint = " [default: " + currentUrl + "]";
-
-                        display.printLine("");
-                        String urlInput = display.readLine("\u25b8 whisper.cpp URL" + urlHint + " ");
-
-                        if (urlInput == null || urlInput.isBlank()) {
-                            context.getModel().setSttWhisperCppUrl(currentUrl);
-                        } else {
-                            context.getModel().setSttWhisperCppUrl(urlInput.trim());
-                        }
-
-                        display.printLine(okText("Backend: " + chosen.type().name()
-                                + " @ " + context.getModel().getSttWhisperCppUrl(), color));
-                        return StepResult.success("Backend: " + chosen.type().name()
-                                + " @ " + context.getModel().getSttWhisperCppUrl());
-                    }
-
-                    display.printLine(okText("Backend selected: " + chosen.type().name(), color));
-                    return StepResult.success("Backend: " + chosen.type().name());
-                } else {
-                    display.showError("Choose between 1 and " + BACKENDS.length + ".");
-                }
-            } catch (NumberFormatException e) {
-                display.showError("Enter a number (1-2) or 's' to skip.");
-            }
+        int choice = display.selectMenu(BACKEND_ITEMS, defaultIndex);
+        if (choice == WizardDisplay.MENU_BACK) {
+            return StepResult.BACK;
         }
-    }
 
-    private String okText(String msg, boolean color) {
-        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
-        return "[OK] " + msg;
+        SttBackendType chosen = BACKENDS[choice];
+        context.getModel().setSttBackend(chosen);
+
+        if (chosen == SttBackendType.WHISPER_CPP) {
+            String currentUrl = context.getModel().getSttWhisperCppUrl();
+            if (currentUrl == null || currentUrl.isBlank()) {
+                currentUrl = "http://localhost:8090";
+            }
+
+            display.setKeyHints("↵ CONFIRM · EMPTY = DEFAULT");
+            display.printLine("");
+            String urlInput = display.readLine("ENDPOINT [" + currentUrl + "] ▸ ");
+
+            String url = (urlInput == null || urlInput.isBlank()) ? currentUrl : urlInput.trim();
+            context.getModel().setSttWhisperCppUrl(url);
+
+            display.printLine("");
+            display.statusLine("INTERPRES", chosen.name(), url, StatusColor.OK);
+            return StepResult.success("Backend: " + chosen.name() + " @ " + url);
+        }
+
+        return StepResult.success("Backend: " + chosen.name());
     }
 }

@@ -33,18 +33,21 @@ public interface WizardStep {
     StepResult execute(WizardDisplay display, WizardContext context);
 
     /** Result of step execution. */
-    record StepResult(boolean success, boolean skipped, String message) {
+    record StepResult(boolean success, boolean skipped, boolean back, String message) {
 
         public static StepResult success(String message) {
-            return new StepResult(true, false, message);
+            return new StepResult(true, false, false, message);
         }
 
         public static StepResult skipped(String message) {
-            return new StepResult(true, true, message);
+            return new StepResult(true, true, false, message);
         }
 
         public static StepResult failure(String message) {
-            return new StepResult(false, false, message);
+            return new StepResult(false, false, false, message);
         }
+
+        /** User backed out (Esc) — the runner returns to the previous step. */
+        public static final StepResult BACK = new StepResult(false, false, true, "back");
     }
 }

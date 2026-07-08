@@ -70,6 +70,44 @@ public class MockWizardDisplay implements WizardDisplay {
     }
 
     @Override
+    public void gauge(int row, String label, int value, int labelWidth) {
+        printedLines.add("GAUGE[" + row + "]: " + label + " = " + value);
+    }
+
+    @Override
+    public int selectMenu(List<MenuItem> items, int defaultIndex,
+                          java.util.function.IntConsumer onHighlight) {
+        StringBuilder menu = new StringBuilder("MENU:");
+        for (MenuItem item : items) {
+            menu.append(" [").append(item.label()).append("]");
+        }
+        printedLines.add(menu.toString());
+        if (onHighlight != null) onHighlight.accept(Math.max(0, defaultIndex));
+
+        String response = inputResponses.isEmpty() ? null : inputResponses.poll();
+        if (response == null || response.isBlank()) {
+            return Math.max(0, Math.min(items.size() - 1, defaultIndex));
+        }
+        if ("b".equalsIgnoreCase(response.trim())) {
+            return MENU_BACK;
+        }
+        try {
+            int choice = Integer.parseInt(response.trim());
+            return Math.max(0, Math.min(items.size() - 1, choice - 1));
+        } catch (NumberFormatException e) {
+            return Math.max(0, Math.min(items.size() - 1, defaultIndex));
+        }
+    }
+
+    @Override
+    public void reveal(String text) {
+        printedLines.add("REVEAL: " + text);
+    }
+
+    @Override
+    public void setKeyHints(String hints) {}
+
+    @Override
     public String gaugeCompact(String abbreviation, int value) {
         return GaugeRenderer.renderCompact(abbreviation, value, false);
     }

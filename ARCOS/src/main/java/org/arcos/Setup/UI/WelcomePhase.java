@@ -2,8 +2,6 @@ package org.arcos.Setup.UI;
 
 import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.graphics.TextGraphics;
-import com.googlecode.lanterna.input.KeyStroke;
-import com.googlecode.lanterna.input.KeyType;
 import com.googlecode.lanterna.screen.Screen;
 import org.arcos.Setup.ConfigurationModel;
 import org.arcos.Setup.Detection.ConfigurationDetector;
@@ -32,8 +30,9 @@ public final class WelcomePhase {
         int termHeight = screen.getTerminalSize().getRows();
         LayoutCalculator.ScreenLayout layout = LayoutCalculator.calculate(termWidth, termHeight);
 
-        // Clear interior
+        // Clear interior + phase header
         clearInterior(tg, layout, palette);
+        LanternaComponents.drawHeaderBar(tg, layout, palette, "VIGILIA v1.0");
 
         // Draw panel divider
         drawWelcomeDivider(tg, layout, palette);
@@ -127,49 +126,23 @@ public final class WelcomePhase {
         drawStatusRow(tg, screen, layout, row, "PORCUPINE", porcValue, null, porcColor, palette, stagger, lock);
         row += 2;
 
-        // Choice options
+        // Decision menu + footer hints
         lock.lock();
         try {
-            LanternaComponents.drawContentRow(tg, layout, row,
-                    "[1]  BOOT — proceed with current configuration", palette.text(), palette);
-            row++;
-            LanternaComponents.drawContentRow(tg, layout, row,
-                    "[2]  RECONFIGURE — run setup wizard", palette.text(), palette);
-            row += 2;
-
-            // Prompt
-            int cx = layout.leftMargin() + 4;
-            tg.setForegroundColor(palette.primary());
-            tg.putString(layout.leftMargin(), row, "┃");
-            tg.putString(cx, row, "▸ ");
-            tg.setForegroundColor(palette.text());
-            // Pad rest
-            int remaining = layout.leftMargin() + layout.frameWidth() - 1 - (cx + 2);
-            if (remaining > 0) tg.putString(cx + 2, row, " ".repeat(remaining));
-            tg.setForegroundColor(palette.primary());
-            tg.putString(layout.leftMargin() + layout.frameWidth() - 1, row, "┃");
-
+            LanternaComponents.drawFooter(tg, layout, palette, "↑↓ NAV · ↵ SELECT");
             screen.refresh();
         } catch (IOException ignored) {
         } finally {
             lock.unlock();
         }
 
-        // Wait for input: 1 or 2
-        while (true) {
-            try {
-                KeyStroke key = screen.readInput();
-                if (key.getKeyType() == KeyType.Character) {
-                    char c = key.getCharacter();
-                    if (c == '1') return WelcomeResult.BOOT;
-                    if (c == '2') return WelcomeResult.RECONFIGURE;
-                }
-                if (key.getKeyType() == KeyType.Enter) return WelcomeResult.BOOT;
-                if (key.getKeyType() == KeyType.EOF) return WelcomeResult.BOOT;
-            } catch (IOException e) {
-                return WelcomeResult.BOOT;
-            }
-        }
+        int choice = LanternaMenu.run(screen, tg, layout, palette, lock, row,
+                java.util.List.of(
+                        new WizardDisplay.MenuItem("BOOT", "proceed with current configuration"),
+                        new WizardDisplay.MenuItem("RECONFIGURE", "run setup wizard")),
+                0, null);
+
+        return choice == 1 ? WelcomeResult.RECONFIGURE : WelcomeResult.BOOT;
     }
 
     private static void drawStatusRow(TextGraphics tg, Screen screen,

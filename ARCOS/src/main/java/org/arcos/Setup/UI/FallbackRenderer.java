@@ -84,6 +84,13 @@ public class FallbackRenderer implements WizardDisplay {
     }
 
     @Override
+    public void resetStep(int i) {
+        if (i >= 0 && i < stepStatuses.size()) {
+            stepStatuses.set(i, StepIndicator.Status.PENDING);
+        }
+    }
+
+    @Override
     public void printLine(int row, String text) {
         // In fallback mode, row is ignored — sequential output
         out.println("   " + text);
@@ -115,8 +122,62 @@ public class FallbackRenderer implements WizardDisplay {
     }
 
     @Override
+    public void gauge(int row, String label, int value, int labelWidth) {
+        // Fallback has no positioned drawing — sequential output
+        gauge(label, value, labelWidth);
+    }
+
+    @Override
     public String gaugeCompact(String abbreviation, int value) {
         return GaugeRenderer.renderCompact(abbreviation, value, color);
+    }
+
+    @Override
+    public int selectMenu(List<WizardDisplay.MenuItem> items, int defaultIndex,
+                          java.util.function.IntConsumer onHighlight) {
+        // No live navigation in scrolling mode: numbered list + line input.
+        int labelWidth = items.stream().mapToInt(i -> i.label().length()).max().orElse(0);
+        for (int i = 0; i < items.size(); i++) {
+            WizardDisplay.MenuItem item = items.get(i);
+            String annotation = item.annotation() != null ? "  " + item.annotation() : "";
+            String label = item.label().length() >= labelWidth
+                    ? item.label()
+                    : item.label() + " ".repeat(labelWidth - item.label().length());
+            out.println("   [" + (i + 1) + "] " + label + annotation);
+        }
+        out.flush();
+
+        while (true) {
+            String input = readLine("> (1-" + items.size() + ", 'b' back) ["
+                    + (defaultIndex + 1) + "] ");
+            if (input == null || input.isBlank()) {
+                return Math.max(0, Math.min(items.size() - 1, defaultIndex));
+            }
+            String trimmed = input.trim();
+            if ("b".equalsIgnoreCase(trimmed) || "back".equalsIgnoreCase(trimmed)) {
+                return MENU_BACK;
+            }
+            try {
+                int choice = Integer.parseInt(trimmed);
+                if (choice >= 1 && choice <= items.size()) {
+                    return choice - 1;
+                }
+            } catch (NumberFormatException ignored) {
+            }
+            showError("Enter a number between 1 and " + items.size() + ", or 'b' to go back.");
+        }
+    }
+
+    @Override
+    public void reveal(String text) {
+        out.println();
+        out.println("   " + text);
+        out.flush();
+    }
+
+    @Override
+    public void setKeyHints(String hints) {
+        // No footer in scrolling mode
     }
 
     @Override

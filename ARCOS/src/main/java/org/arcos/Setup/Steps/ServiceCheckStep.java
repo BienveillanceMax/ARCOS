@@ -53,15 +53,13 @@ public class ServiceCheckStep implements WizardStep {
     public StepResult execute(WizardDisplay display, WizardContext context) {
         boolean color = display.isColorSupported();
 
-        display.printLine("Checking services...");
-        display.printLine("");
+        display.setKeyHints("CORPUS SCAN IN PROGRESS");
 
         Map<String, CheckTask> checks = buildChecks(context);
         ExecutorService executor = Executors.newFixedThreadPool(Math.min(checks.size(), 5));
 
         int online = 0;
         int total = checks.size();
-        int row = 2; // start after header lines
 
         for (Map.Entry<String, CheckTask> entry : checks.entrySet()) {
             String label = entry.getKey();
@@ -115,6 +113,7 @@ public class ServiceCheckStep implements WizardStep {
         display.statusLine(summaryValue, summaryTag, null, summaryColor);
 
         display.printLine("");
+        display.setKeyHints("↵ CONTINUE");
         display.waitForKey();
 
         return StepResult.success(online + "/" + total + " services operational.");

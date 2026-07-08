@@ -2,23 +2,36 @@ package org.arcos.Setup.Steps;
 
 import org.arcos.Setup.ConfigurationModel;
 import org.arcos.Setup.StepDefinition;
-import org.arcos.Setup.UI.AnsiPalette;
 import org.arcos.Setup.UI.StatusColor;
 import org.arcos.Setup.UI.WizardDisplay;
+import org.arcos.Setup.UI.WizardDisplay.MenuItem;
 import org.arcos.Setup.Validation.ApiKeyValidator;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
 
+import java.util.List;
+
 /**
  * Step I — NEXUS: API key entry and validation.
- * - MISTRALAI_API_KEY: mandatory, validated via HTTP
- * - BRAVE_SEARCH_API_KEY: optional, skippable
- * - PORCUPINE_ACCESS_KEY: optional, skippable
+ * - MISTRALAI_API_KEY: mandatory, validated via HTTP, fixed retry region
+ * - BRAVE_SEARCH_API_KEY / PORCUPINE_ACCESS_KEY: optional, CONFIGURE/SKIP menu
  *
- * All text in English. Masked input via display.readMaskedLine().
- * Fixed 3-line validation region that rewrites in place on retry.
+ * Fixed row map (panel-relative) — regions rewrite in place, never creep:
+ *   0  MISTRALAI_API_KEY ........ REQUIRED
+ *   1    KEY ▸ input
+ *   2    validation status
+ *   4  BRAVE_SEARCH_API_KEY ..... OPTIONAL · WEB SEARCH
+ *   5-6  menu CONFIGURE / SKIP
+ *   7    input → result
+ *   9  PORCUPINE_ACCESS_KEY ..... OPTIONAL · WAKE WORD
+ *   10-11 menu CONFIGURE / SKIP
+ *   12   input → result
  */
 public class ApiKeyStep implements WizardStep {
+
+    private static final List<MenuItem> CONFIGURE_OR_SKIP = List.of(
+            new MenuItem("CONFIGURE", "enter and validate key"),
+            new MenuItem("SKIP", "feature stays disabled"));
 
     private final ApiKeyValidator validator;
 
@@ -52,127 +65,132 @@ public class ApiKeyStep implements WizardStep {
 
     @Override
     public StepResult execute(WizardDisplay display, WizardContext context) {
-        boolean color = display.isColorSupported();
         ConfigurationModel model = context.getModel();
 
-        display.printLine("Enter your API keys. Keys are masked and stored in .env (permissions 600).");
-        display.printLine("");
-
-        // ── Mistral AI (mandatory) ──────────────────────────────────────────
-        display.printLine("MISTRALAI_API_KEY *");
-        int mistralInputRow = 3; // fixed row for retry region
+        // ── Mistral AI (mandatory, in-place retry region rows 0-2) ──────────
+        display.setKeyHints("↵ CONFIRM · KEYS MASKED");
+        display.setRow(0);
+        display.statusLine("MISTRALAI_API_KEY", "REQUIRED", null, StatusColor.INFO);
 
         boolean mistralOk = false;
         while (!mistralOk) {
             String existingKey = model.getMistralApiKey();
-            String prompt = buildPrompt(existingKey, color);
-            display.printLine(mistralInputRow, ""); // clear line
-            String key = display.readMaskedLine(prompt);
 
-            // If user pressed Enter with existing key, keep it
+            display.printLine(1, "");
+            display.printLine(2, "");
+            display.setRow(1);
+            String key = display.readMaskedLine(buildPrompt(existingKey));
+
+            // Enter with an existing key keeps it
             if ((key == null || key.isBlank()) && existingKey != null && !existingKey.isBlank()) {
                 key = existingKey;
             }
 
             if (key == null || key.isBlank()) {
-                display.printLine(mistralInputRow + 1, errorText("Mistral AI key is required.", color));
+                display.setRow(2);
+                display.showError("Mistral AI key is required.");
                 continue;
             }
 
-            WizardDisplay.SpinnerHandle spinner = display.showSpinner("Validating Mistral AI...");
+            display.setRow(2);
+            WizardDisplay.SpinnerHandle spinner = display.showSpinner("VALIDATING MISTRAL AI");
             ApiKeyValidator.ValidationResult result = validator.validateMistralKey(key);
 
             if (result.valid()) {
                 model.setMistralApiKey(key);
                 model.setKeyValidated("MISTRALAI_API_KEY", true);
-                spinner.stop(okText("Key validated (" + ApiKeyValidator.maskKey(key) + ")", color));
+                spinner.stop("✓ VALIDATED  " + ApiKeyValidator.maskKey(key));
                 mistralOk = true;
             } else {
-                spinner.stop(errorText("Invalid key: " + result.message(), color));
+                spinner.stop("✗ INVALID — " + result.message());
             }
         }
-
-        display.printLine("");
 
         // ── Brave Search (optional) ─────────────────────────────────────────
-        display.printLine("BRAVE_SEARCH_API_KEY [OPTIONAL]");
-        display.printLine("[1] Enter key   [2] Skip");
-        String braveChoice = display.readLine("\u25b8 ");
-
-        if ("1".equals(braveChoice)) {
-            String existingBrave = model.getBraveSearchApiKey();
-            String key = display.readMaskedLine(buildPrompt(existingBrave, color));
-            if ((key == null || key.isBlank()) && existingBrave != null && !existingBrave.isBlank()) {
-                key = existingBrave;
-            }
-            if (key != null && !key.isBlank()) {
-                WizardDisplay.SpinnerHandle spinner = display.showSpinner("Validating Brave Search...");
-                ApiKeyValidator.ValidationResult result = validator.validateBraveKey(key);
-                if (result.valid()) {
-                    model.setBraveSearchApiKey(key);
-                    model.setKeyValidated("BRAVE_SEARCH_API_KEY", true);
-                    spinner.stop(okText("Key validated (" + ApiKeyValidator.maskKey(key) + ")", color));
-                } else {
-                    spinner.stop(errorText("Invalid key: " + result.message() + " — not saved.", color));
-                    context.addWarning("BRAVE_SEARCH_API_KEY invalid — web search disabled");
-                }
-            }
-        } else {
-            context.addWarning("BRAVE_SEARCH_API_KEY not configured — web search disabled");
-            display.printLine(mutedText("Skipped — web search disabled", color));
-        }
-
-        display.printLine("");
+        display.setKeyHints("↑↓ NAV · ↵ SELECT · ESC BACK");
+        int braveResult = configureOptionalKey(display, "BRAVE_SEARCH_API_KEY",
+                "OPTIONAL · WEB SEARCH", 4,
+                model.getBraveSearchApiKey(),
+                key -> {
+                    ApiKeyValidator.ValidationResult r = validator.validateBraveKey(key);
+                    if (r.valid()) {
+                        model.setBraveSearchApiKey(key);
+                        model.setKeyValidated("BRAVE_SEARCH_API_KEY", true);
+                    }
+                    return r;
+                },
+                context, "web search disabled");
+        if (braveResult == WizardDisplay.MENU_BACK) return StepResult.BACK;
 
         // ── Porcupine (optional) ────────────────────────────────────────────
-        display.printLine("PORCUPINE_ACCESS_KEY [OPTIONAL]");
-        display.printLine("[1] Enter key   [2] Skip");
-        String porcChoice = display.readLine("\u25b8 ");
-
-        if ("1".equals(porcChoice)) {
-            String existingPorc = model.getPorcupineAccessKey();
-            String key = display.readMaskedLine(buildPrompt(existingPorc, color));
-            if ((key == null || key.isBlank()) && existingPorc != null && !existingPorc.isBlank()) {
-                key = existingPorc;
-            }
-            if (key != null && !key.isBlank()) {
-                ApiKeyValidator.ValidationResult result = validator.validatePorcupineKey(key);
-                if (result.valid()) {
-                    model.setPorcupineAccessKey(key);
-                    model.setKeyValidated("PORCUPINE_ACCESS_KEY", true);
-                    display.printLine(okText("Key registered (" + ApiKeyValidator.maskKey(key) + ")", color));
-                } else {
-                    display.showError("Invalid key: " + result.message() + " — not saved.");
-                    context.addWarning("PORCUPINE_ACCESS_KEY invalid — wake word disabled");
-                }
-            }
-        } else {
-            context.addWarning("PORCUPINE_ACCESS_KEY not configured — wake word disabled");
-            display.printLine(mutedText("Skipped — wake word disabled", color));
-        }
+        int porcResult = configureOptionalKey(display, "PORCUPINE_ACCESS_KEY",
+                "OPTIONAL · WAKE WORD", 9,
+                model.getPorcupineAccessKey(),
+                key -> {
+                    ApiKeyValidator.ValidationResult r = validator.validatePorcupineKey(key);
+                    if (r.valid()) {
+                        model.setPorcupineAccessKey(key);
+                        model.setKeyValidated("PORCUPINE_ACCESS_KEY", true);
+                    }
+                    return r;
+                },
+                context, "wake word disabled");
+        if (porcResult == WizardDisplay.MENU_BACK) return StepResult.BACK;
 
         return StepResult.success("API keys configured.");
     }
 
-    private String buildPrompt(String existingValue, boolean color) {
-        if (existingValue != null && !existingValue.isBlank()) {
-            return "Key [" + ApiKeyValidator.maskKey(existingValue) + "]: ";
+    /**
+     * Renders one optional key block: header, CONFIGURE/SKIP menu, input+result row.
+     *
+     * @return 0 on completion, {@link WizardDisplay#MENU_BACK} if the user backed out
+     */
+    private int configureOptionalKey(WizardDisplay display, String keyName, String annotation,
+                                     int baseRow, String existingValue,
+                                     java.util.function.Function<String, ApiKeyValidator.ValidationResult> validate,
+                                     WizardContext context, String disabledEffect) {
+        display.setRow(baseRow);
+        display.statusLine(keyName, annotation, null, StatusColor.INFO);
+
+        boolean hasExisting = existingValue != null && !existingValue.isBlank();
+        display.setRow(baseRow + 1);
+        int choice = display.selectMenu(CONFIGURE_OR_SKIP, hasExisting ? 0 : 1);
+
+        if (choice == WizardDisplay.MENU_BACK) {
+            return WizardDisplay.MENU_BACK;
         }
-        return "Key: ";
+
+        int resultRow = baseRow + 3;
+        if (choice == 0) {
+            display.setRow(resultRow);
+            String key = display.readMaskedLine(buildPrompt(existingValue));
+            if ((key == null || key.isBlank()) && hasExisting) {
+                key = existingValue;
+            }
+            if (key != null && !key.isBlank()) {
+                display.setRow(resultRow);
+                WizardDisplay.SpinnerHandle spinner = display.showSpinner("VALIDATING");
+                ApiKeyValidator.ValidationResult result = validate.apply(key);
+                if (result.valid()) {
+                    spinner.stop("✓ VALIDATED  " + ApiKeyValidator.maskKey(key));
+                } else {
+                    spinner.stop("✗ INVALID — " + result.message() + " · not saved");
+                    context.addWarning(keyName + " invalid — " + disabledEffect);
+                }
+                return 0;
+            }
+        }
+
+        context.addWarning(keyName + " not configured — " + disabledEffect);
+        display.setRow(resultRow);
+        display.printLine("— SKIPPED · " + disabledEffect);
+        return 0;
     }
 
-    private String okText(String msg, boolean color) {
-        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
-        return "[OK] " + msg;
-    }
-
-    private String errorText(String msg, boolean color) {
-        if (color) return AnsiPalette.BRIGHT + "\u2717" + AnsiPalette.RESET + " " + msg;
-        return "[!!] " + msg;
-    }
-
-    private String mutedText(String msg, boolean color) {
-        if (color) return AnsiPalette.MUTED + "\u2192" + AnsiPalette.RESET + " " + msg;
-        return "-> " + msg;
+    private String buildPrompt(String existingValue) {
+        if (existingValue != null && !existingValue.isBlank()) {
+            return "KEY [" + ApiKeyValidator.maskKey(existingValue) + "] ▸ ";
+        }
+        return "KEY ▸ ";
     }
 }

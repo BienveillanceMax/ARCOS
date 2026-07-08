@@ -1,40 +1,51 @@
 package org.arcos.Setup.Steps;
 
 import org.arcos.Setup.StepDefinition;
-import org.arcos.Setup.UI.AnsiPalette;
 import org.arcos.Setup.UI.WizardDisplay;
+import org.arcos.Setup.UI.WizardDisplay.MenuItem;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Step III — ANIMA: Personality profile selection.
- * Compact horizontal gauge layout: 2 lines per profile.
- * All text in English.
+ * Step IV — ANIMA: Personality profile selection.
+ * Interactive menu with a live detail pane: navigating the profiles
+ * instantly redraws the highlighted profile's description and value gauges
+ * below the menu — the user reads the soul before binding it.
  */
 public class PersonalityStep implements WizardStep {
 
-    /** Trait value for compact gauge display. */
-    public record TraitValue(String abbreviation, int value) {}
+    /** Trait value for gauge display. */
+    public record TraitValue(String name, int value) {}
 
-    private record ProfileOption(String key, String displayName, String description,
-                                 List<TraitValue> traits) {}
+    private record ProfileOption(String key, String displayName, String tagline,
+                                 String description, List<TraitValue> traits) {}
+
+    private static final int TRAIT_LABEL_WIDTH = 13;
 
     private static final List<ProfileOption> PROFILES = List.of(
-            new ProfileOption("CALCIFER", "CALCIFER",
-                    "Fire spirit — loyal, curious, freedom-seeking",
-                    List.of(new TraitValue("AUT", 85), new TraitValue("BNV", 90), new TraitValue("HED", 60))),
-            new ProfileOption("K2SO", "K-2SO",
-                    "Reprogrammed droid — reliable, blunt, sarcastic",
-                    List.of(new TraitValue("FIA", 90), new TraitValue("REG", 80), new TraitValue("AUT", 70))),
-            new ProfileOption("GLADOS", "GLaDOS",
-                    "Control AI — analytical, cold, manipulative",
-                    List.of(new TraitValue("POW", 90), new TraitValue("ACH", 90), new TraitValue("BNV", 10))),
-            new ProfileOption("DEFAULT", "DEFAULT",
-                    "Balanced profile — all values 50/100",
-                    List.of())
-    );
+            new ProfileOption("CALCIFER", "CALCIFER", "fire spirit",
+                    "Loyal, curious, attached to its freedom.",
+                    List.of(new TraitValue("AUTONOMY", 85),
+                            new TraitValue("BENEVOLENCE", 90),
+                            new TraitValue("HEDONISM", 60))),
+            new ProfileOption("K2SO", "K-2SO", "reprogrammed droid",
+                    "Reliable, blunt, statistically pessimistic.",
+                    List.of(new TraitValue("RELIABILITY", 90),
+                            new TraitValue("CONFORMITY", 80),
+                            new TraitValue("AUTONOMY", 70))),
+            new ProfileOption("GLADOS", "GLaDOS", "control AI",
+                    "Analytical, cold, quietly manipulative.",
+                    List.of(new TraitValue("POWER", 90),
+                            new TraitValue("ACHIEVEMENT", 90),
+                            new TraitValue("BENEVOLENCE", 10))),
+            new ProfileOption("DEFAULT", "DEFAULT", "balanced baseline",
+                    "Neutral profile — every value at 50/100.",
+                    List.of(new TraitValue("AUTONOMY", 50),
+                            new TraitValue("BENEVOLENCE", 50),
+                            new TraitValue("ACHIEVEMENT", 50))));
 
     @Override
     public String getName() {
@@ -58,76 +69,49 @@ public class PersonalityStep implements WizardStep {
 
     @Override
     public StepResult execute(WizardDisplay display, WizardContext context) {
-        boolean color = display.isColorSupported();
+        display.setKeyHints("↑↓ NAV · ↵ SELECT · ESC BACK");
 
-        display.printLine("Select personality profile:");
-        display.printLine("");
-
-        for (int i = 0; i < PROFILES.size(); i++) {
-            ProfileOption p = PROFILES.get(i);
-            String nameColor = color ? AnsiPalette.BRIGHT : "";
-            String reset = color ? AnsiPalette.RESET : "";
-
-            display.printLine("[" + (i + 1) + "]  " + nameColor + p.displayName() + reset
-                    + " \u2014 " + p.description());
-
-            // Compact horizontal gauges on second line
-            if (!p.traits().isEmpty()) {
-                StringBuilder gauges = new StringBuilder("     ");
-                for (int t = 0; t < p.traits().size(); t++) {
-                    TraitValue tv = p.traits().get(t);
-                    gauges.append(display.gaugeCompact(tv.abbreviation(), tv.value()));
-                    if (t < p.traits().size() - 1) gauges.append("   ");
-                }
-                display.printLine(gauges.toString());
-            }
-
-            display.printLine("");
+        List<MenuItem> items = new ArrayList<>();
+        for (ProfileOption p : PROFILES) {
+            items.add(new MenuItem(p.displayName(), p.tagline()));
         }
 
         String currentProfile = context.getModel().getPersonalityProfile();
-        String defaultHint = (currentProfile != null && !currentProfile.isBlank())
-                ? " [current: " + currentProfile + "]" : "";
+        int defaultIndex = indexOfProfile(currentProfile);
+        if (defaultIndex < 0) defaultIndex = 0;
 
-        while (true) {
-            String input = display.readLine("\u25b8 (1-4)" + defaultHint + " ");
+        // Menu on rows 0..3; live detail pane below (rows 5..8)
+        int detailRow = PROFILES.size() + 1;
+        int choice = display.selectMenu(items, defaultIndex,
+                highlighted -> drawDetailPane(display, detailRow, PROFILES.get(highlighted)));
 
-            if (input == null || input.isBlank()) {
-                if (currentProfile != null && !currentProfile.isBlank()) {
-                    display.printLine(okText("Profile kept: " + currentProfile, color));
-                    return StepResult.success("Profile kept: " + currentProfile);
-                }
-                display.showError("Choose a profile (1-4).");
-                continue;
-            }
+        if (choice == WizardDisplay.MENU_BACK) {
+            return StepResult.BACK;
+        }
 
-            try {
-                int choice = Integer.parseInt(input.trim());
-                if (choice >= 1 && choice <= PROFILES.size()) {
-                    ProfileOption chosen = PROFILES.get(choice - 1);
-                    context.getModel().setPersonalityProfile(chosen.key());
-                    display.printLine(okText("Profile selected: " + chosen.displayName(), color));
-                    return StepResult.success("Profile: " + chosen.key());
-                } else {
-                    display.showError("Choose between 1 and " + PROFILES.size() + ".");
-                }
-            } catch (NumberFormatException e) {
-                // Accept profile name input
-                String upper = input.trim().toUpperCase();
-                for (ProfileOption p : PROFILES) {
-                    if (p.key().equals(upper) || p.displayName().toUpperCase().equals(upper)) {
-                        context.getModel().setPersonalityProfile(p.key());
-                        display.printLine(okText("Profile selected: " + p.displayName(), color));
-                        return StepResult.success("Profile: " + p.key());
-                    }
-                }
-                display.showError("Unknown profile. Enter a number (1-4) or profile name.");
-            }
+        ProfileOption chosen = PROFILES.get(choice);
+        context.getModel().setPersonalityProfile(chosen.key());
+        return StepResult.success("Profile: " + chosen.key());
+    }
+
+    /**
+     * Redraws the detail pane for the highlighted profile:
+     * description line + three value gauges. Rewrites in place on navigation.
+     */
+    private void drawDetailPane(WizardDisplay display, int startRow, ProfileOption profile) {
+        display.printLine(startRow, profile.description());
+        List<TraitValue> traits = profile.traits();
+        for (int t = 0; t < traits.size(); t++) {
+            TraitValue trait = traits.get(t);
+            display.gauge(startRow + 1 + t, trait.name(), trait.value(), TRAIT_LABEL_WIDTH);
         }
     }
 
-    private String okText(String msg, boolean color) {
-        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
-        return "[OK] " + msg;
+    private static int indexOfProfile(String key) {
+        if (key == null || key.isBlank()) return -1;
+        for (int i = 0; i < PROFILES.size(); i++) {
+            if (PROFILES.get(i).key().equalsIgnoreCase(key.trim())) return i;
+        }
+        return -1;
     }
 }

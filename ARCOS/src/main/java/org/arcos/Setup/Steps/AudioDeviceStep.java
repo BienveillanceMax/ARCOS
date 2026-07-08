@@ -1,8 +1,9 @@
 package org.arcos.Setup.Steps;
 
 import org.arcos.Setup.StepDefinition;
-import org.arcos.Setup.UI.AnsiPalette;
+import org.arcos.Setup.UI.StatusColor;
 import org.arcos.Setup.UI.WizardDisplay;
+import org.arcos.Setup.UI.WizardDisplay.MenuItem;
 import org.arcos.Setup.Validation.AudioDeviceEnumerator;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
@@ -12,9 +13,9 @@ import java.util.List;
 
 /**
  * Step II — VOX: Microphone selection.
- * - Auto-selects if only 1 device
- * - Numbered menu if multiple devices
- * All text in English.
+ * Probes every input device for live signal (RMS), then presents an
+ * interactive menu with per-device signal readouts. The loudest device is
+ * pre-selected; AUTO delegates to system selection.
  */
 public class AudioDeviceStep implements WizardStep {
 
@@ -40,15 +41,17 @@ public class AudioDeviceStep implements WizardStep {
 
     @Override
     public StepResult execute(WizardDisplay display, WizardContext context) {
-        boolean color = display.isColorSupported();
+        display.setKeyHints("↑↓ NAV · ↵ SELECT · ESC BACK");
 
         List<AudioDeviceEnumerator.AudioDevice> devices = AudioDeviceEnumerator.getInputDevices();
 
         if (devices.isEmpty()) {
-            display.printLine(warnText("No audio input device detected.", color));
-            display.printLine("ARCOS will use system auto-selection.");
+            display.statusLine("INPUT DEVICES", "NONE DETECTED", null, StatusColor.WARN);
+            display.printLine("System auto-selection will be used.");
             context.getModel().setAudioDeviceIndex(-1);
             context.addWarning("No microphone detected — audio index = -1 (auto)");
+            display.printLine("");
+            display.waitForKey();
             return StepResult.success("No microphone detected — auto mode.");
         }
 
@@ -56,29 +59,27 @@ public class AudioDeviceStep implements WizardStep {
             AudioDeviceEnumerator.AudioDevice device = devices.get(0);
             context.getModel().setAudioDeviceIndex(device.index());
             context.getModel().setAudioDeviceName(device.name());
-            String msg = "Auto-selected: " + device.name() + " (index " + device.index() + ")";
-            display.printLine(okText(msg, color));
-            return StepResult.success(msg);
+            display.statusLine("VOX", device.name() + " · index " + device.index(),
+                    "auto-bound", StatusColor.OK);
+            // Follow-through: let the readout land before the next step clears it
+            try { Thread.sleep(700); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
+            return StepResult.success("Auto-selected: " + device.name());
         }
 
-        // Multiple devices — probe each for signal.
-        // ALSA without PulseAudio only allows one subdevice open per card at a time.
-        // First pass probes all; second pass retries failures (card lock released by then).
-        display.printLine("Probing microphones...");
-
-        int bestIndex = -1;
-        int bestRms = -1;
+        // ── Probe all devices for signal while a spinner runs ───────────────
+        // ALSA without PulseAudio allows one open subdevice per card at a time:
+        // first pass probes all, second pass retries the locked ones.
+        display.setRow(0);
+        WizardDisplay.SpinnerHandle spinner = display.showSpinner("VOX PROBE — SAMPLING INPUT SIGNAL");
 
         AudioDeviceEnumerator.ProbeResult[] results = new AudioDeviceEnumerator.ProbeResult[devices.size()];
         List<Integer> retryIndices = new ArrayList<>();
-
         for (int d = 0; d < devices.size(); d++) {
             results[d] = AudioDeviceEnumerator.probeRmsLevel(devices.get(d).index(), 44100, 300);
             if (results[d].rms() < 0) {
                 retryIndices.add(d);
             }
         }
-
         if (!retryIndices.isEmpty()) {
             try { Thread.sleep(500); } catch (InterruptedException ignored) { Thread.currentThread().interrupt(); }
             for (int d : retryIndices) {
@@ -86,88 +87,71 @@ public class AudioDeviceStep implements WizardStep {
             }
         }
 
-        display.printLine("");
+        int bestMenuIndex = -1;
+        int bestRms = 0;
         for (int d = 0; d < devices.size(); d++) {
-            AudioDeviceEnumerator.AudioDevice device = devices.get(d);
-            String indicator = signalIndicator(results[d], color);
-            display.printLine("[" + device.index() + "]  " + device.name() + "  " + indicator);
             if (results[d].rms() > bestRms) {
                 bestRms = results[d].rms();
-                bestIndex = device.index();
+                bestMenuIndex = d;
             }
         }
+
+        spinner.stop(String.format("%d DEVICES · SIGNAL SAMPLED", devices.size()));
         display.printLine("");
 
-        String recommendation = "";
-        if (bestRms > 0 && bestIndex >= 0) {
-            recommendation = " [recommended: " + bestIndex + "]";
+        // ── Device menu with signal annotations ─────────────────────────────
+        List<MenuItem> items = new ArrayList<>();
+        for (int d = 0; d < devices.size(); d++) {
+            AudioDeviceEnumerator.AudioDevice device = devices.get(d);
+            items.add(new MenuItem(truncate(device.name(), 30), signalAnnotation(results[d])));
         }
+        items.add(new MenuItem("AUTO", "system default selection"));
 
         int currentIndex = context.getModel().getAudioDeviceIndex();
-        String defaultHint = currentIndex >= 0 ? " [current: " + currentIndex + "]" : recommendation;
+        int defaultMenuIndex = menuIndexOfDevice(devices, currentIndex);
+        if (defaultMenuIndex < 0) defaultMenuIndex = bestMenuIndex;
+        if (defaultMenuIndex < 0) defaultMenuIndex = 0;
 
-        while (true) {
-            String input = display.readLine("\u25b8 (index or 's' to skip)" + defaultHint + " ");
-            if (input == null || input.isBlank()) {
-                if (currentIndex >= 0) {
-                    display.printLine(okText("Kept index: " + currentIndex, color));
-                    return StepResult.success("Microphone kept: index " + currentIndex);
-                }
-                display.showError("Enter a valid index.");
-                continue;
-            }
-            if ("s".equalsIgnoreCase(input.trim()) || "skip".equalsIgnoreCase(input.trim())) {
-                context.getModel().setAudioDeviceIndex(-1);
-                return StepResult.skipped("Audio selection skipped — auto mode.");
-            }
-            try {
-                int idx = Integer.parseInt(input.trim());
-                AudioDeviceEnumerator.AudioDevice chosen = AudioDeviceEnumerator.getDeviceAt(idx);
-                if (chosen != null) {
-                    context.getModel().setAudioDeviceIndex(idx);
-                    context.getModel().setAudioDeviceName(chosen.name());
-                    display.printLine(okText("Selected: " + chosen.name() + " (index " + idx + ")", color));
-                    return StepResult.success("Microphone configured: " + chosen.name());
-                } else {
-                    display.showError("Index " + idx + " not found. Choose from the listed indices.");
-                }
-            } catch (NumberFormatException e) {
-                display.showError("Enter a number or 's' to skip.");
-            }
+        int choice = display.selectMenu(items, defaultMenuIndex);
+        if (choice == WizardDisplay.MENU_BACK) {
+            return StepResult.BACK;
         }
+
+        if (choice == items.size() - 1) {
+            context.getModel().setAudioDeviceIndex(-1);
+            return StepResult.success("Microphone: system auto-selection.");
+        }
+
+        AudioDeviceEnumerator.AudioDevice chosen = devices.get(choice);
+        context.getModel().setAudioDeviceIndex(chosen.index());
+        context.getModel().setAudioDeviceName(chosen.name());
+        return StepResult.success("Microphone configured: " + chosen.name());
     }
 
-    private String okText(String msg, boolean color) {
-        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
-        return "[OK] " + msg;
+    private static int menuIndexOfDevice(List<AudioDeviceEnumerator.AudioDevice> devices, int deviceIndex) {
+        if (deviceIndex < 0) return -1;
+        for (int d = 0; d < devices.size(); d++) {
+            if (devices.get(d).index() == deviceIndex) return d;
+        }
+        return -1;
     }
 
-    private String warnText(String msg, boolean color) {
-        if (color) return AnsiPalette.WARN + "\u26a0" + AnsiPalette.RESET + " " + msg;
-        return "[!!] " + msg;
-    }
-
-    private String signalIndicator(AudioDeviceEnumerator.ProbeResult probe, boolean color) {
+    private static String signalAnnotation(AudioDeviceEnumerator.ProbeResult probe) {
         int rms = probe.rms();
         if (rms < 0) {
-            String detail = probe.error() != null ? " (" + probe.error() + ")" : "";
-            return color
-                    ? AnsiPalette.MUTED + "--- ERROR" + detail + AnsiPalette.RESET
-                    : "--- ERROR" + detail;
+            return probe.error() != null ? "— ERROR · " + probe.error() : "— ERROR";
         }
         if (rms == 0) {
-            return color
-                    ? AnsiPalette.MUTED + "--- SILENT" + AnsiPalette.RESET
-                    : "--- SILENT";
+            return "— SILENT";
         }
-        // Scale: 1-20 = low, 20+ = live
         if (rms < 20) {
-            return color
-                    ? AnsiPalette.WARN + "\u2581\u2582  LOW (rms:" + rms + ")" + AnsiPalette.RESET
-                    : "..  LOW (rms:" + rms + ")";
+            return "▁▂  LOW · rms " + rms;
         }
-        return color
-                ? AnsiPalette.OK + "\u2581\u2582\u2583 LIVE (rms:" + rms + ")" + AnsiPalette.RESET
-                : "... LIVE (rms:" + rms + ")";
+        return "▁▂▃ LIVE · rms " + rms;
+    }
+
+    private static String truncate(String text, int maxLen) {
+        if (text.length() <= maxLen) return text;
+        return text.substring(0, maxLen - 1) + "…";
     }
 }

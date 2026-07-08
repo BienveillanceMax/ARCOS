@@ -46,12 +46,14 @@ public final class CogitoPhase {
         LayoutCalculator.ScreenLayout layout = LayoutCalculator.calculate(screen.getTerminalSize());
         ReentrantLock lock = new ReentrantLock();
 
-        // 1. Clear interior
+        // 1. Clear interior + phase header
         lock.lock();
         try {
             for (int r = layout.headerRow() + 1; r < layout.footerRow(); r++) {
                 LanternaComponents.drawEmptyRow(tg, layout, r, palette);
             }
+            LanternaComponents.drawHeaderBar(tg, layout, palette, "COGITO v1.0");
+            LanternaComponents.drawFooter(tg, layout, palette, "ESC SKIP PROBES");
             screen.refresh();
         } catch (IOException ignored) {
         } finally {

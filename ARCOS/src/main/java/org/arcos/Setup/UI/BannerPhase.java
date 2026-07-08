@@ -50,7 +50,7 @@ public final class BannerPhase {
         // T+0ms: Frame borders draw instantly
         lock.lock();
         try {
-            LanternaComponents.drawHeaderBar(tg, layout, palette);
+            LanternaComponents.drawHeaderBar(tg, layout, palette, "v1.0");
             LanternaComponents.drawFooter(tg, layout, palette);
             // Draw side borders for all rows
             for (int r = layout.headerRow() + 1; r < layout.footerRow(); r++) {
@@ -90,7 +90,7 @@ public final class BannerPhase {
                 SUBTITLE, palette.dim(), palette.muted(), 400, lock);
 
         // T+~1200ms: Show prompt and wait for Enter
-        String prompt = "[Setup Ready - Press Enter]";
+        String prompt = "[ ↵ ENGAGE ]";
         int promptX = layout.leftMargin() + (layout.frameWidth() - prompt.length()) / 2;
         int promptRow = layout.footerRow() - 2;
 

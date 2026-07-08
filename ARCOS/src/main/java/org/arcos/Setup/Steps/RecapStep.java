@@ -3,23 +3,29 @@ package org.arcos.Setup.Steps;
 import org.arcos.Setup.ConfigurationModel;
 import org.arcos.Setup.Persistence.ConfigurationWriter;
 import org.arcos.Setup.StepDefinition;
-import org.arcos.Setup.UI.AnsiPalette;
 import org.arcos.Setup.UI.StatusColor;
 import org.arcos.Setup.UI.WizardDisplay;
+import org.arcos.Setup.UI.WizardDisplay.MenuItem;
 import org.arcos.Setup.Validation.ApiKeyValidator;
 import org.arcos.Setup.WizardContext;
 import org.arcos.Setup.WizardStep;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * Final step — FIAT: Configuration summary and save.
- * Displays summary in dot-leader format. English text.
- * Post-save: FIAT LUX. — the final moment.
+ * Dense dot-leader recap of every collected value, then a FIAT / REVISE
+ * decision menu. On write: file confirmations + FIAT LUX reveal.
  */
 public class RecapStep implements WizardStep {
 
     private static final Logger log = LoggerFactory.getLogger(RecapStep.class);
+
+    private static final List<MenuItem> DECISION = List.of(
+            new MenuItem("FIAT", "write configuration and proceed"),
+            new MenuItem("REVISE", "restart the wizard, values kept"));
 
     private final ConfigurationWriter writer;
 
@@ -53,73 +59,60 @@ public class RecapStep implements WizardStep {
 
     @Override
     public StepResult execute(WizardDisplay display, WizardContext context) {
-        boolean color = display.isColorSupported();
+        display.setKeyHints("↑↓ NAV · ↵ SELECT · ESC BACK");
         ConfigurationModel model = context.getModel();
 
-        // Summary in dot-leader format
-        String profile = orDefault(model.getPersonalityProfile(), "DEFAULT");
-        display.statusLine("ANIMA", profile, null, StatusColor.INFO);
-
-        String micInfo = model.getAudioDeviceIndex() >= 0
-                ? "index " + model.getAudioDeviceIndex()
-                : "auto-select";
-        display.statusLine("VOX", micInfo, null, StatusColor.INFO);
-
-        display.printLine("");
-
-        // API keys
-        printKeyStatus(display, "MISTRALAI_API_KEY", model.getMistralApiKey(), true, color);
-        printKeyStatus(display, "BRAVE_SEARCH_API_KEY", model.getBraveSearchApiKey(), false, color);
-        printKeyStatus(display, "PORCUPINE_ACCESS_KEY", model.getPorcupineAccessKey(), false, color);
+        // ── Identity & bindings ─────────────────────────────────────────────
+        display.statusLine("ANIMA", orDefault(model.getPersonalityProfile(), "DEFAULT"),
+                null, StatusColor.INFO);
+        display.statusLine("VOX", model.getAudioDeviceIndex() >= 0
+                        ? "index " + model.getAudioDeviceIndex()
+                        : "auto-select",
+                null, StatusColor.INFO);
+        display.statusLine("INTERPRES", model.getSttBackend().name(), null, StatusColor.INFO);
 
         display.printLine("");
 
-        // File paths
-        String envPath = writer.getEnvFile().getAbsolutePath();
-        String yamlPath = writer.getLocalYamlFile().getAbsolutePath();
-        display.statusLine(".env", envPath, null, StatusColor.MUTED);
-        display.statusLine("application-local.yaml", yamlPath, null, StatusColor.MUTED);
+        // ── API keys ────────────────────────────────────────────────────────
+        printKeyStatus(display, "MISTRALAI_API_KEY", model.getMistralApiKey(), true);
+        printKeyStatus(display, "BRAVE_SEARCH_API_KEY", model.getBraveSearchApiKey(), false);
+        printKeyStatus(display, "PORCUPINE_ACCESS_KEY", model.getPorcupineAccessKey(), false);
 
-        // Warnings
-        if (!context.getWarnings().isEmpty()) {
-            display.printLine("");
-            for (String warning : context.getWarnings()) {
-                display.printLine(warnText(warning, color));
-            }
+        display.printLine("");
+
+        // ── Target files ────────────────────────────────────────────────────
+        display.statusLine(".env", writer.getEnvFile().getAbsolutePath(),
+                null, StatusColor.MUTED);
+        display.statusLine("application-local.yaml", writer.getLocalYamlFile().getAbsolutePath(),
+                null, StatusColor.MUTED);
+
+        display.printLine("");
+
+        // ── Decision ────────────────────────────────────────────────────────
+        int choice = display.selectMenu(DECISION, 0);
+        if (choice == WizardDisplay.MENU_BACK) {
+            return StepResult.BACK;
         }
-
-        display.printLine("");
-
-        // Confirmation
-        while (true) {
-            String input = display.readLine("[Y] Confirm   [A] Cancel and restart   \u25b8 ");
-            if (input == null || input.isBlank() || "y".equalsIgnoreCase(input.trim())) {
-                return doSave(display, model, color);
-            } else if ("a".equalsIgnoreCase(input.trim())) {
-                display.printLine(mutedText("Cancelled. No files written.", color));
-                return StepResult.failure("Save cancelled by user.");
-            } else {
-                display.showError("Enter Y to confirm or A to cancel.");
-            }
+        if (choice == 1) {
+            return StepResult.failure("Save cancelled by user.");
         }
+        return doSave(display, model);
     }
 
-    private StepResult doSave(WizardDisplay display, ConfigurationModel model, boolean color) {
+    private StepResult doSave(WizardDisplay display, ConfigurationModel model) {
         try {
             writer.save(model);
 
-            display.printLine(okText(".env", color));
-            display.printLine(okText("application-local.yaml", color));
+            display.printLine("");
+            display.statusLine(".env", "✓ WRITTEN", "chmod 600", StatusColor.OK);
+            display.statusLine("application-local.yaml", "✓ WRITTEN", null, StatusColor.OK);
             display.printLine("");
 
-            // The final moment
-            if (color) {
-                display.printLine(AnsiPalette.BRIGHT + AnsiPalette.BOLD + "FIAT LUX." + AnsiPalette.RESET);
-            } else {
-                display.printLine("FIAT LUX.");
-            }
+            // The final moment — earned, mechanical, no fanfare
+            display.reveal("FIAT LUX.");
 
             display.printLine("");
+            display.setKeyHints("↵ BOOT");
             display.waitForKey();
 
             return StepResult.success("Configuration saved.");
@@ -131,30 +124,15 @@ public class RecapStep implements WizardStep {
     }
 
     private void printKeyStatus(WizardDisplay display, String keyName, String value,
-                                boolean required, boolean color) {
+                                boolean required) {
         boolean present = value != null && !value.isBlank();
         if (present) {
-            display.statusLine(keyName, "\u2713 " + ApiKeyValidator.maskKey(value), null, StatusColor.OK);
+            display.statusLine(keyName, "✓ " + ApiKeyValidator.maskKey(value), null, StatusColor.OK);
         } else {
-            String status = required ? "\u2717 MISSING (required)" : "\u2014 not configured";
+            String status = required ? "✗ MISSING (required)" : "— not configured";
             StatusColor sColor = required ? StatusColor.BRIGHT : StatusColor.MUTED;
             display.statusLine(keyName, status, null, sColor);
         }
-    }
-
-    private String okText(String msg, boolean color) {
-        if (color) return AnsiPalette.OK + "\u2713" + AnsiPalette.RESET + " " + msg;
-        return "[OK] " + msg;
-    }
-
-    private String warnText(String msg, boolean color) {
-        if (color) return AnsiPalette.WARN + "\u26a0" + AnsiPalette.RESET + " " + msg;
-        return "[!!] " + msg;
-    }
-
-    private String mutedText(String msg, boolean color) {
-        if (color) return AnsiPalette.MUTED + "\u2192" + AnsiPalette.RESET + " " + msg;
-        return "-> " + msg;
     }
 
     private String orDefault(String value, String defaultValue) {

@@ -119,14 +119,24 @@ public class WizardRunner {
                 new RecapStep()
         );
 
-        for (int i = 0; i < steps.size(); i++) {
+        int i = 0;
+        while (i < steps.size()) {
             WizardStep step = steps.get(i);
             display.activateStep(i);
 
             WizardStep.StepResult result = step.execute(display, context);
 
+            if (result.back()) {
+                // Esc — return to the previous step (values are kept in the context)
+                display.resetStep(i);
+                i = Math.max(0, i - 1);
+                display.resetStep(i);
+                continue;
+            }
+
             if (result.success()) {
                 display.completeStep(i);
+                i++;
             } else {
                 if (step.isRequired() && !result.skipped()) {
                     if ("FIAT".equals(step.getName()) && result.message().contains("cancelled")) {
@@ -139,6 +149,7 @@ public class WizardRunner {
                     display.waitForKey();
                     return false;
                 }
+                i++;
             }
         }
 

@@ -16,16 +16,25 @@ public final class LanternaComponents {
             (System.getProperty("user.name", "arcos") + ProcessHandle.current().pid()).hashCode() & 0xFFFF);
 
     /**
-     * Draws the header bar: ┏━━ ARCOS ━━━━━━━━━━━━━━━━ INITIUM v1.0 ━━━━┓
+     * Draws the header bar with the default INITIUM phase label.
      */
     public static void drawHeaderBar(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
                                      LanternaPalette palette) {
+        drawHeaderBar(tg, layout, palette, "INITIUM v1.0");
+    }
+
+    /**
+     * Draws the header bar: ┏━━ ARCOS ━━━━━━━━━━━━━━━━ [phase] ━━━━┓
+     * The phase label tracks the boot lifecycle: VIGILIA → INITIUM → COGITO.
+     */
+    public static void drawHeaderBar(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
+                                     LanternaPalette palette, String phaseLabel) {
         int row = layout.headerRow();
         int x = layout.leftMargin();
         int w = layout.frameWidth();
 
         String leftLabel = " ARCOS ";
-        String rightLabel = " INITIUM v1.0 ";
+        String rightLabel = " " + phaseLabel + " ";
         int fillLeft = 2;
         int fillRight = 4;
         int fillMid = w - 2 - fillLeft - leftLabel.length() - fillRight - rightLabel.length();
@@ -48,23 +57,52 @@ public final class LanternaComponents {
     }
 
     /**
-     * Draws the footer bar: ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+     * Draws the footer bar without key hints.
      */
     public static void drawFooter(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
                                   LanternaPalette palette) {
+        drawFooter(tg, layout, palette, null);
+    }
+
+    /**
+     * Draws the footer bar with contextual key hints embedded on the left:
+     * ┗━━ ↑↓ NAV · ↵ SELECT ━━━━━━━━━━━━━━━━━━━ SYS:1A2B ━━┛
+     */
+    public static void drawFooter(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
+                                  LanternaPalette palette, String keyHints) {
         int row = layout.footerRow();
         int x = layout.leftMargin();
         int w = layout.frameWidth();
-        String label = " SYS:" + SYS_FINGERPRINT + " ";
-        int fillBefore = w - label.length() - 4;
-        if (fillBefore < 1) fillBefore = 1;
+
+        String hints = (keyHints != null && !keyHints.isEmpty()) ? " " + keyHints + " " : "";
+        String sysLabel = " SYS:" + SYS_FINGERPRINT + " ";
+
+        int fillMid = w - 2 - 2 - hints.length() - sysLabel.length() - 2;
+        if (fillMid < 1) { // hints too long for this width — drop them
+            hints = "";
+            fillMid = w - 2 - 2 - sysLabel.length() - 2;
+            if (fillMid < 1) fillMid = 1;
+        }
+
+        int cx = x;
+        tg.setForegroundColor(palette.primary());
+        tg.putString(cx, row, "┗━━");
+        cx += 3;
+
+        tg.setForegroundColor(palette.muted());
+        tg.putString(cx, row, hints);
+        cx += hints.length();
 
         tg.setForegroundColor(palette.primary());
-        tg.putString(x, row, "┗" + "━".repeat(fillBefore));
+        tg.putString(cx, row, "━".repeat(fillMid));
+        cx += fillMid;
+
         tg.setForegroundColor(palette.dim());
-        tg.putString(x + 1 + fillBefore, row, label);
+        tg.putString(cx, row, sysLabel);
+        cx += sysLabel.length();
+
         tg.setForegroundColor(palette.primary());
-        tg.putString(x + 1 + fillBefore + label.length(), row, "━━┛");
+        tg.putString(cx, row, "━".repeat(Math.max(0, x + w - 1 - cx)) + "┛");
     }
 
     /**
@@ -285,57 +323,42 @@ public final class LanternaComponents {
     }
 
     /**
-     * Draws the step index strip (3 rows: 2×2 grid + optional centered FIAT row)
-     * with native Lanterna TextColor rendering per segment.
+     * Draws the step index strip: a column-major 2×3 grid filling the 3-row zone.
+     * Six steps: I NEXUS / II VOX / III INTERPRES on the left,
+     * IV ANIMA / V CORPUS / FIAT on the right.
      */
     public static void drawStepIndex(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
                                      java.util.List<StepState> states, LanternaPalette palette) {
+        int rows = layout.stepIndexEnd() - layout.stepIndexStart() + 1;
         int halfWidth = layout.contentWidth() / 2;
         int cx = layout.leftMargin() + 4;
 
-        int row1 = layout.stepIndexStart();
-        drawEmptyRow(tg, layout, row1, palette);
-        drawNativeStepEntry(tg, cx, row1, states.get(0), palette);
-        if (states.size() > 2) {
-            drawNativeStepEntry(tg, cx + halfWidth, row1, states.get(2), palette);
+        for (int r = 0; r < rows; r++) {
+            int row = layout.stepIndexStart() + r;
+            drawEmptyRow(tg, layout, row, palette);
+            if (r < states.size()) {
+                drawNativeStepEntry(tg, cx, row, states.get(r), palette);
+            }
+            int rightIndex = r + rows;
+            if (rightIndex < states.size()) {
+                drawNativeStepEntry(tg, cx + halfWidth, row, states.get(rightIndex), palette);
+            }
         }
-
-        int row2 = layout.stepIndexStart() + 1;
-        drawEmptyRow(tg, layout, row2, palette);
-        if (states.size() > 1) {
-            drawNativeStepEntry(tg, cx, row2, states.get(1), palette);
-        }
-        if (states.size() > 3) {
-            drawNativeStepEntry(tg, cx + halfWidth, row2, states.get(3), palette);
-        }
-
-        int row3 = layout.stepIndexStart() + 2;
-        if (states.size() >= 5 && !states.get(4).latinName().isEmpty()) {
-            drawEmptyRow(tg, layout, row3, palette);
-            int entryWidth = stepEntryWidth(states.get(4));
-            int centerX = cx + (layout.contentWidth() - entryWidth) / 2;
-            drawNativeStepEntry(tg, centerX, row3, states.get(4), palette);
-        } else {
-            drawEmptyRow(tg, layout, row3, palette);
-        }
-    }
-
-    private static int stepEntryWidth(StepState step) {
-        int dots = Math.max(1, DOT_LEADER_WIDTH - step.latinName().length());
-        return 4 + 2 + step.latinName().length() + 1 + dots + 1 + 1;
     }
 
     private static void drawNativeStepEntry(TextGraphics tg, int x, int y,
                                              StepState step, LanternaPalette palette) {
+        boolean active = step.status() == StepIndicator.Status.ACTIVE;
+
         String numeral = String.format("%4s", step.romanNumeral());
-        tg.setForegroundColor(palette.muted());
+        tg.setForegroundColor(active ? palette.text() : palette.muted());
         tg.putString(x, y, numeral);
         x += 4;
 
         tg.putString(x, y, "  ");
         x += 2;
 
-        tg.setForegroundColor(palette.text());
+        tg.setForegroundColor(active ? palette.text() : palette.muted());
         tg.putString(x, y, step.latinName());
         x += step.latinName().length();
 
