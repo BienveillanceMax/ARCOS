@@ -5,7 +5,23 @@ ARCOS/target/
 ARCOS/src/main/resources/client_secrets.json
 ARCOS/data/
 ARCOS/qdrant_storage/
+ARCOS/logs/
 ARCOS/tokens/
 ARCOS/application-local.yaml
 # autoresearch transient run log
 autoresearch.last.log
+
+# Local-only working notes, planning docs, agent scratch & Obsidian vaults
+.claude/
+.superpowers/
+outputs/
+papers/
+progress.md
+benchmarks/
+skills/
+notes/
+wiki-arcos/
+ImplemNotes/
+VocalReimplementation/
+docs/
+CLAUDE.md

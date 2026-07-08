@@ -1,61 +1,85 @@
-# Deploying ArCoS with Docker
+# Déploiement ARCOS
 
-This guide provides instructions to deploy the ArCoS application and its dependencies using Docker and Docker Compose. This method simplifies the setup by containerizing the application and its environment.
+## Modèle : app native + services Docker
 
-## Prerequisites
+L'app ARCOS tourne **nativement** (hors Docker) : elle a besoin d'un accès direct
+à l'audio (PipeWire/PulseAudio), au Bluetooth (D-Bus système) et à un terminal
+interactif (TUI Lanterna). Seuls les services réseau dont elle dépend tournent en
+Docker (`docker-compose.yml`) ; l'app les joint via `localhost:<port>`.
 
-1.  **Raspberry Pi 5**: With a Debian-based OS like Raspberry Pi OS (64-bit) installed.
-2.  **Docker**: Docker must be installed on your Raspberry Pi. You can install it and the compose plugin with:
-    ```bash
-    sudo apt-get update && sudo apt-get install -y docker.io docker-compose-plugin
-    ```
-3.  **Hardware**: Your Bluetooth speaker/microphone must be paired and connected to the Raspberry Pi using the `bluetoothctl` tool as described in the main project documentation.
-4.  **API Keys and Credentials**: You must have the following secrets ready:
-    *   Mistral AI API Key
-    *   BraveSearch API Key
-    *   Google Calendar `client_secrets.json` file
-    *   Piper TTS voice model files (`.onnx` and `.onnx.json`)
+Voir aussi la note de déploiement en fin de `docker-compose.yml` et `CLAUDE.md`.
 
-## Deployment Steps
-
-All commands should be run from the `ARCOS` directory of the project.
-
-### Step 1: Configure Secrets
-
-Before building the container, you need to place your secrets in the correct locations.
-
-1.  **Create `.env` file**:
-    Create a file named `.env` in the `~/ARCOS` directory. This file will hold your API keys. Its content should be:
-    ```
-    MISTRALAI_API_KEY=YOUR_MISTRAL_API_KEY_HERE
-    BRAVE_SEARCH_API_KEY=YOUR_BRAVE_SEARCH_API_KEY_HERE
-    ```
-    Replace the placeholder values with your actual keys.
-
-2.  **Place Google Credentials**:
-    Place your `client_secrets.json` file inside the `src/main/resources/` directory.
-
-3.  **Place TTS Voice Models**:
-    *   Create a new directory: `src/main/resources/upmc-model/`
-    *   Place your `fr_FR-upmc-medium.onnx` and `fr_FR-upmc-medium.onnx.json` files (or any other piper-compatible voice model) inside this new directory.
-
-4.  **Place WakeWord Models**:
-    *   Place your `.ppn` and `.pv` files in `src/main/resources/`, custom wakeword can be made through picovoice (very easily).    
-
-### Step 2: Build and Run the Application
-
-With the secrets in place, you can now build and run the entire application stack with a single command.
+## Lancement
 
 ```bash
-sudo docker compose up --build
+./scripts/run-arcos.sh            # canonique : compose up -d + attente santé + jar
+./scripts/run-arcos.sh --build    # force un rebuild du jar avant lancement
 ```
 
-**What this command does:**
-*   `--build`: This flag tells Docker Compose to first build the `arcos-app` image using the `Dockerfile`. It will download the base Java image, install Piper, copy the application's code, and compile it with Maven. This only needs to be done the first time or when you change the application code.
-*   `up`: This command starts all the services defined in the `docker-compose.yml` file (`arcos-app` and `qdrant`).
+Manuel (dev) : `docker compose up -d` puis `mvn spring-boot:run`.
 
-The application should now be running. You can view the logs for all services in your terminal. To stop the application, press `Ctrl+C`. To run it in the background in the future, you can use `sudo docker compose up -d`.
+Logs persistants : `logs/arcos.log` (rotation 10 Mo / 14 jours / 200 Mo max).
+En mode TUI la console est muette pendant le boot — le fichier est la seule trace.
 
-This completes the containerized deployment process.
+## Services
 
-WARNING: You'll still have to connect with Oauth2 to google (to access the calendar functionalities).
+| Service | Image | Port(s) | Données | Rôle |
+|---------|-------|---------|---------|------|
+| `qdrant` | qdrant/qdrant:v1.11.4 | 6333 (HTTP), 6334 (gRPC) | bind mount `./qdrant_storage` | Mémoire vectorielle (Memories, Opinions, Desires) |
+| `whisper-cpp` | saririus/whisper-cpp-vulkan | 8090→8080 | modèle dans l'image | STT actif (Vulkan, `arcos.stt.backend=WHISPER_CPP`) |
+| `faster-whisper` | fedirz/faster-whisper-server:latest-cpu | 8000 | modèle préchargé | STT alternatif (CPU) — **profil**, ne démarre pas par défaut |
+| `radicale` | tomsquest/docker-radicale | 5232 | volume `radicale_data` | Calendrier CalDAV |
+
+Démarrer faster-whisper (benchmarks / backend FASTER_WHISPER) :
+
+```bash
+docker compose --profile faster-whisper up -d
+```
+
+Rebuild de l'image whisper-cpp (télécharge ggml-large-v3-turbo, ~1,5 Go) :
+
+```bash
+docker build -f docker/whisper-cpp-vulkan.Dockerfile -t saririus/whisper-cpp-vulkan:latest .
+```
+
+## Sauvegardes
+
+`scripts/backup-arcos.sh` archive dans `~/arcos-backups/` (rétention : 7 archives) :
+
+- les collections Qdrant via l'API snapshots (sans toucher au bind mount root) ;
+- `data/*.json` (persona tree, actions planifiées, historique…) ;
+- `application-local.yaml` et `.env` (**secrets** → archives en mode 600, à garder
+  sur stockage local de confiance).
+
+Surcharges : `ARCOS_BACKUP_DIR`, `ARCOS_BACKUP_KEEP`, `ARCOS_QDRANT_URL`.
+
+### Planification (timer systemd utilisateur, quotidien à ~03h47)
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp scripts/systemd/arcos-backup.* ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now arcos-backup.timer
+sudo loginctl enable-linger "$USER"   # une seule fois : timers actifs sans session ouverte
+```
+
+Suivi : `systemctl --user list-timers arcos-backup.timer` ;
+échecs visibles via `journalctl --user -u arcos-backup`.
+
+NB : `arcos-backup.service` contient le chemin absolu du dépôt — l'adapter si le
+dépôt change d'emplacement (ex. migration UM890).
+
+### Restauration
+
+```bash
+mkdir /tmp/restore && tar -xzf ~/arcos-backups/arcos-backup-<ts>.tar.gz -C /tmp/restore
+
+# Chaque collection Qdrant (recrée/écrase la collection) :
+curl -X POST "http://localhost:6333/collections/<nom>/snapshots/upload?priority=snapshot" \
+     -H 'Content-Type: multipart/form-data' \
+     -F "snapshot=@/tmp/restore/qdrant/<nom>.snapshot"
+
+# Fichiers d'état (app arrêtée) :
+cp /tmp/restore/data/*.json data/
+cp /tmp/restore/application-local.yaml /tmp/restore/.env .
+```

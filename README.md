@@ -6,9 +6,12 @@ Agent IA autonome avec personnalité, mémoire, opinions et prise d'initiative. 
 
 ```bash
 cd ARCOS
-cp .env.example .env   # Remplir au minimum MISTRALAI_API_KEY
-docker compose up --build
+cp .env.example .env     # Remplir au minimum MISTRALAI_API_KEY
+./scripts/run-arcos.sh   # Services Docker + attente santé + app native
 ```
+
+L'app tourne **nativement** (audio, Bluetooth, TUI) ; seuls les services réseau
+(qdrant, whisper-cpp, radicale) tournent en Docker. Logs persistants : `logs/arcos.log`.
 
 Ou laisser le **wizard interactif** guider la configuration au premier lancement :
 
@@ -28,7 +31,7 @@ Bannière ASCII  →  Wizard (si config manquante)  →  Spring Boot
 ## Architecture
 
 ```
-WakeWord → Capture audio → Speech-to-Text (faster-whisper)
+WakeWord → Capture audio → Speech-to-Text (whisper.cpp)
     → EventQueue (priorité HIGH/MEDIUM/LOW)
     → Orchestrator → LLM (Mistral AI, streaming)
     → TTS (Piper) + pipeline personnalité async
@@ -58,12 +61,21 @@ Java 21, Spring Boot 3.5.3, Mistral AI, Qdrant, Porcupine, faster-whisper, Piper
 ## Développement
 
 ```bash
-docker compose up qdrant faster-whisper   # Services externes
+docker compose up -d                      # Services externes (qdrant, whisper-cpp, radicale)
 mvn spring-boot:run                       # App locale
 
 mvn test                                  # Tous les tests
 mvn test -Dtest=MemoryServiceTest         # Un test
 ```
+
+Le backend STT alternatif faster-whisper est derrière un profil compose :
+`docker compose --profile faster-whisper up -d` (requis seulement si `arcos.stt.backend=FASTER_WHISPER`).
+
+## Sauvegardes
+
+`scripts/backup-arcos.sh` archive les collections Qdrant (API snapshots), `data/*.json`
+et la config dans `~/arcos-backups/` (rétention 7 jours). Planification quotidienne via
+timer systemd : voir [ARCOS/docker/README.md](ARCOS/docker/README.md).
 
 ## Accès distant (Tailscale)
 

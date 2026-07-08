@@ -12,14 +12,20 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
       - QDRANT__LOG_LEVEL=INFO
     restart: unless-stopped
+    # L'image qdrant n'embarque ni curl ni wget (seulement bash) et l'endpoint
+    # est /readyz (pas /health) — probe HTTP via /dev/tcp.
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:6333/health" ]
+      test: [ "CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333 && printf \"GET /readyz HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n\" >&3 && head -1 <&3 | grep -q 200'" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
+  # Backend STT alternatif (CPU) — requis seulement si arcos.stt.backend=FASTER_WHISPER.
+  # Derrière un profil : ne démarre pas par défaut (précharge large-v3-turbo, ~2 Go RAM).
+  # Démarrer avec : docker compose --profile faster-whisper up -d
   faster-whisper:
+    profiles: ["faster-whisper"]
     image: fedirz/faster-whisper-server:latest-cpu
     container_name: faster-whisper-container
     ports:
@@ -49,16 +55,19 @@ services:
        - "8090:8080"
      devices:
        - /dev/dri:/dev/dri
-     # Encoder mel-context cap. Default is 1500 mel-frames (30s) regardless of input length;
-     # 250 (5s) covers typical voice commands while cutting encoder attention complexity O(n^2).
-     # Utterances >5s are truncated, acceptable for ARCOS's interactive workload.
+     # Encoder mel-context cap. Default is 1500 mel-frames (30s) regardless of input length.
+     # WER matrix on real French speech (SttAccuracyBench, 2026-07-02): 250 -> 43% mean WER
+     # (65% on >5s utterances, hallucination loops that also blow up decode latency);
+     # 750 (15s) -> 4.9% WER, identical to the 1500 baseline, at ~half its latency.
+     # Values below ~700 hallucinate even on short audio — do not lower this again without
+     # re-running SttAccuracyBench. Per-request audio_ctx override is honored by this server.
      command: [
        "--host", "0.0.0.0",
        "--port", "8080",
        "--model", "/models/ggml-large-v3-turbo.bin",
        "--language", "fr",
        "--no-timestamps",
-       "--audio-ctx", "250"
+       "--audio-ctx", "750"
      ]
      restart: unless-stopped
      healthcheck:
@@ -95,10 +104,15 @@ services:
 # Ce compose ne fournit donc que les services réseau dont l'app dépend ; elle les
 # joint via localhost:<port> (ports publiés ci-dessus).
 #
-# Lancement :
-#   docker compose up -d        # services réseau (qdrant, whisper, radicale)
+# Lancement (canonique) :
+#   ./scripts/run-arcos.sh      # compose up -d + attente santé + lancement du jar
+#
+# Lancement manuel (dev) :
+#   docker compose up -d        # services réseau (qdrant, whisper-cpp, radicale)
 #   mvn spring-boot:run         # app ARCOS, dans un vrai terminal
+#
+# faster-whisper est derrière un profil (voir le service ci-dessus) ; requis
+# seulement si arcos.stt.backend=FASTER_WHISPER.
 
 volumes:
-  qdrant_storage:
   radicale_data:

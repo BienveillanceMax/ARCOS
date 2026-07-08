@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Logging ARCOS : console (comportement Spring Boot par défaut, inchangé)
+  + fichier avec rotation (logs/arcos.log).
+
+  Pourquoi le fichier : en mode TUI, ArcosApplication redirige stdout/stderr
+  vers /dev/null avant l'init des loggers (Lanterna possède le terminal).
+  L'appender FILE ouvre logs/arcos.log directement et n'est pas affecté —
+  c'est la seule trace persistante d'un crash.
+
+  Le répertoire est relatif au CWD (ARCOS/) ; surchargables via ARCOS_LOG_DIR.
+  Les niveaux (logging.level.*) restent pilotés par application.properties.
+-->
+<configuration>
+    <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
+    <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+
+    <property name="LOG_DIR" value="${ARCOS_LOG_DIR:-logs}"/>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/arcos.log</file>
+        <encoder>
+            <pattern>${FILE_LOG_PATTERN}</pattern>
+            <charset>${FILE_LOG_CHARSET}</charset>
+        </encoder>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_DIR}/arcos.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>14</maxHistory>
+            <totalSizeCap>200MB</totalSizeCap>
+        </rollingPolicy>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+    </root>
+</configuration>

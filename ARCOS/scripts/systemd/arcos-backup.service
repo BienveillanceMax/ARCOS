@@ -1,0 +1,10 @@
+[Unit]
+Description=Sauvegarde ARCOS (snapshots Qdrant + data + config)
+
+[Service]
+Type=oneshot
+# Adapter le chemin si le dépôt change d'emplacement (ex: migration UM890).
+ExecStart=/home/pierre-wagniart/project/ARCOS/ARCOS/scripts/backup-arcos.sh
+# Surcharges optionnelles :
+# Environment=ARCOS_BACKUP_KEEP=7
+# Environment=ARCOS_BACKUP_DIR=%h/arcos-backups

@@ -1,0 +1,11 @@
+[Unit]
+Description=Sauvegarde quotidienne ARCOS
+
+[Timer]
+OnCalendar=*-*-* 03:47:00
+RandomizedDelaySec=10min
+# Rattrape les exécutions manquées (machine éteinte à 03h47).
+Persistent=true
+
+[Install]
+WantedBy=timers.target
