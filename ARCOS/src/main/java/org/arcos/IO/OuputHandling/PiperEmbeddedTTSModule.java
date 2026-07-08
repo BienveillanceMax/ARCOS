@@ -25,6 +25,12 @@ public class PiperEmbeddedTTSModule {
     private File configFile;
     private boolean enabled = false;
     private String audioPlayerCommand;
+    /** Notifié au démarrage de chaque lecture de chunk (télémétrie premier-audio). */
+    private volatile Runnable playbackStartListener;
+
+    public void setPlaybackStartListener(Runnable listener) {
+        this.playbackStartListener = listener;
+    }
 
     public PiperEmbeddedTTSModule() {
         this.generationExecutor = Executors.newSingleThreadExecutor();
@@ -410,6 +416,11 @@ public class PiperEmbeddedTTSModule {
         return speakAsync(text, 1.0f, 0.667f, 0.8f);
     }
 
+    /** Synthèse avec paramètres de voix par défaut et callback de fin de lecture. */
+    public void speakAsync(String text, Runnable onComplete) {
+        speakAsync(text, 1.0f, 0.667f, 0.8f, onComplete);
+    }
+
     public Future<Void> speakAsync(String text, float lengthScale, float noiseScale, float noiseW) {
         if (!enabled) return java.util.concurrent.CompletableFuture.completedFuture(null);
         return generationExecutor.submit(() -> {
@@ -559,6 +570,11 @@ public class PiperEmbeddedTTSModule {
     private void playAudio(File audioFile) throws Exception {
         if (audioPlayerCommand == null) {
             throw new RuntimeException("No audio player found. Install pulseaudio-utils, pipewire or alsa-utils");
+        }
+
+        Runnable listener = playbackStartListener;
+        if (listener != null) {
+            listener.run();
         }
 
         log.debug("Lecture audio avec {} : {}", audioPlayerCommand, audioFile.getAbsolutePath());

@@ -15,7 +15,7 @@ class AudioPropertiesTest {
         // Then
         assertEquals(-1, props.getInputDeviceIndex());
         assertEquals(44100, props.getSampleRate());
-        assertEquals(1000, props.getSilenceThreshold());
+        assertEquals(-1, props.getSilenceThreshold()); // -1 = auto (seuil recommandé par la source micro)
         assertEquals(1200, props.getSilenceDurationMs());
         assertEquals(30, props.getMaxRecordingSeconds());
     }

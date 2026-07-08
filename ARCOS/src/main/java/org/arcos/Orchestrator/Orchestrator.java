@@ -6,7 +6,9 @@ import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.EventBus.Events.WakeWordEvent;
 import org.arcos.Producers.WakeWordProducer;
+import org.arcos.IO.InputHandling.EndpointingPolicyService;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -73,6 +75,11 @@ public class Orchestrator
     private final ExecutionHistoryService executionHistoryService;
 
     private final ConversationSummaryService conversationSummaryService;
+    private final TurnTimeline turnTimeline;
+    private final EndpointingPolicyService endpointingPolicyService;
+    private final ConversationRecoveryService conversationRecoveryService;
+    /** Dernière réponse complète d'ARCOS — classifiée par la politique d'endpointing dans onTtsDone. */
+    private volatile String lastAssistantResponse = "";
     private final WakeWordProducer wakeWordProducer;
     private final AudioProperties audioProperties;
     private final ConversationQueueService conversationQueueService;
@@ -99,8 +106,14 @@ public class Orchestrator
     });
 
     @Autowired
-    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodStateHolder moodStateHolder, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, @Nullable ConversationQueueService conversationQueueService, @Nullable InactivityProducer inactivityProducer, @Nullable BatchPipelineOrchestrator batchPipelineOrchestrator) {
+    public Orchestrator(CentralFeedBackHandler centralFeedBackHandler, PersonalityOrchestrator personalityOrchestrator, EventQueue evenQueue, LLMClient llmClient, ChatOrchestrator chatOrchestrator, PromptBuilder promptBuilder, ConversationContext context, MemoryService memoryService, InitiativeService initiativeService, DesireService desireService, MoodService moodService, MoodStateHolder moodStateHolder, MoodVoiceMapper moodVoiceMapper, PlannedActionExecutor plannedActionExecutor, PlannedActionService plannedActionService, ExecutionHistoryService executionHistoryService, WakeWordProducer wakeWordProducer, AudioProperties audioProperties, ConversationSummaryService conversationSummaryService, TurnTimeline turnTimeline, EndpointingPolicyService endpointingPolicyService, ConversationRecoveryService conversationRecoveryService, @Nullable ConversationQueueService conversationQueueService, @Nullable InactivityProducer inactivityProducer, @Nullable BatchPipelineOrchestrator batchPipelineOrchestrator) {
         this.ttsHandler = new PiperEmbeddedTTSModule();
+        this.turnTimeline = turnTimeline;
+        this.endpointingPolicyService = endpointingPolicyService;
+        this.conversationRecoveryService = conversationRecoveryService;
+        // Marque "premier audio" au démarrage de la lecture du premier chunk du tour.
+        // Câblage provisoire : remplacé par l'injection d'un TTSModule en phase P4.
+        this.ttsHandler.setPlaybackStartListener(turnTimeline::markFirstAudible);
         this.desireService = desireService;
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.eventQueue = evenQueue;
@@ -128,8 +141,13 @@ public class Orchestrator
     public void dispatch(Event<?> event) {
         if (event.getType() == EventType.WAKEWORD) {
             log.info("starting processing");
+            conversationRecoveryService.reset(); // énoncé compris : l'escalade repart de zéro
             boolean isMultiTurn = (event instanceof WakeWordEvent) && ((WakeWordEvent) event).isMultiTurn();
             processAndSpeak((String) event.getPayload(), isMultiTurn);
+        } else if (event.getType() == EventType.STT_UNINTELLIGIBLE) {
+            handleUnintelligibleSpeech();
+        } else if (event.getType() == EventType.STT_ERROR) {
+            handleSttError();
         } else if (event.getType() == EventType.LISTENING_WINDOW_TIMEOUT) {
             inConversationMode = false;
             log.info("Mode conversation terminé — retour veille standard");
@@ -245,6 +263,7 @@ public class Orchestrator
 
         // Create the prompt for streaming response
         Prompt streamingPrompt = promptBuilder.buildConversationnalPrompt(context, userQuery);
+        turnTimeline.markPromptBuilt();
         log.info("Streaming Prompt: {}", streamingPrompt);
 
         // Get Voice Parameters based on current Mood
@@ -257,8 +276,12 @@ public class Orchestrator
         Runnable onTtsDone = () -> {
             if (audioProperties.isMultiTurnEnabled() && !isExecutingAction) {
                 inConversationMode = true;
-                wakeWordProducer.openConversationWindow(audioProperties.getPostResponseListeningWindowMs());
-                log.debug("Fenêtre de conversation ouverte ({} ms)", audioProperties.getPostResponseListeningWindowMs());
+                // Endpointing contextuel : le silence de fin d'énoncé dépend du type de la réponse
+                // qui vient d'être prononcée (question fermée → court, ouverte → long).
+                long silenceMs = endpointingPolicyService.conversationSilenceMs(lastAssistantResponse);
+                wakeWordProducer.openConversationWindow(audioProperties.getPostResponseListeningWindowMs(), silenceMs);
+                log.debug("Fenêtre de conversation ouverte ({} ms, silence {} ms)",
+                        audioProperties.getPostResponseListeningWindowMs(), silenceMs);
             } else {
                 wakeWordProducer.resumeDetection();
             }
@@ -283,11 +306,38 @@ public class Orchestrator
         centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
     }
 
+    /** Parole détectée mais incompréhensible : escalade en 3 niveaux puis retour veille. */
+    private void handleUnintelligibleSpeech() {
+        ConversationRecoveryService.Recovery recovery = conversationRecoveryService.onUnintelligible();
+        wakeWordProducer.suspend();
+        ttsHandler.speakAsync(recovery.message(), () -> {
+            if (recovery.reopenWindow()) {
+                inConversationMode = true;
+                long silenceMs = endpointingPolicyService.conversationSilenceMs(recovery.message());
+                wakeWordProducer.openConversationWindow(audioProperties.getPostResponseListeningWindowMs(), silenceMs);
+            } else {
+                inConversationMode = false;
+                wakeWordProducer.resumeDetection();
+            }
+        });
+    }
+
+    /** Backend STT en panne : message distinct + cue d'échec, retour veille (le TTS reste fonctionnel). */
+    private void handleSttError() {
+        log.error("Backend STT en échec — feedback utilisateur et retour veille");
+        centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
+        inConversationMode = false;
+        wakeWordProducer.suspend();
+        ttsHandler.speakAsync("Mon module d'écoute a un problème. Réessaie dans un instant.",
+                wakeWordProducer::resumeDetection);
+    }
+
     private void generateFluxAndSpeak(Prompt streamingPrompt, String userQuery, MoodVoiceMapper.VoiceParams voiceParams, Runnable onTtsDone) {
         StringBuilder sentenceBuffer = new StringBuilder();
         StringBuilder fullResponse = new StringBuilder();
         chatOrchestrator.generateStreamingChatResponse(streamingPrompt)
                 .doOnNext(chunk -> {
+                    turnTimeline.markFirstToken();
                     // 1. On garde le texte brut (avec *) pour l'historique et le buffer
                     sentenceBuffer.append(chunk);
                     fullResponse.append(chunk);
@@ -324,6 +374,7 @@ public class Orchestrator
 
                     // Pour la mémoire, on garde le texte original 'fullResponse' (avec le formatage)
                     String finalResponse = fullResponse.toString();
+                    lastAssistantResponse = finalResponse; // lu par onTtsDone (endpointing contextuel)
 
                     context.addUserMessage(userQuery);
                     context.addAssistantMessage(finalResponse);

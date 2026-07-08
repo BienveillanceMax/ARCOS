@@ -1,0 +1,13 @@
+# Motifs d'hallucination Whisper (français) — un motif par ligne, insensible à la casse.
+# Un transcript contenant l'un de ces motifs est filtré (artefacts de sous-titres YouTube
+# présents dans les données d'entraînement de Whisper, émis sur du silence/bruit).
+sous-titrage
+sous-titres
+sous-titre
+amara.org
+merci d'avoir regardé
+abonnez-vous
+n'hésitez pas à
+likez cette vidéo
+s'il vous plaît
+merci pour votre attention

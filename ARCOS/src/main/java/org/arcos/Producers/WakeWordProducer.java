@@ -7,11 +7,15 @@ import org.arcos.EventBus.Events.EventPriority;
 import org.arcos.EventBus.Events.EventType;
 import org.arcos.EventBus.Events.WakeWordEvent;
 import org.arcos.IO.InputHandling.AudioFraming;
+import org.arcos.IO.InputHandling.CaptureConfig;
 import org.arcos.IO.InputHandling.JavaSoundMicrophoneSource;
 import org.arcos.IO.InputHandling.MicrophoneSource;
 import org.arcos.IO.InputHandling.PipeWireMicrophoneSource;
+import org.arcos.IO.InputHandling.UtteranceCaptureService;
 import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.IO.InputHandling.STT.SttGate;
+import org.arcos.IO.InputHandling.STT.SttResult;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -35,11 +39,6 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 @Component
 @Slf4j
@@ -54,20 +53,13 @@ public class WakeWordProducer implements Runnable {
     private final AudioCueFeedbackHandler audioCueFeedbackHandler;
     private final AudioProperties audioProperties;
     private final SpeechToTextProperties sttProperties;
+    private final TurnTimeline turnTimeline;
 
     /**
-     * Single-thread executor that runs speculative STT calls launched the moment silence is
-     * first detected. The blocking HTTP round-trip runs concurrently with the
-     * {@code silenceDurationMs} confirmation wait, so end-of-utterance latency drops to
-     * {@code max(silenceDurationMs, sttRoundTrip)} instead of {@code silenceDurationMs + sttRoundTrip}.
-     * If the speaker resumes within the silence window, the in-flight future is orphaned
-     * (compute is wasted but no extra user-perceived latency is incurred).
+     * Boucle de capture partagée (VAD + fin d'énoncé + STT spéculatif) — créée une fois
+     * la source micro et le SttGate initialisés, recréée si la source micro est remplacée.
      */
-    private final ExecutorService speculationExecutor = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "stt-speculation");
-        t.setDaemon(true);
-        return t;
-    });
+    private UtteranceCaptureService captureService;
     private volatile Thread wakeWordThread;
     private boolean porcupineEnabled = false;
     private boolean porcupineInitialized = false;
@@ -91,6 +83,8 @@ public class WakeWordProducer implements Runnable {
     private volatile boolean needsDrain = false;
     private volatile boolean inConversationWindowMode = false;
     private volatile long conversationWindowExpiry = 0L;
+    /** Silence de fin d'énoncé pour la prochaine fenêtre de conversation (endpointing contextuel). */
+    private volatile long nextConversationSilenceMs = -1;
 
     @EventListener(ApplicationReadyEvent.class)
     @Order(2)
@@ -121,7 +115,9 @@ public class WakeWordProducer implements Runnable {
         if (porcupine != null) {
             porcupine.delete();
         }
-        speculationExecutor.shutdownNow();
+        if (captureService != null) {
+            captureService.close();
+        }
     }
 
     @Autowired
@@ -129,12 +125,14 @@ public class WakeWordProducer implements Runnable {
                             CentralFeedBackHandler centralFeedBackHandler,
                             AudioCueFeedbackHandler audioCueFeedbackHandler,
                             AudioProperties audioProperties,
-                            SpeechToTextProperties sttProperties) {
+                            SpeechToTextProperties sttProperties,
+                            TurnTimeline turnTimeline) {
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.audioCueFeedbackHandler = audioCueFeedbackHandler;
         this.eventQueue = eventQueue;
         this.audioProperties = audioProperties;
         this.sttProperties = sttProperties;
+        this.turnTimeline = turnTimeline;
     }
 
     /**
@@ -166,9 +164,10 @@ public class WakeWordProducer implements Runnable {
             initializePorcupine(keywordPaths, porcupineModelPath);
             initializeMicrophone();
             if (this.micSource != null && this.micSource.isAvailable()) {
-                this.silenceThreshold = micSource.recommendedSilenceThreshold();
+                this.silenceThreshold = UtteranceCaptureService.resolveSilenceThreshold(audioProperties, micSource);
                 log.info("Silence threshold: {} (from {})", silenceThreshold, micSource.describe());
                 this.sttGate = SttGate.create(sttProperties.getBackend(), sttProperties);
+                rebuildCaptureService();
             }
             this.porcupineEnabled = true;
             log.info("WakeWordProducer initialisé avec succès.");
@@ -286,15 +285,23 @@ public class WakeWordProducer implements Runnable {
                         emitListeningWindowTimeout();
                         continue;
                     }
-                    String transcription = recordAndTranscribeForConversation((int) remaining);
+                    long silenceMs = nextConversationSilenceMs > 0
+                            ? nextConversationSilenceMs
+                            : audioProperties.getConversationSilenceMs();
+                    SttResult result = captureService.capture(
+                            CaptureConfig.forConversation(audioProperties, remaining, silenceMs));
                     inConversationWindowMode = false;
-                    if (transcription != null && !transcription.isEmpty()) {
-                        log.info(">>> [CONVERSATION] TRANSCRIBED: {}", transcription);
-                        WakeWordEvent event = new WakeWordEvent(transcription, "conversation", true);
-                        eventQueue.offer(event);
-                    } else {
-                        log.info(">>> [CONVERSATION] Aucune parole dans la fenêtre");
-                        emitListeningWindowTimeout();
+                    switch (result.status()) {
+                        case TRANSCRIPT -> {
+                            log.info(">>> [CONVERSATION] TRANSCRIBED: {}", result.text());
+                            eventQueue.offer(new WakeWordEvent(result.text(), "conversation", true));
+                        }
+                        case UNINTELLIGIBLE -> emitSttEvent(EventType.STT_UNINTELLIGIBLE);
+                        case ERROR -> emitSttEvent(EventType.STT_ERROR);
+                        case NO_SPEECH -> {
+                            log.info(">>> [CONVERSATION] Aucune parole dans la fenêtre");
+                            emitListeningWindowTimeout();
+                        }
                     }
                     continue;
                 }
@@ -342,14 +349,16 @@ public class WakeWordProducer implements Runnable {
                         audioCueFeedbackHandler.playWakeUpSoundSoftSync(); // blocks until cue finishes — prevents mic bleed
 
                         // Switch to transcription mode
-                        String transcription = recordAndTranscribe();
+                        SttResult sttResult = captureService.capture(CaptureConfig.forWake(audioProperties));
 
-                        if (transcription != null && !transcription.isEmpty()) {
-                            log.info(">>> TRANSCRIBED MESSAGE: {}", transcription);
-                            WakeWordEvent event = new WakeWordEvent(transcription, "default");
-                            eventQueue.offer(event);
-                        } else {
-                            log.info(">>> No speech detected or transcription failed");
+                        switch (sttResult.status()) {
+                            case TRANSCRIPT -> {
+                                log.info(">>> TRANSCRIBED MESSAGE: {}", sttResult.text());
+                                eventQueue.offer(new WakeWordEvent(sttResult.text(), "default"));
+                            }
+                            case UNINTELLIGIBLE -> emitSttEvent(EventType.STT_UNINTELLIGIBLE);
+                            case ERROR -> emitSttEvent(EventType.STT_ERROR);
+                            case NO_SPEECH -> log.info(">>> No speech detected");
                         }
                     }
                 } else if (bytesRead < 0) {
@@ -361,7 +370,8 @@ public class WakeWordProducer implements Runnable {
                     Thread.sleep(backoff);                 // interruptible — InterruptedException exits via the loop's catch
                     recreatePipeWireSource();
                     if (micSource.isAvailable()) {         // micSource is never null — see recreatePipeWireSource()
-                        this.silenceThreshold = micSource.recommendedSilenceThreshold();
+                        this.silenceThreshold = UtteranceCaptureService.resolveSilenceThreshold(audioProperties, micSource);
+                        rebuildCaptureService();           // le service référence la source remplacée
                         log.info("Source PipeWire rétablie après {} échec(s).", micFailureCount);
                         micFailureCount = 0;               // recovered: reset
                     }
@@ -402,168 +412,12 @@ public class WakeWordProducer implements Runnable {
         AudioFraming.downsample(input, inputLength, output, outputLength);
     }
 
-    private String recordAndTranscribe() {
-        log.info("Started listening for speech...");
-
-        sttGate.reset();
-
-        final int micSampleRate = micSource.getSampleRate();
-        final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
-        // Whisper frame: 50ms at 16kHz = 1600 bytes
-        final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20;
-        final int micFrameSize = needsResample
-                ? (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE)
-                : whisperFrameSize;
-
-        byte[] micBuffer = new byte[micFrameSize];
-        byte[] whisperBuffer = new byte[whisperFrameSize];
-
-        // Pre-buffer: ring buffer of recent frames to preserve speech onset
-        final int PRE_BUFFER_FRAMES = 4; // ~200ms at 50ms/frame
-        byte[][] preBuffer = new byte[PRE_BUFFER_FRAMES][];
-        int preBufferIndex = 0;
-
-        long lastSoundTime = System.currentTimeMillis();
-        long recordingStartTime = System.currentTimeMillis();
-        boolean hasDetectedSpeech = false;
-        // Speculative STT: launched on the first silent frame after speech, awaited at loop exit.
-        // null = no speculation in flight (either we never started or the speaker resumed and we orphaned it).
-        Future<String> speculation = null;
-
-        try {
-            while (true) {
-                int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
-
-                if (bytesRead > 0) {
-                    if (needsResample) {
-                        int samplesRead = bytesRead / BYTES_PER_SAMPLE;
-                        short[] micSamples = new short[samplesRead];
-                        ByteBuffer.wrap(micBuffer, 0, bytesRead)
-                                .order(ByteOrder.LITTLE_ENDIAN)
-                                .asShortBuffer()
-                                .get(micSamples);
-
-                        int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
-                        short[] downsampled = new short[whisperSamples];
-                        downsample(micSamples, samplesRead, downsampled, whisperSamples);
-
-                        ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
-                        for (short s : downsampled) {
-                            bb.putShort(s);
-                        }
-                    } else {
-                        System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, whisperFrameSize));
-                    }
-
-                    // Store frame in ring buffer before silence check (only while waiting for speech)
-                    if (!hasDetectedSpeech) {
-                        preBuffer[preBufferIndex % PRE_BUFFER_FRAMES] = whisperBuffer.clone();
-                        preBufferIndex++;
-                    }
-
-                    // Check for silence
-                    boolean isSilent = isSilence(whisperBuffer);
-
-                    if (!isSilent) {
-                        lastSoundTime = System.currentTimeMillis();
-                        if (!hasDetectedSpeech) {
-                            hasDetectedSpeech = true;
-                            log.info("Speech detected, recording...");
-                            // Flush pre-buffer: send prior frames that contain the speech onset
-                            int oldest = Math.max(0, preBufferIndex - PRE_BUFFER_FRAMES);
-                            for (int j = oldest; j < preBufferIndex - 1; j++) {
-                                byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
-                                if (frame != null) {
-                                    sttGate.processAudio(frame);
-                                }
-                            }
-                        }
-                        // Speaker resumed — orphan any in-flight speculative STT.
-                        // We do not cancel the OkHttp call (saves complexity); its result is just discarded.
-                        if (speculation != null) {
-                            log.debug("Speech resumed; orphaning speculative STT");
-                            speculation = null;
-                        }
-                    } else if (hasDetectedSpeech && speculation == null) {
-                        // First silent frame after speech — launch the speculative STT call now,
-                        // so its HTTP round-trip overlaps with the silenceDurationMs confirmation wait.
-                        log.debug("Silence-onset; launching speculative STT");
-                        speculation = speculationExecutor.submit(sttGate::getTranscription);
-                    }
-
-                    // Only buffer audio once speech has been detected.
-                    // Skip trailing-silence frames — they add audio that the STT model
-                    // has to process for no information gain. Inter-word brief pauses
-                    // typically remain non-silent thanks to ambient/breath noise; pure
-                    // tail-silence after the utterance is what gets dropped here.
-                    if (hasDetectedSpeech && !isSilent) {
-                        sttGate.processAudio(whisperBuffer);
-                    }
-
-                    // Check if we should stop due to silence
-                    if (hasDetectedSpeech && isSilent) {
-                        long silenceDuration = System.currentTimeMillis() - lastSoundTime;
-                        long silenceDurationMs = audioProperties.getSilenceDurationMs();
-                        if (silenceDuration >= silenceDurationMs) {
-                            log.info("Detected {}ms of silence, processing transcription...", silenceDurationMs);
-                            break;
-                        }
-                    }
-
-                    // Timeout: short window while waiting for speech, full duration once speaking
-                    long elapsed = System.currentTimeMillis() - recordingStartTime;
-                    long timeoutMs = hasDetectedSpeech
-                            ? (long) audioProperties.getMaxRecordingSeconds() * 1000
-                            : audioProperties.getPostResponseListeningWindowMs();
-                    if (elapsed >= timeoutMs) {
-                        log.info(hasDetectedSpeech
-                                ? "Maximum recording time reached, processing transcription..."
-                                : "No speech detected within {}ms, aborting", timeoutMs);
-                        break;
-                    }
-                }
-            }
-
-            // Process transcription only if speech was actually detected.
-            // If we launched a speculative call at silence-onset, await it instead of a fresh blocking call.
-            if (hasDetectedSpeech && sttGate.hasMinimumAudio()) {
-                log.info("Processing {}ms of audio...", sttGate.getBufferedAudioDurationMs());
-                return awaitSpeculationOrTranscribe(speculation);
-            } else {
-                if (speculation != null) speculation.cancel(true);
-                log.info(hasDetectedSpeech ? "Not enough audio data for transcription" : "No speech detected");
-                return "";
-            }
-
-        } catch (Exception e) {
-            log.error("Error during transcription recording", e);
-            return "";
+    /** (Re)crée la boucle de capture — à appeler quand micSource ou silenceThreshold change. */
+    private void rebuildCaptureService() {
+        if (captureService != null) {
+            captureService.close();
         }
-    }
-
-    private boolean isSilence(byte[] audioData) {
-        return AudioFraming.isSilence(audioData, silenceThreshold);
-    }
-
-    /**
-     * If a speculative STT call was launched at silence-onset, await its result; otherwise
-     * fall back to a synchronous {@code sttGate.getTranscription()}. Any exception or timeout
-     * from the speculative path also falls back, so the request still completes.
-     */
-    private String awaitSpeculationOrTranscribe(Future<String> speculation) {
-        if (speculation == null) {
-            return sttGate.getTranscription();
-        }
-        try {
-            return speculation.get(10, TimeUnit.SECONDS);
-        } catch (TimeoutException te) {
-            log.warn("Speculative STT timed out after 10s; cancelling and falling back to sync call");
-            speculation.cancel(true);
-            return sttGate.getTranscription();
-        } catch (Exception e) {
-            log.warn("Speculative STT failed; falling back to sync call: {}", e.toString());
-            return sttGate.getTranscription();
-        }
+        this.captureService = new UtteranceCaptureService(micSource, sttGate, silenceThreshold, turnTimeline);
     }
 
     /**
@@ -586,17 +440,26 @@ public class WakeWordProducer implements Runnable {
     }
 
     public void openConversationWindow(int durationMs) {
+        openConversationWindow(durationMs, -1);
+    }
+
+    /**
+     * @param silenceDurationMs silence de fin d'énoncé contextuel pour cette fenêtre
+     *                          (EndpointingPolicyService) ; -1 = valeur de config
+     */
+    public void openConversationWindow(int durationMs, long silenceDurationMs) {
         if (!porcupineEnabled) {
             log.debug("openConversationWindow ignorée : Porcupine non actif");
             return;
         }
+        nextConversationSilenceMs = silenceDurationMs;
         // Set conversation state BEFORE clearing suspended, so the wakeword thread
         // sees the conversation window as soon as it resumes (avoids race condition
         // where thread wakes, drains instantly with JavaSound, and misses the flag).
         conversationWindowExpiry = System.currentTimeMillis() + durationMs;
         inConversationWindowMode = true;
         suspended = false;
-        log.debug("Fenêtre conversation ouverte pour {}ms", durationMs);
+        log.debug("Fenêtre conversation ouverte pour {}ms (silence {}ms)", durationMs, silenceDurationMs);
     }
 
     private void emitListeningWindowTimeout() {
@@ -609,129 +472,10 @@ public class WakeWordProducer implements Runnable {
         eventQueue.offer(timeout);
     }
 
-    private String recordAndTranscribeForConversation(int maxDurationMs) {
-        log.info("[CONVERSATION] Écoute pendant {}ms max...", maxDurationMs);
-
-        sttGate.reset();
-
-        final int micSampleRate = micSource.getSampleRate();
-        final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
-        final int whisperFrameSize = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20;
-        final int micFrameSize = needsResample
-                ? (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE)
-                : whisperFrameSize;
-
-        byte[] micBuffer = new byte[micFrameSize];
-        byte[] whisperBuffer = new byte[whisperFrameSize];
-
-        // Pre-buffer: ring buffer of recent frames to preserve speech onset
-        final int PRE_BUFFER_FRAMES = 4; // ~200ms at 50ms/frame
-        byte[][] preBuffer = new byte[PRE_BUFFER_FRAMES][];
-        int preBufferIndex = 0;
-
-        long lastSoundTime = System.currentTimeMillis();
-        long recordingStartTime = System.currentTimeMillis();
-        boolean hasDetectedSpeech = false;
-        // Speculative STT — see recordAndTranscribe() for rationale.
-        Future<String> speculation = null;
-
-        try {
-            while (true) {
-                int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
-
-                if (bytesRead > 0) {
-                    if (needsResample) {
-                        int samplesRead = bytesRead / BYTES_PER_SAMPLE;
-                        short[] micSamples = new short[samplesRead];
-                        ByteBuffer.wrap(micBuffer, 0, bytesRead)
-                                .order(ByteOrder.LITTLE_ENDIAN)
-                                .asShortBuffer()
-                                .get(micSamples);
-
-                        int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
-                        short[] downsampled = new short[whisperSamples];
-                        downsample(micSamples, samplesRead, downsampled, whisperSamples);
-
-                        ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
-                        for (short s : downsampled) {
-                            bb.putShort(s);
-                        }
-                    } else {
-                        System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, whisperFrameSize));
-                    }
-
-                    // Store frame in ring buffer before silence check (only while waiting for speech)
-                    if (!hasDetectedSpeech) {
-                        preBuffer[preBufferIndex % PRE_BUFFER_FRAMES] = whisperBuffer.clone();
-                        preBufferIndex++;
-                    }
-
-                    boolean isSilent = isSilence(whisperBuffer);
-
-                    if (!isSilent) {
-                        lastSoundTime = System.currentTimeMillis();
-                        if (!hasDetectedSpeech) {
-                            hasDetectedSpeech = true;
-                            log.info("[CONVERSATION] Parole détectée, enregistrement...");
-                            // Flush pre-buffer: send prior frames that contain the speech onset
-                            int oldest = Math.max(0, preBufferIndex - PRE_BUFFER_FRAMES);
-                            for (int j = oldest; j < preBufferIndex - 1; j++) {
-                                byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
-                                if (frame != null) {
-                                    sttGate.processAudio(frame);
-                                }
-                            }
-                        }
-                        if (speculation != null) {
-                            log.debug("[CONVERSATION] Speech resumed; orphaning speculative STT");
-                            speculation = null;
-                        }
-                    } else if (hasDetectedSpeech && speculation == null) {
-                        log.debug("[CONVERSATION] Silence-onset; launching speculative STT");
-                        speculation = speculationExecutor.submit(sttGate::getTranscription);
-                    }
-
-                    // Only buffer audio once speech has been detected; skip trailing silence (see initial loop).
-                    if (hasDetectedSpeech && !isSilent) {
-                        sttGate.processAudio(whisperBuffer);
-                    }
-
-                    if (hasDetectedSpeech && isSilent) {
-                        long silenceDuration = System.currentTimeMillis() - lastSoundTime;
-                        if (silenceDuration >= audioProperties.getConversationSilenceMs()) {
-                            log.info("[CONVERSATION] Silence de {}ms, traitement...", audioProperties.getConversationSilenceMs());
-                            break;
-                        }
-                    }
-
-                    long elapsed = System.currentTimeMillis() - recordingStartTime;
-                    // Window timeout only applies while waiting for speech to start.
-                    // Once speech is detected, let silence detection handle the end,
-                    // with maxRecordingSeconds as a safety backstop.
-                    long timeout = hasDetectedSpeech
-                            ? (long) audioProperties.getMaxRecordingSeconds() * 1000
-                            : maxDurationMs;
-                    if (elapsed >= timeout) {
-                        log.info("[CONVERSATION] {} après {}ms",
-                                hasDetectedSpeech ? "Durée max d'enregistrement atteinte" : "Fenêtre expirée sans parole",
-                                elapsed);
-                        break;
-                    }
-                }
-            }
-
-            if (hasDetectedSpeech && sttGate.hasMinimumAudio()) {
-                log.info("[CONVERSATION] Traitement de {}ms d'audio...", sttGate.getBufferedAudioDurationMs());
-                return awaitSpeculationOrTranscribe(speculation);
-            } else {
-                if (speculation != null) speculation.cancel(true);
-                log.info(hasDetectedSpeech ? "[CONVERSATION] Pas assez d'audio pour la transcription" : "[CONVERSATION] Aucune parole détectée");
-                return "";
-            }
-
-        } catch (Exception e) {
-            log.error("[CONVERSATION] Erreur lors de l'enregistrement", e);
-            return "";
-        }
+    /** Parole incompréhensible ou backend STT en panne — l'Orchestrator porte la réaction utilisateur. */
+    private void emitSttEvent(EventType type) {
+        log.info(">>> {} — délégué à l'Orchestrator", type);
+        eventQueue.offer(new Event<>(type, EventPriority.HIGH, null, "WakeWordProducer"));
     }
+
 }

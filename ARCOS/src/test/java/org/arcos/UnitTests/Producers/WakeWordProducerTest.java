@@ -5,6 +5,7 @@ import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.arcos.Producers.WakeWordProducer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -87,7 +88,7 @@ class WakeWordProducerTest {
     private WakeWordProducer buildProducerViaDegradedPath() {
         WakeWordProducer[] holder = new WakeWordProducer[1];
         assertThatCode(() -> {
-            holder[0] = new WakeWordProducer(eventQueue, centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties(), new SpeechToTextProperties());
+            holder[0] = new WakeWordProducer(eventQueue, centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties(), new SpeechToTextProperties(), new TurnTimeline());
         }).doesNotThrowAnyException();
         return holder[0];
     }

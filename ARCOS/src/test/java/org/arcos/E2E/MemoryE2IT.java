@@ -1,4 +1,4 @@
-package org.arcos.E2IT;
+package org.arcos.E2E;
 
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.LongTermMemory.Models.MemoryEntry;

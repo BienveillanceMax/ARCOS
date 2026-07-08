@@ -1,4 +1,4 @@
-package org.arcos.E2IT;
+package org.arcos.E2E;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;

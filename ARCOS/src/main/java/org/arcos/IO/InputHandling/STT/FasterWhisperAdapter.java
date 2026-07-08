@@ -10,8 +10,8 @@ class FasterWhisperAdapter extends AbstractSttAdapter {
 
     private final String model;
 
-    FasterWhisperAdapter(String baseUrl, String model, String language) {
-        super(baseUrl, language);
+    FasterWhisperAdapter(String baseUrl, String model, String language, long timeoutMs) {
+        super(baseUrl, language, timeoutMs);
         this.model = model;
     }
 
@@ -21,7 +21,7 @@ class FasterWhisperAdapter extends AbstractSttAdapter {
     }
 
     @Override
-    protected MultipartBody.Builder addFormFields(MultipartBody.Builder builder) {
+    protected MultipartBody.Builder addFormFields(MultipartBody.Builder builder, byte[] wavData) {
         return builder
                 .addFormDataPart("model", model)
                 .addFormDataPart("language", language);

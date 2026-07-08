@@ -3,6 +3,7 @@ package org.arcos.UnitTests.IO.InputHandling.STT;
 import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.IO.InputHandling.STT.SttBackendType;
 import org.arcos.IO.InputHandling.STT.SttGate;
+import org.arcos.IO.InputHandling.STT.SttResult;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -66,15 +67,32 @@ class SttGateTest {
     }
 
     @Test
-    void getTranscription_WhenNoAudio_ShouldReturnEmpty() {
+    void getTranscription_WhenNoAudio_ShouldReturnNoSpeech() {
         // Given
         SttGate gate = SttGate.create(SttBackendType.FASTER_WHISPER, defaultProps());
 
         // When
-        String result = gate.getTranscription();
+        SttResult result = gate.getTranscription();
 
         // Then
-        assertThat(result).isEmpty();
+        assertThat(result.status()).isEqualTo(SttResult.Status.NO_SPEECH);
+        assertThat(result.hasTranscript()).isFalse();
+    }
+
+    @Test
+    void getTranscription_WhenBackendUnreachable_ShouldReturnError() {
+        // Given : backend sur un port fermé, timeout court
+        SpeechToTextProperties props = defaultProps();
+        props.setTimeoutMs(500);
+        SttGate gate = SttGate.create(SttBackendType.WHISPER_CPP, props);
+        gate.processAudio(new byte[16000]); // 500ms d'audio
+
+        // When
+        SttResult result = gate.getTranscription();
+
+        // Then : une panne backend est distinguable d'un silence
+        assertThat(result.status()).isEqualTo(SttResult.Status.ERROR);
+        gate.close();
     }
 
     @Test

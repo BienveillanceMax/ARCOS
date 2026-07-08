@@ -28,6 +28,13 @@ public class SpeechToTextProperties {
     /** Code langue ISO 639-1. */
     private String language = "fr";
 
+    /**
+     * Timeout des appels HTTP de transcription en ms. Échelle interactive : au-delà,
+     * l'utilisateur a déjà abandonné — mieux vaut un message d'erreur rapide qu'une
+     * attente de 60s (ancienne valeur).
+     */
+    private long timeoutMs = 8000;
+
     public SttBackendType getBackend() { return backend; }
     public void setBackend(SttBackendType backend) { this.backend = backend; }
 
@@ -42,4 +49,7 @@ public class SpeechToTextProperties {
 
     public String getLanguage() { return language; }
     public void setLanguage(String language) { this.language = language; }
+
+    public long getTimeoutMs() { return timeoutMs; }
+    public void setTimeoutMs(long timeoutMs) { this.timeoutMs = timeoutMs; }
 }

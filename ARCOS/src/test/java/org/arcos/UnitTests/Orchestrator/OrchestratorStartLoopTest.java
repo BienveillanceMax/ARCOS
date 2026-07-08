@@ -4,14 +4,17 @@ import org.arcos.Configuration.AudioProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
+import org.arcos.IO.InputHandling.EndpointingPolicyService;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.arcos.LLM.Client.ChatOrchestrator;
 import org.arcos.LLM.Client.LLMClient;
 import org.arcos.LLM.Prompts.PromptBuilder;
 import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.Memory.LongTermMemory.service.MemoryService;
+import org.arcos.Orchestrator.ConversationRecoveryService;
 import org.arcos.Orchestrator.Orchestrator;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Initiative.InitiativeService;
@@ -88,6 +91,9 @@ class OrchestratorStartLoopTest {
                 wakeWordProducer,
                 audioProperties,
                 conversationSummaryService,
+                new TurnTimeline(),
+                new EndpointingPolicyService(audioProperties),
+                new ConversationRecoveryService(),
                 null, null, null
         );
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);

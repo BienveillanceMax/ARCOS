@@ -22,8 +22,12 @@ public class AudioProperties {
     /** Fréquence d'échantillonnage du microphone en Hz. */
     private int sampleRate = 44100;
 
-    /** Seuil RMS en-dessous duquel l'audio est considéré comme silence. */
-    private int silenceThreshold = 1000;
+    /**
+     * Seuil RMS en-dessous duquel l'audio est considéré comme silence.
+     * -1 = auto : le seuil recommandé par la source micro s'applique (75 PipeWire, 1000 JavaSound).
+     * Une valeur >= 0 force ce seuil — voir UtteranceCaptureService#resolveSilenceThreshold.
+     */
+    private int silenceThreshold = -1;
 
     /** Durée de silence en ms avant d'arrêter l'enregistrement. */
     private int silenceDurationMs = 1200;

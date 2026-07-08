@@ -1,4 +1,4 @@
-package org.arcos.E2IT;
+package org.arcos.E2E;
 
 import org.arcos.UserModel.BatchPipeline.BatchPipelineOrchestrator;
 import org.arcos.UserModel.BatchPipeline.MemListenerReadinessCheck;

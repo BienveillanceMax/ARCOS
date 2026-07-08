@@ -36,10 +36,12 @@ public class SttGate {
             case FASTER_WHISPER -> new FasterWhisperAdapter(
                     props.getFasterWhisperUrl(),
                     props.getFasterWhisperModel(),
-                    props.getLanguage());
+                    props.getLanguage(),
+                    props.getTimeoutMs());
             case WHISPER_CPP -> new WhisperCppAdapter(
                     props.getWhisperCppUrl(),
-                    props.getLanguage());
+                    props.getLanguage(),
+                    props.getTimeoutMs());
         };
         return new SttGate(backend);
     }
@@ -52,16 +54,44 @@ public class SttGate {
         audioBuffer.write(audioData, 0, audioData.length);
     }
 
-    public String getTranscription() {
+    public SttResult getTranscription() {
+        return startTranscription().await();
+    }
+
+    /**
+     * Prépare une transcription annulable sur un instantané du buffer courant.
+     * L'appel HTTP part au premier {@link SttCall#await()} ; {@link SttCall#cancel()}
+     * interrompt le round-trip en vol (STT spéculatif orphelin).
+     */
+    public SttCall startTranscription() {
         byte[] audioBytes = audioBuffer.toByteArray();
         if (audioBytes.length == 0) {
-            return "";
+            return SttCall.completed(SttResult.noSpeech());
         }
 
         byte[] wavData = buildWav(audioBytes);
         log.info("Sending {} bytes of audio data for transcription...", audioBytes.length);
-        String rawTranscript = backend.transcribe(wavData);
-        return cleanTranscript(rawTranscript);
+        SttCall raw = backend.newCall(wavData);
+        return new SttCall() {
+            @Override
+            public SttResult await() {
+                SttResult result = raw.await();
+                if (result.status() != SttResult.Status.TRANSCRIPT) {
+                    return result;
+                }
+                // Parole capturée mais transcription vide ou hallucination filtrée :
+                // incompréhensible, pas un silence — la récupération conversationnelle en dépend.
+                String cleaned = cleanTranscript(result.text());
+                return (cleaned == null || cleaned.isBlank())
+                        ? SttResult.unintelligible()
+                        : SttResult.transcript(cleaned);
+            }
+
+            @Override
+            public void cancel() {
+                raw.cancel();
+            }
+        };
     }
 
     public void reset() {
@@ -133,18 +163,26 @@ public class SttGate {
         header[43] = (byte) ((pcmDataLength >> 24) & 0xff);
     }
 
-    private static final List<String> HALLUCINATION_PATTERNS = List.of(
-            "sous-titrage",
-            "sous-titres",
-            "sous-titre",
-            "amara.org",
-            "merci d'avoir regardé",
-            "abonnez-vous",
-            "n'hésitez pas à",
-            "likez cette vidéo",
-            "s'il vous plaît",
-            "merci pour votre attention"
-    );
+    /**
+     * Motifs d'hallucination Whisper (artefacts de sous-titres YouTube dans les données
+     * d'entraînement), chargés depuis les ressources — éditables sans recompiler.
+     */
+    private static final List<String> HALLUCINATION_PATTERNS = loadHallucinationPatterns();
+
+    private static List<String> loadHallucinationPatterns() {
+        try (var in = SttGate.class.getResourceAsStream("/stt-hallucination-patterns-fr.txt")) {
+            if (in == null) {
+                throw new IllegalStateException("stt-hallucination-patterns-fr.txt introuvable dans les ressources");
+            }
+            return new java.io.BufferedReader(new java.io.InputStreamReader(in, java.nio.charset.StandardCharsets.UTF_8))
+                    .lines()
+                    .map(String::strip)
+                    .filter(l -> !l.isEmpty() && !l.startsWith("#"))
+                    .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("Impossible de charger les motifs d'hallucination STT", e);
+        }
+    }
 
     private String cleanTranscript(String transcript) {
         if (transcript == null) return null;

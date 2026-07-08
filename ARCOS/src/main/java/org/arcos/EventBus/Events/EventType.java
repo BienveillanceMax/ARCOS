@@ -21,6 +21,8 @@ public enum EventType
     CALENDAR_EVENT_SCHEDULER("Événement de calendrier"),
     PLANNED_ACTION("Action planifiée à exécuter"),
     LISTENING_WINDOW_TIMEOUT("Fin de fenêtre d'écoute conversation"),
+    STT_UNINTELLIGIBLE("Parole détectée mais transcription vide"),
+    STT_ERROR("Échec du module de transcription"),
     SESSION_END("Fin de session conversationnelle par inactivité"),
     IDLE_WINDOW_OPEN("Fenêtre d'inactivité ouverte pour traitement batch");
 

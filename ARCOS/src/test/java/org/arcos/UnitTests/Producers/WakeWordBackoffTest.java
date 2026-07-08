@@ -5,6 +5,7 @@ import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.EventBus.EventQueue;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.arcos.Producers.WakeWordProducer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,7 +30,7 @@ class WakeWordBackoffTest {
     @Test
     void backoffMillis_isExponential_cappedAt30s_andNeverZero() {
         WakeWordProducer p = new WakeWordProducer(eventQueue, centralFeedBackHandler,
-                audioCueFeedbackHandler, new AudioProperties(), new SpeechToTextProperties());
+                audioCueFeedbackHandler, new AudioProperties(), new SpeechToTextProperties(), new TurnTimeline());
         long b1 = ReflectionTestUtils.invokeMethod(p, "backoffMillis", 1);
         long b2 = ReflectionTestUtils.invokeMethod(p, "backoffMillis", 2);
         long b3 = ReflectionTestUtils.invokeMethod(p, "backoffMillis", 3);

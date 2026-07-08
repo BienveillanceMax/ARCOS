@@ -3,288 +3,242 @@ package org.arcos.Benchmarks;
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.IO.InputHandling.AudioFraming;
+import org.arcos.IO.InputHandling.CaptureConfig;
+import org.arcos.IO.InputHandling.MicrophoneSource;
 import org.arcos.IO.InputHandling.STT.SttBackendType;
 import org.arcos.IO.InputHandling.STT.SttGate;
+import org.arcos.IO.InputHandling.UtteranceCaptureService;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.locks.LockSupport;
 
 /**
  * End-of-Utterance latency benchmark.
  *
- * Measures wall-clock time from "last non-silent audio frame in fixture WAV" until
- * "SttGate.getTranscription() returns". This is the user-perceived latency from
- * "user stops speaking" to "ARCOS could begin reasoning/responding".
+ * Mesure le temps entre "dernier octet de parole servi par le micro" et "transcription
+ * disponible" — la latence perçue entre la fin de parole utilisateur et le moment où
+ * ARCOS peut commencer à raisonner.
  *
- * The benchmark replays a fixed WAV through a harness that mirrors WakeWordProducer's
- * silence-detection inner loop (downsample 44.1kHz -> 16kHz, RMS silence check,
- * silenceDurationMs wait, then SttGate.getTranscription()).
+ * Depuis la refonte P1, le bench exerce le VRAI code de capture de production
+ * ({@link UtteranceCaptureService} : VAD, fin d'énoncé, STT spéculatif avec débounce et
+ * annulation) au lieu d'un clone — via une {@link MicrophoneSource} qui rejoue en temps
+ * réel une fixture de vraie parole française (voir fixtures/speech-fr, générées en P0),
+ * suivie de silence synthétique. Le seuil VAD se résout comme en production
+ * ({@link UtteranceCaptureService#resolveSilenceThreshold}). Deux scénarios sont mesurés :
+ * le chemin wake-word et la fenêtre de conversation (silence de fin différent).
  *
- * EOU = silenceDurationMs wait (post-speech) + STT HTTP round-trip
+ * Les chiffres ne sont PAS comparables aux runs de la campagne auto-research iters 0-9
+ * (ancien clone : fixture de bruit, seuil VAD 1000, fin de parole codée en dur).
  *
- * The benchmark is gated behind ARCOS_BENCH=1 to avoid running it during plain `mvn test`.
- * Requires faster-whisper container at http://localhost:8000 (docker compose up -d faster-whisper).
+ * Gated derrière ARCOS_BENCH=1. Nécessite le conteneur STT du backend configuré.
  *
- * Emits a single line on stdout:
- *   METRIC_EOU_MS=&lt;median_ms_over_measured_runs&gt;
+ * Lignes parsables :
+ *   METRIC_EOU_MS=&lt;médiane wake&gt;   (+ MIN/MAX/MEAN)
+ *   METRIC_EOU_CONV_MS=&lt;médiane conversation&gt;
+ *   METRIC_EOU_WER_PCT=&lt;WER moyen des transcriptions mesurées, garde-fou hallucination&gt;
  *
- * Tuning knobs (env vars, all optional):
- *   ARCOS_BENCH_WARMUP   default 3
- *   ARCOS_BENCH_MEASURED default 10
- *   ARCOS_BENCH_FIXTURE  default ARCOS/src/test/resources/audio/eou_fixture.wav
- *   ARCOS_BENCH_STT_URL  default http://localhost:8000
- *   ARCOS_BENCH_STT_MODEL default deepdml/faster-whisper-large-v3-turbo-ct2
- *   ARCOS_BENCH_LANG     default fr
- *   (Defaults for silenceThreshold/silenceDurationMs come from application.properties baseline.)
+ * Env optionnels : ARCOS_BENCH_WARMUP (3), ARCOS_BENCH_MEASURED (10),
+ * ARCOS_BENCH_FIXTURE (fixtures/speech-fr/utt_05s_dentiste.wav),
+ * ARCOS_BENCH_SILENCE_THRESHOLD, ARCOS_BENCH_SILENCE_DURATION_MS.
  */
 @EnabledIfEnvironmentVariable(named = "ARCOS_BENCH", matches = "1")
 class EouLatencyBench {
 
-    // --- constants mirrored from WakeWordProducer ---
-    private static final int PORCUPINE_SAMPLE_RATE = 16000;
-    private static final int BYTES_PER_SAMPLE = 2;
-    private static final int WHISPER_FRAME_SIZE = PORCUPINE_SAMPLE_RATE * BYTES_PER_SAMPLE / 20; // 1600 bytes = 50ms @ 16kHz
-
-    /** 21-tap low-pass FIR — now lives in {@link AudioFraming#LP_FILTER}. Kept symbol-deleted; this is a marker comment only. */
+    private static final int SAMPLE_RATE = 16000;
+    private static final String DEFAULT_FIXTURE = "src/test/resources/fixtures/speech-fr/utt_05s_dentiste.wav";
 
     @Test
     void bench_eou_latency() throws Exception {
         int warmup = envInt("ARCOS_BENCH_WARMUP", 3);
         int measured = envInt("ARCOS_BENCH_MEASURED", 10);
-        String fixturePath = env("ARCOS_BENCH_FIXTURE", "ARCOS/src/test/resources/audio/eou_fixture.wav");
 
-        // Load production config from application.properties so the bench tracks prod automatically.
         Properties appProps = loadAppProperties();
         AudioProperties audio = audioFromAppProps(appProps);
         SpeechToTextProperties stt = sttFromAppProps(appProps);
         SttBackendType backend = SttBackendType.valueOf(
                 appProps.getProperty("arcos.stt.backend", "FASTER_WHISPER").trim());
 
-        // Resolve fixture relative to either the repo root or the ARCOS module dir
+        Path fixture = resolveFixture(env("ARCOS_BENCH_FIXTURE", DEFAULT_FIXTURE));
+        Wav wav = readWav(fixture);
+        if (wav.sampleRate != SAMPLE_RATE) {
+            throw new IllegalStateException("Fixture must be 16kHz mono (got " + wav.sampleRate + "Hz): " + fixture);
+        }
+        String golden = readGolden(fixture);
+
+        int silenceThreshold = UtteranceCaptureService.resolveSilenceThreshold(
+                audio, new FixtureMicrophoneSource(wav.pcm));
+        String sttUrl = backend == SttBackendType.WHISPER_CPP ? stt.getWhisperCppUrl() : stt.getFasterWhisperUrl();
+        System.out.printf("BENCH fixture: %s | duration=%.3fs | golden=\"%s\"%n", fixture, wav.durationSec(), golden);
+        System.out.printf("BENCH config: backend=%s silenceThreshold=%d silenceDurationMs=%d conversationSilenceMs=%d sttUrl=%s lang=%s%n",
+                backend, silenceThreshold, audio.getSilenceDurationMs(), audio.getConversationSilenceMs(),
+                sttUrl, stt.getLanguage());
+
+        // Warmup (chemin wake)
+        for (int i = 0; i < warmup; i++) {
+            Run r = runOne(wav, golden, CaptureConfig.forWake(audio), audio, stt, backend);
+            System.out.printf("BENCH warmup[%d]=%dms%n", i, r.eouMs);
+        }
+
+        // Mesures : wake puis conversation
+        List<Run> wakeRuns = new ArrayList<>(measured);
+        for (int i = 0; i < measured; i++) {
+            Run r = runOne(wav, golden, CaptureConfig.forWake(audio), audio, stt, backend);
+            wakeRuns.add(r);
+            System.out.printf("BENCH wake[%d]=%dms wer=%.1f%%%n", i, r.eouMs, r.werPct);
+        }
+        List<Run> convRuns = new ArrayList<>(measured);
+        for (int i = 0; i < measured; i++) {
+            Run r = runOne(wav, golden, CaptureConfig.forConversation(audio, 4000), audio, stt, backend);
+            convRuns.add(r);
+            System.out.printf("BENCH conv[%d]=%dms wer=%.1f%%%n", i, r.eouMs, r.werPct);
+        }
+
+        summarize("wake", wakeRuns, "METRIC_EOU");
+        summarize("conversation", convRuns, "METRIC_EOU_CONV");
+
+        double meanWer = wakeRuns.stream().mapToDouble(r -> r.werPct).average().orElse(Double.NaN);
+        System.out.printf(Locale.ROOT, "METRIC_EOU_WER_PCT=%.1f%n", meanWer);
+        if (meanWer > 30.0) {
+            System.out.println("BENCH WARNING: WER > 30% — la latence mesurée inclut probablement un chemin d'hallucination, chiffres suspects.");
+        }
+    }
+
+    private record Run(long eouMs, double werPct) { }
+
+    /** Un run : rejoue la fixture en temps réel à travers le service de capture de production. */
+    private Run runOne(Wav wav, String golden, CaptureConfig config, AudioProperties audio,
+                       SpeechToTextProperties stt, SttBackendType backend) {
+        FixtureMicrophoneSource source = new FixtureMicrophoneSource(wav.pcm);
+        int threshold = UtteranceCaptureService.resolveSilenceThreshold(audio, source);
+        SttGate gate = SttGate.create(backend, stt);
+        try (UtteranceCaptureService service = new UtteranceCaptureService(source, gate, threshold, new TurnTimeline())) {
+            var result = service.capture(config);
+            long eou = System.currentTimeMillis() - source.lastSpeechServedAtMs();
+            double werPct = golden == null ? Double.NaN : Wer.compute(golden, result.text()) * 100.0;
+            return new Run(eou, werPct);
+        } finally {
+            gate.close();
+        }
+    }
+
+    private static String readGolden(Path fixture) throws IOException {
+        Path txt = fixture.resolveSibling(fixture.getFileName().toString().replaceFirst("\\.wav$", ".txt"));
+        return Files.exists(txt) ? Files.readString(txt, StandardCharsets.UTF_8).strip() : null;
+    }
+
+    private static void summarize(String label, List<Run> runs, String metricPrefix) {
+        List<Long> lats = new ArrayList<>(runs.stream().map(Run::eouMs).toList());
+        Collections.sort(lats);
+        long median = lats.get(lats.size() / 2);
+        long min = lats.get(0);
+        long max = lats.get(lats.size() - 1);
+        double mean = lats.stream().mapToLong(Long::longValue).average().orElse(Double.NaN);
+        System.out.printf("BENCH %s summary: n=%d min=%dms median=%dms mean=%.0fms max=%dms%n",
+                label, runs.size(), min, median, mean, max);
+        System.out.printf("%s_MS=%d%n", metricPrefix, median);
+        System.out.printf("%s_MIN_MS=%d%n", metricPrefix, min);
+        System.out.printf("%s_MAX_MS=%d%n", metricPrefix, max);
+        System.out.printf(Locale.ROOT, "%s_MEAN_MS=%.0f%n", metricPrefix, mean);
+    }
+
+    /**
+     * Source micro de fixture : sert la parole 16kHz en temps réel (une trame de 50ms par
+     * read()), puis du silence pur une fois la fixture épuisée. Mémorise l'instant où le
+     * dernier octet de parole a été servi — la référence "l'utilisateur a fini de parler"
+     * du calcul d'EOU (remplace le t0+3000ms codé en dur de l'ancien bench).
+     */
+    static final class FixtureMicrophoneSource implements MicrophoneSource {
+        private final byte[] pcm;
+        private int pos = 0;
+        private long startNs = -1;
+        private int frameIndex = 0;
+        private volatile long lastSpeechServedAtMs = -1;
+
+        FixtureMicrophoneSource(byte[] pcm) {
+            this.pcm = pcm;
+        }
+
+        long lastSpeechServedAtMs() {
+            return lastSpeechServedAtMs;
+        }
+
+        @Override
+        public int read(byte[] buffer, int offset, int length) {
+            if (startNs < 0) startNs = System.nanoTime();
+            long deadline = startNs + (frameIndex + 1) * 50_000_000L;
+            long sleepNs = deadline - System.nanoTime();
+            if (sleepNs > 0) LockSupport.parkNanos(sleepNs);
+            frameIndex++;
+
+            int avail = Math.min(length, pcm.length - pos);
+            if (avail > 0) {
+                System.arraycopy(pcm, pos, buffer, offset, avail);
+                pos += avail;
+                if (avail < length) {
+                    Arrays.fill(buffer, offset + avail, offset + length, (byte) 0);
+                }
+                // Référence EOU = dernière trame NON silencieuse servie (la fin de la fixture
+                // peut être quasi silencieuse — queue de synthèse Piper — et la capture peut
+                // couper dessus avant d'avoir servi le dernier octet).
+                byte[] frame = offset == 0 && length == buffer.length
+                        ? buffer : Arrays.copyOfRange(buffer, offset, offset + length);
+                if (!AudioFraming.isSilence(frame, recommendedSilenceThreshold())) {
+                    lastSpeechServedAtMs = System.currentTimeMillis();
+                }
+            } else {
+                Arrays.fill(buffer, offset, offset + length, (byte) 0);
+            }
+            return length;
+        }
+
+        @Override public void close() { }
+        @Override public boolean isAvailable() { return true; }
+        @Override public String describe() { return "fixture-replay (16kHz, " + pcm.length + " bytes)"; }
+        @Override public int getSampleRate() { return SAMPLE_RATE; }
+        @Override public int recommendedSilenceThreshold() { return 75; } // aligné PipeWire (prod)
+    }
+
+    // --- plumbing (inchangé : lecture de la config de prod + parsing WAV) ---
+
+    private static Path resolveFixture(String fixturePath) {
         Path fixture = Paths.get(fixturePath);
+        if (!Files.exists(fixture) && fixturePath.startsWith("ARCOS/")) {
+            fixture = Paths.get(fixturePath.substring("ARCOS/".length()));
+        }
         if (!Files.exists(fixture)) {
-            String alt = fixturePath.startsWith("ARCOS/") ? fixturePath.substring("ARCOS/".length()) : fixturePath;
-            fixture = Paths.get(alt);
+            Path alt = Paths.get("ARCOS").resolve(fixturePath);
+            if (Files.exists(alt)) fixture = alt;
         }
         if (!Files.exists(fixture)) {
             throw new IllegalStateException("Fixture not found at " + fixturePath + " (cwd=" + Paths.get("").toAbsolutePath() + ")");
         }
-
-        Wav wav = readWav(fixture);
-        System.out.printf("BENCH fixture: %s | sampleRate=%d ch=%d duration=%.3fs%n",
-                fixture, wav.sampleRate, wav.channels, wav.durationSec());
-
-        String sttUrl = backend == SttBackendType.WHISPER_CPP ? stt.getWhisperCppUrl() : stt.getFasterWhisperUrl();
-        System.out.printf("BENCH config: backend=%s silenceThreshold=%d silenceDurationMs=%d sttUrl=%s model=%s lang=%s%n",
-                backend, audio.getSilenceThreshold(), audio.getSilenceDurationMs(),
-                sttUrl, stt.getFasterWhisperModel(), stt.getLanguage());
-
-        // Warmup
-        for (int i = 0; i < warmup; i++) {
-            long t = runOne(wav, audio, stt, backend);
-            System.out.printf("BENCH warmup[%d]=%dms%n", i, t);
-        }
-
-        // Measured
-        List<Long> latencies = new ArrayList<>(measured);
-        for (int i = 0; i < measured; i++) {
-            long t = runOne(wav, audio, stt, backend);
-            latencies.add(t);
-            System.out.printf("BENCH measured[%d]=%dms%n", i, t);
-        }
-
-        Collections.sort(latencies);
-        long median = latencies.get(latencies.size() / 2);
-        long min = latencies.get(0);
-        long max = latencies.get(latencies.size() - 1);
-        double mean = latencies.stream().mapToLong(Long::longValue).average().orElse(Double.NaN);
-
-        System.out.printf("BENCH summary: n=%d min=%dms median=%dms mean=%.0fms max=%dms%n",
-                measured, min, median, mean, max);
-        // Auto-research-parseable line:
-        System.out.printf("METRIC_EOU_MS=%d%n", median);
-        // Extras (for diagnostics, parsed by autoresearch.sh):
-        System.out.printf("METRIC_EOU_MIN_MS=%d%n", min);
-        System.out.printf("METRIC_EOU_MAX_MS=%d%n", max);
-        System.out.printf("METRIC_EOU_MEAN_MS=%.0f%n", mean);
+        return fixture;
     }
-
-    /** Single benchmark run: replay WAV in real-time through silence detector + STT. */
-    private long runOne(Wav wav, AudioProperties audio, SpeechToTextProperties stt, SttBackendType backend) throws InterruptedException {
-        SttGate gate = SttGate.create(backend, stt);
-        ExecutorService speculationExecutor = Executors.newSingleThreadExecutor(r -> {
-            Thread t = new Thread(r, "stt-speculation-bench");
-            t.setDaemon(true);
-            return t;
-        });
-        try {
-            gate.reset();
-
-            final int micSampleRate = wav.sampleRate;
-            final boolean needsResample = micSampleRate != PORCUPINE_SAMPLE_RATE;
-            final int whisperFrameSize = WHISPER_FRAME_SIZE; // 1600 bytes / 50ms
-            final int micFrameSize = needsResample
-                    ? (int) Math.ceil(whisperFrameSize * micSampleRate / (double) PORCUPINE_SAMPLE_RATE)
-                    : whisperFrameSize;
-
-            // Real-time pacing: a mic frame represents (whisperFrameSize/2) samples @ 16kHz = 50ms.
-            final long frameDurationNs = 50_000_000L;
-
-            byte[] micBuffer = new byte[micFrameSize];
-            byte[] whisperBuffer = new byte[whisperFrameSize];
-            final int PRE_BUFFER_FRAMES = 4;
-            byte[][] preBuffer = new byte[PRE_BUFFER_FRAMES][];
-            int preBufferIndex = 0;
-
-            boolean hasDetectedSpeech = false;
-            long lastSoundTime = 0;
-            int wavPos = 0;
-            int silenceThreshold = audio.getSilenceThreshold();
-            long silenceDurationMs = audio.getSilenceDurationMs();
-            // Mirrors WakeWordProducer.recordAndTranscribe(): speculative STT launched at silence-onset.
-            Future<String> speculation = null;
-
-            long startNs = System.nanoTime();
-            long t0Ms = System.currentTimeMillis();
-            // Ground-truth: the WAV has 3.000s of non-silent audio followed by silence.
-            // The "user stops speaking" moment in wall-clock = startMs + 3000.
-            // (We use the WAV layout we know we generated; this is intentional.)
-            final long endOfSpeechMs = t0Ms + 3000;
-
-            long sttResultMs;
-            while (true) {
-                long frameDeadline = startNs + ((long) (wavPos / micFrameSize) + 1) * frameDurationNs;
-
-                // Read next mic-sized chunk from WAV
-                int avail = Math.min(micFrameSize, wav.pcm.length - wavPos);
-                if (avail <= 0) {
-                    // Source exhausted before silence triggered — append zero-frames (true silence)
-                    java.util.Arrays.fill(micBuffer, (byte) 0);
-                } else {
-                    System.arraycopy(wav.pcm, wavPos, micBuffer, 0, avail);
-                    if (avail < micFrameSize) {
-                        java.util.Arrays.fill(micBuffer, avail, micFrameSize, (byte) 0);
-                    }
-                }
-                wavPos += micFrameSize;
-
-                // Resample to 16kHz if needed
-                if (needsResample) {
-                    int samplesRead = micFrameSize / BYTES_PER_SAMPLE;
-                    short[] micSamples = new short[samplesRead];
-                    ByteBuffer.wrap(micBuffer).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(micSamples);
-                    int whisperSamples = whisperFrameSize / BYTES_PER_SAMPLE;
-                    short[] downsampled = new short[whisperSamples];
-                    AudioFraming.downsample(micSamples, samplesRead, downsampled, whisperSamples);
-                    ByteBuffer bb = ByteBuffer.wrap(whisperBuffer).order(ByteOrder.LITTLE_ENDIAN);
-                    bb.clear();
-                    for (short s : downsampled) bb.putShort(s);
-                } else {
-                    System.arraycopy(micBuffer, 0, whisperBuffer, 0, whisperFrameSize);
-                }
-
-                if (!hasDetectedSpeech) {
-                    preBuffer[preBufferIndex % PRE_BUFFER_FRAMES] = whisperBuffer.clone();
-                    preBufferIndex++;
-                }
-
-                boolean isSilent = AudioFraming.isSilence(whisperBuffer, silenceThreshold);
-
-                if (!isSilent) {
-                    lastSoundTime = System.currentTimeMillis();
-                    if (!hasDetectedSpeech) {
-                        hasDetectedSpeech = true;
-                        int oldest = Math.max(0, preBufferIndex - PRE_BUFFER_FRAMES);
-                        for (int j = oldest; j < preBufferIndex - 1; j++) {
-                            byte[] frame = preBuffer[j % PRE_BUFFER_FRAMES];
-                            if (frame != null) gate.processAudio(frame);
-                        }
-                    }
-                    if (speculation != null) speculation = null; // orphan; speaker resumed
-                } else if (hasDetectedSpeech && speculation == null) {
-                    // First silent frame after speech — launch speculative STT now to overlap with silence-wait.
-                    final SttGate g = gate;
-                    speculation = speculationExecutor.submit(g::getTranscription);
-                }
-                // Mirror WakeWordProducer: only buffer non-silent frames once speech has been detected.
-                if (hasDetectedSpeech && !isSilent) {
-                    gate.processAudio(whisperBuffer);
-                }
-
-                if (hasDetectedSpeech && isSilent) {
-                    long silenceDuration = System.currentTimeMillis() - lastSoundTime;
-                    if (silenceDuration >= silenceDurationMs) {
-                        // Silence confirmed — await speculative STT (in-flight since silence-onset),
-                        // or fall back to a sync call if none was launched.
-                        if (speculation != null) {
-                            try {
-                                speculation.get(10, TimeUnit.SECONDS);
-                            } catch (TimeoutException te) {
-                                speculation.cancel(true);
-                                gate.getTranscription();
-                            } catch (Exception e) {
-                                gate.getTranscription();
-                            }
-                        } else {
-                            gate.getTranscription();
-                        }
-                        sttResultMs = System.currentTimeMillis();
-                        break;
-                    }
-                }
-
-                // Hard safety timeout (15s real-time)
-                if (System.currentTimeMillis() - t0Ms > 15_000) {
-                    throw new IllegalStateException("Bench loop did not terminate within 15s — silence never triggered. " +
-                            "Check silenceThreshold/silenceDurationMs.");
-                }
-
-                // Real-time pace: sleep until next 50ms frame boundary
-                long sleepNs = frameDeadline - System.nanoTime();
-                if (sleepNs > 0) {
-                    long sleepMs = sleepNs / 1_000_000L;
-                    int sleepRemNs = (int) (sleepNs % 1_000_000L);
-                    Thread.sleep(sleepMs, sleepRemNs);
-                }
-            }
-
-            return sttResultMs - endOfSpeechMs;
-        } finally {
-            gate.close();
-            speculationExecutor.shutdownNow();
-        }
-    }
-
-    // --- (audio framing helpers now live in IO.InputHandling.AudioFraming; LP_FILTER + downsample + isSilence removed from bench) ---
 
     /** Load main/resources/application.properties so the bench tracks production config automatically. */
     private static Properties loadAppProperties() throws IOException {
         Properties p = new Properties();
-        // Try classpath first (test runtime classpath includes main resources)
         try (InputStream in = EouLatencyBench.class.getResourceAsStream("/application.properties")) {
             if (in != null) {
                 p.load(in);
                 return p;
             }
         }
-        // Fallback: read from disk relative to repo layout
         Path[] candidates = new Path[] {
                 Paths.get("ARCOS/src/main/resources/application.properties"),
                 Paths.get("src/main/resources/application.properties")
@@ -301,13 +255,12 @@ class EouLatencyBench {
     private static AudioProperties audioFromAppProps(Properties p) {
         AudioProperties a = new AudioProperties();
         a.setSampleRate(Integer.parseInt(p.getProperty("arcos.audio.sample-rate", "44100").trim()));
-        a.setSilenceThreshold(Integer.parseInt(p.getProperty("arcos.audio.silence-threshold", "1000").trim()));
+        a.setSilenceThreshold(Integer.parseInt(p.getProperty("arcos.audio.silence-threshold", "-1").trim()));
         a.setSilenceDurationMs(Integer.parseInt(p.getProperty("arcos.audio.silence-duration-ms", "1200").trim()));
         a.setMaxRecordingSeconds(Integer.parseInt(p.getProperty("arcos.audio.max-recording-seconds", "30").trim()));
         a.setMultiTurnEnabled(Boolean.parseBoolean(p.getProperty("arcos.audio.multi-turn-enabled", "true").trim()));
         a.setPostResponseListeningWindowMs(Integer.parseInt(p.getProperty("arcos.audio.post-response-listening-window-ms", "4000").trim()));
         a.setConversationSilenceMs(Integer.parseInt(p.getProperty("arcos.audio.conversation-silence-ms", "1500").trim()));
-        // Env-var overrides (still supported, for sweep experiments without source edits)
         String thr = System.getenv("ARCOS_BENCH_SILENCE_THRESHOLD");
         if (thr != null) a.setSilenceThreshold(Integer.parseInt(thr));
         String dur = System.getenv("ARCOS_BENCH_SILENCE_DURATION_MS");
@@ -340,7 +293,6 @@ class EouLatencyBench {
     private static Wav readWav(Path path) throws IOException {
         try (InputStream in = Files.newInputStream(path)) {
             byte[] all = in.readAllBytes();
-            // Minimal RIFF parser: locate 'fmt ' and 'data' subchunks
             if (all.length < 44 || all[0] != 'R' || all[1] != 'I' || all[2] != 'F' || all[3] != 'F') {
                 throw new IOException("Not a RIFF/WAV file: " + path);
             }
@@ -366,7 +318,6 @@ class EouLatencyBench {
             }
             byte[] pcm = new byte[dataLength];
             System.arraycopy(all, dataOffset, pcm, 0, dataLength);
-            // If stereo, mix down to mono (simple average)
             if (channels == 2) {
                 ByteArrayOutputStream mono = new ByteArrayOutputStream(pcm.length / 2);
                 for (int i = 0; i + 3 < pcm.length; i += 4) {

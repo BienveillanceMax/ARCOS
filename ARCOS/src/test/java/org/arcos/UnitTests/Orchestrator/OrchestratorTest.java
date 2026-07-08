@@ -5,7 +5,9 @@ import org.arcos.EventBus.EventQueue;
 import org.arcos.Memory.ConversationSummaryService;
 import org.arcos.EventBus.Events.Event;
 import org.arcos.EventBus.Events.EventType;
+import org.arcos.IO.InputHandling.EndpointingPolicyService;
 import org.arcos.IO.OuputHandling.PiperEmbeddedTTSModule;
+import org.arcos.IO.Telemetry.TurnTimeline;
 import org.arcos.Producers.WakeWordProducer;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.LLM.Client.ChatOrchestrator;
@@ -15,6 +17,7 @@ import org.arcos.Memory.ConversationContext;
 import org.arcos.Memory.LongTermMemory.Models.DesireEntry;
 import org.arcos.Memory.LongTermMemory.service.MemoryService;
 import org.arcos.Personality.Initiative.InitiativeService;
+import org.arcos.Orchestrator.ConversationRecoveryService;
 import org.arcos.Orchestrator.Orchestrator;
 import org.arcos.Personality.Desires.DesireService;
 import org.arcos.Personality.Mood.MoodService;
@@ -31,7 +34,6 @@ import org.arcos.PlannedAction.PlannedActionService;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.ai.chat.prompt.Prompt;
@@ -48,7 +50,8 @@ import static org.mockito.Mockito.*;
 
 class OrchestratorTest {
 
-    @InjectMocks
+    // Construit manuellement dans setUp() — pas de @InjectMocks : le constructeur
+    // déréférence ses paramètres (TurnTimeline), l'injection par réflexion passerait null.
     private Orchestrator orchestrator;
 
     @Mock
@@ -133,6 +136,9 @@ class OrchestratorTest {
                 wakeWordProducer,
                 audioProperties,
                 conversationSummaryService,
+                new TurnTimeline(),
+                new EndpointingPolicyService(audioProperties),
+                new ConversationRecoveryService(),
                 null, null, null
         );
         ReflectionTestUtils.setField(orchestrator, "ttsHandler", piperEmbeddedTTSModule);

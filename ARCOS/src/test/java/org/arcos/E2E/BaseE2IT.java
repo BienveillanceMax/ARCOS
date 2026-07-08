@@ -1,4 +1,4 @@
-package org.arcos.E2IT;
+package org.arcos.E2E;
 
 import io.qdrant.client.grpc.Points;
 import org.arcos.Memory.ConversationContext;

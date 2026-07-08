@@ -8,12 +8,12 @@ package org.arcos.IO.InputHandling.STT;
 interface SttBackend {
 
     /**
-     * Envoie des données WAV au service de transcription et retourne le texte brut.
+     * Prépare une transcription annulable sans l'exécuter. L'appel HTTP part au premier
+     * {@link SttCall#await()} ; {@link SttCall#cancel()} interrompt le round-trip en vol.
      *
      * @param wavData contenu WAV complet (header + PCM)
-     * @return texte transcrit, ou chaîne vide en cas d'erreur
      */
-    String transcribe(byte[] wavData);
+    SttCall newCall(byte[] wavData);
 
     /**
      * Description lisible pour les logs (ex: "faster-whisper @ localhost:8000").
