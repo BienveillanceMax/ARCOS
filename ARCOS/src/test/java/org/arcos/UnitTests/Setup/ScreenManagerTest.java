@@ -20,7 +20,7 @@ class ScreenManagerTest {
     private static final List<StepDefinition> ALL_STEPS = List.of(
             StepDefinition.NEXUS, StepDefinition.VOX,
             StepDefinition.ANIMA, StepDefinition.CORPUS,
-            StepDefinition.FIAT);
+            StepDefinition.SIGILLUM);
 
     private Screen screen;
 

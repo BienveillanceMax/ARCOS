@@ -110,6 +110,16 @@ public final class LanternaComponents {
      */
     public static void drawPanelDivider(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
                                         String numeral, String name, LanternaPalette palette) {
+        drawPanelDivider(tg, layout, numeral, name, null, palette);
+    }
+
+    /**
+     * Draws a panel divider with an optional right-aligned progress readout:
+     * ┣━ III // ANIMA ━━━━━━━━━━━━━━━━━━━━━━━ 4/6 ━┫
+     */
+    public static void drawPanelDivider(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
+                                        String numeral, String name, String progress,
+                                        LanternaPalette palette) {
         int row = layout.panelDividerRow();
         int x = layout.leftMargin();
         int w = layout.frameWidth();
@@ -121,17 +131,67 @@ public final class LanternaComponents {
             label = " " + numeral + " // " + name + " ";
         }
 
-        int fillLen = w - 2 - label.length();
-        if (fillLen < 0) fillLen = 0;
+        String progressLabel = (progress != null && !progress.isEmpty()) ? " " + progress + " " : "";
+        int fillLen = w - 2 - label.length() - progressLabel.length() - (progressLabel.isEmpty() ? 0 : 2);
+        if (fillLen < 1) {
+            progressLabel = "";
+            fillLen = Math.max(0, w - 2 - label.length());
+        }
 
+        int cx = x;
         tg.setForegroundColor(palette.primary());
-        tg.putString(x, row, "┣━");
+        tg.putString(cx, row, "┣━");
+        cx += 2;
 
         tg.setForegroundColor(palette.bright());
-        tg.putString(x + 2, row, label);
+        tg.putString(cx, row, label);
+        cx += label.length();
 
         tg.setForegroundColor(palette.primary());
-        tg.putString(x + 2 + label.length(), row, "━".repeat(Math.max(0, fillLen - 1)) + "┫");
+        tg.putString(cx, row, "━".repeat(Math.max(0, fillLen - 1)));
+        cx += Math.max(0, fillLen - 1);
+
+        if (!progressLabel.isEmpty()) {
+            tg.setForegroundColor(palette.muted());
+            tg.putString(cx, row, progressLabel);
+            cx += progressLabel.length();
+            tg.setForegroundColor(palette.primary());
+            tg.putString(cx, row, "━━┫");
+        } else {
+            tg.setForegroundColor(palette.primary());
+            tg.putString(cx, row, "┫");
+        }
+    }
+
+    /**
+     * Draws a light horizontal rule with an inline label:
+     * ┃   ── GLADOS ────────────────────────   ┃
+     * Light lines against the heavy frame — brutalist depth. Dashes in DIM,
+     * label in MUTED: structure, not content.
+     */
+    public static void drawRule(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
+                                int row, String label, LanternaPalette palette) {
+        drawEmptyRow(tg, layout, row, palette);
+        int x = layout.leftMargin();
+        int contentW = layout.contentWidth();
+        int cx = x + 4;
+
+        if (label == null || label.isEmpty()) {
+            tg.setForegroundColor(palette.dim());
+            tg.putString(cx, row, "─".repeat(contentW - 2));
+            return;
+        }
+
+        String text = " " + label + " ";
+        int tail = contentW - 2 - 2 - text.length();
+        if (tail < 1) tail = 1;
+
+        tg.setForegroundColor(palette.dim());
+        tg.putString(cx, row, "──");
+        tg.setForegroundColor(palette.muted());
+        tg.putString(cx + 2, row, text);
+        tg.setForegroundColor(palette.dim());
+        tg.putString(cx + 2 + text.length(), row, "─".repeat(tail));
     }
 
     /**
@@ -325,7 +385,7 @@ public final class LanternaComponents {
     /**
      * Draws the step index strip: a column-major 2×3 grid filling the 3-row zone.
      * Six steps: I NEXUS / II VOX / III INTERPRES on the left,
-     * IV ANIMA / V CORPUS / FIAT on the right.
+     * IV ANIMA / V CORPUS / SIGILLUM on the right.
      */
     public static void drawStepIndex(TextGraphics tg, LayoutCalculator.ScreenLayout layout,
                                      java.util.List<StepState> states, LanternaPalette palette) {

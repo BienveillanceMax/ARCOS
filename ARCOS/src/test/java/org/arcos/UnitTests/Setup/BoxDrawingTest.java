@@ -33,8 +33,8 @@ class BoxDrawingTest {
 
     @Test
     void panelDivider_noNumeral_omitsSlashes() {
-        String result = BoxDrawing.panelDivider("", "FIAT", 60, true);
-        assertTrue(result.contains("FIAT"));
+        String result = BoxDrawing.panelDivider("", "SIGILLUM", 60, true);
+        assertTrue(result.contains("SIGILLUM"));
         assertFalse(result.contains("//"));
     }
 

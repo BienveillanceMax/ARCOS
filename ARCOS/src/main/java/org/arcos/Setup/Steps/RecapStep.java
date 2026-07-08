@@ -15,16 +15,16 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 
 /**
- * Final step — FIAT: Configuration summary and save.
- * Dense dot-leader recap of every collected value, then a FIAT / REVISE
- * decision menu. On write: file confirmations + FIAT LUX reveal.
+ * Final step — SIGILLUM: Configuration summary and save.
+ * Dense dot-leader recap of every collected value, then a SEAL / REVISE
+ * decision menu. On write: file confirmations + FACTUM EST. reveal.
  */
 public class RecapStep implements WizardStep {
 
     private static final Logger log = LoggerFactory.getLogger(RecapStep.class);
 
     private static final List<MenuItem> DECISION = List.of(
-            new MenuItem("FIAT", "write configuration and proceed"),
+            new MenuItem("SEAL", "write configuration and proceed"),
             new MenuItem("REVISE", "restart the wizard, values kept"));
 
     private final ConfigurationWriter writer;
@@ -39,7 +39,7 @@ public class RecapStep implements WizardStep {
 
     @Override
     public String getName() {
-        return "FIAT";
+        return "SIGILLUM";
     }
 
     @Override
@@ -54,7 +54,7 @@ public class RecapStep implements WizardStep {
 
     @Override
     public StepDefinition getStepDefinition() {
-        return StepDefinition.FIAT;
+        return StepDefinition.SIGILLUM;
     }
 
     @Override
@@ -109,7 +109,7 @@ public class RecapStep implements WizardStep {
             display.printLine("");
 
             // The final moment — earned, mechanical, no fanfare
-            display.reveal("FIAT LUX.");
+            display.reveal("FACTUM EST.");
 
             display.printLine("");
             display.setKeyHints("↵ BOOT");

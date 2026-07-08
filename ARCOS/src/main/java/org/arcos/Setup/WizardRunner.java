@@ -105,7 +105,7 @@ public class WizardRunner {
         List<StepDefinition> stepDefs = List.of(
                 StepDefinition.NEXUS, StepDefinition.VOX,
                 StepDefinition.INTERPRES, StepDefinition.ANIMA,
-                StepDefinition.CORPUS, StepDefinition.FIAT);
+                StepDefinition.CORPUS, StepDefinition.SIGILLUM);
 
         display.initializeSteps(stepDefs);
         display.drawFrame();
@@ -139,7 +139,7 @@ public class WizardRunner {
                 i++;
             } else {
                 if (step.isRequired() && !result.skipped()) {
-                    if ("FIAT".equals(step.getName()) && result.message().contains("cancelled")) {
+                    if ("SIGILLUM".equals(step.getName()) && result.message().contains("cancelled")) {
                         return executeWizardSteps(display, context);
                     }
 

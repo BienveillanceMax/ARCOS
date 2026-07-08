@@ -35,11 +35,11 @@ public final class StepIndicator {
     /**
      * Renders the step index strip for 4 or 5 steps.
      * 4 steps → 2-row 2×2 grid (NEXUS/ANIMA | VOX/CORPUS).
-     * 5 steps → adds a 3rd centered row for FIAT.
+     * 5 steps → adds a 3rd centered row for SIGILLUM.
      * <pre>
      *    I  NEXUS ........... ✓       III  ANIMA .......... ◆
      *   II  VOX ............. ✓        IV  CORPUS ......... ◇
-     *                  V  FIAT .............. ◇
+     *                  V  SIGILLUM .............. ◇
      * </pre>
      *
      * @param steps 4 or 5 step states (at least 4 required)

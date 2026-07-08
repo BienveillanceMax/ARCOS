@@ -85,12 +85,12 @@ class StepIndicatorTest {
                 new StepState("II", "VOX", StepIndicator.Status.COMPLETED),
                 new StepState("III", "ANIMA", StepIndicator.Status.COMPLETED),
                 new StepState("IV", "CORPUS", StepIndicator.Status.COMPLETED),
-                new StepState("V", "FIAT", StepIndicator.Status.ACTIVE)
+                new StepState("V", "SIGILLUM", StepIndicator.Status.ACTIVE)
         );
 
         String[] lines = StepIndicator.renderStepIndex(steps, 60, false);
         assertEquals(3, lines.length);
-        assertTrue(lines[2].contains("FIAT"));
+        assertTrue(lines[2].contains("SIGILLUM"));
         assertTrue(lines[2].contains("V"));
     }
 

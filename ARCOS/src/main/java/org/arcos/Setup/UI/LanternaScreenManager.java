@@ -83,6 +83,9 @@ public class LanternaScreenManager implements WizardDisplay {
         } finally {
             writeLock.unlock();
         }
+        // Materialize the step name — brief mechanical decode over the divider label
+        Animations.scrambleDecode(tg, screen, layout.leftMargin() + 3, layout.panelDividerRow(),
+                dividerLabel(), palette.dim(), palette.bright(), 220, writeLock);
         currentPanelRow = 0;
     }
 
@@ -193,13 +196,26 @@ public class LanternaScreenManager implements WizardDisplay {
     }
 
     @Override
-    public void reveal(String text) {
+    public void reveal(String text, StatusColor color) {
         int absRow = layout.panelContentStart() + currentPanelRow;
         if (absRow > layout.panelContentEnd()) return;
         int x = layout.leftMargin() + 4;
         Animations.scrambleDecode(tg, screen, x, absRow,
-                text, palette.dim(), palette.bright(), 500, writeLock);
+                text, palette.dim(), palette.forStatus(color), 500, writeLock);
         currentPanelRow++;
+    }
+
+    @Override
+    public void rule(int row, String label) {
+        int absRow = layout.panelContentStart() + row;
+        if (absRow > layout.panelContentEnd()) return;
+        writeLock.lock();
+        try {
+            LanternaComponents.drawRule(tg, layout, absRow, label, palette);
+            refresh();
+        } finally {
+            writeLock.unlock();
+        }
     }
 
     @Override
@@ -405,14 +421,28 @@ public class LanternaScreenManager implements WizardDisplay {
     }
 
     private void drawPanelDivider() {
+        String progress = (stepDefs != null && !stepDefs.isEmpty() && activeStepIndex >= 0)
+                ? (activeStepIndex + 1) + "/" + stepDefs.size()
+                : null;
+        String[] parts = dividerParts();
+        LanternaComponents.drawPanelDivider(tg, layout, parts[0], parts[1], progress, palette);
+    }
+
+    /** The divider label text as displayed (without surrounding spaces). */
+    private String dividerLabel() {
+        String[] parts = dividerParts();
+        return parts[0].isEmpty() ? parts[1] : parts[0] + " // " + parts[1];
+    }
+
+    private String[] dividerParts() {
         String numeral = "";
-        String name = "FIAT";
-        if (activeStepIndex >= 0 && activeStepIndex < stepDefs.size()) {
+        String name = "SIGILLUM";
+        if (stepDefs != null && activeStepIndex >= 0 && activeStepIndex < stepDefs.size()) {
             StepDefinition def = stepDefs.get(activeStepIndex);
             numeral = def.romanNumeral();
             name = def.latinName();
         }
-        LanternaComponents.drawPanelDivider(tg, layout, numeral, name, palette);
+        return new String[]{numeral, name};
     }
 
     private void clearPanelInternal() {

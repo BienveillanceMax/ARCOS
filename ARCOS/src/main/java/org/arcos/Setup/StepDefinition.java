@@ -11,7 +11,7 @@ public enum StepDefinition {
     INTERPRES("III", "INTERPRES"), // STT backend selection
     ANIMA("IV",   "ANIMA"),      // Personality / soul
     CORPUS("V",   "CORPUS"),     // Service body check
-    FIAT("",      "FIAT");       // Final save — no numeral
+    SIGILLUM("",   "SIGILLUM");  // Final seal — configuration written; no numeral
 
     private final String romanNumeral;
     private final String latinName;

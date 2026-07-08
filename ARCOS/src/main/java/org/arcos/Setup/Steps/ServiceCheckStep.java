@@ -98,19 +98,16 @@ public class ServiceCheckStep implements WizardStep {
 
         display.printLine("");
 
-        // Summary line
-        String summaryTag;
-        StatusColor summaryColor;
+        // Summary — CORPUS INTEGRUM is earned: scramble-decode in OK, not a tag
+        String summaryValue = online + "/" + total + " OPERATIONAL";
         if (online == total) {
-            summaryTag = "[CORPUS INTEGRUM]";
-            summaryColor = StatusColor.OK;
+            display.statusLine("CORPUS", summaryValue, null, StatusColor.OK);
+            display.reveal("CORPUS INTEGRUM", StatusColor.OK);
         } else {
             int alerts = total - online;
-            summaryTag = "[" + alerts + " ALERT" + (alerts > 1 ? "S" : "") + "]";
-            summaryColor = StatusColor.WARN;
+            String summaryTag = "[" + alerts + " ALERT" + (alerts > 1 ? "S" : "") + "]";
+            display.statusLine(summaryValue, summaryTag, null, StatusColor.WARN);
         }
-        String summaryValue = online + "/" + total + " OPERATIONAL";
-        display.statusLine(summaryValue, summaryTag, null, summaryColor);
 
         display.printLine("");
         display.setKeyHints("↵ CONTINUE");

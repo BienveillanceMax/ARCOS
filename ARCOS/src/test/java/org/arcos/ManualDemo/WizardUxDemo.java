@@ -18,7 +18,7 @@ import java.util.List;
  * Manual visual demo of the wizard TUI — run inside tmux and drive with
  * send-keys. Exercises the network-free interactive surfaces:
  * banner → frame + step index → INTERPRES menu → ANIMA live detail pane
- * → FIAT LUX reveal. Never touches the filesystem or the network.
+ * → FACTUM EST. reveal. Never touches the filesystem or the network.
  */
 public final class WizardUxDemo {
 
@@ -38,7 +38,7 @@ public final class WizardUxDemo {
             display.initializeSteps(List.of(
                     StepDefinition.NEXUS, StepDefinition.VOX,
                     StepDefinition.INTERPRES, StepDefinition.ANIMA,
-                    StepDefinition.CORPUS, StepDefinition.FIAT));
+                    StepDefinition.CORPUS, StepDefinition.SIGILLUM));
             display.drawFrame();
             display.completeStep(0);
             display.completeStep(1);
@@ -55,10 +55,10 @@ public final class WizardUxDemo {
             new PersonalityStep().execute(display, context);
             display.completeStep(3);
 
-            // Phase 5 — FIAT reveal
+            // Phase 5 — SIGILLUM reveal
             display.activateStep(5);
             display.printLine("");
-            display.reveal("FIAT LUX.");
+            display.reveal("FACTUM EST.");
             display.setKeyHints("↵ EXIT DEMO");
             display.waitForKey();
         } finally {

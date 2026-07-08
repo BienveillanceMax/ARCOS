@@ -80,7 +80,7 @@ public class PersonalityStep implements WizardStep {
         int defaultIndex = indexOfProfile(currentProfile);
         if (defaultIndex < 0) defaultIndex = 0;
 
-        // Menu on rows 0..3; live detail pane below (rows 5..8)
+        // Menu on rows 0..3; live detail pane below (rule + description + gauges)
         int detailRow = PROFILES.size() + 1;
         int choice = display.selectMenu(items, defaultIndex,
                 highlighted -> drawDetailPane(display, detailRow, PROFILES.get(highlighted)));
@@ -95,15 +95,16 @@ public class PersonalityStep implements WizardStep {
     }
 
     /**
-     * Redraws the detail pane for the highlighted profile:
-     * description line + three value gauges. Rewrites in place on navigation.
+     * Redraws the detail pane for the highlighted profile: labeled light rule,
+     * description line, three value gauges. Rewrites in place on navigation.
      */
     private void drawDetailPane(WizardDisplay display, int startRow, ProfileOption profile) {
-        display.printLine(startRow, profile.description());
+        display.rule(startRow, profile.displayName().toUpperCase());
+        display.printLine(startRow + 1, profile.description());
         List<TraitValue> traits = profile.traits();
         for (int t = 0; t < traits.size(); t++) {
             TraitValue trait = traits.get(t);
-            display.gauge(startRow + 1 + t, trait.name(), trait.value(), TRAIT_LABEL_WIDTH);
+            display.gauge(startRow + 2 + t, trait.name(), trait.value(), TRAIT_LABEL_WIDTH);
         }
     }
 

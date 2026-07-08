@@ -64,7 +64,7 @@ public class FallbackRenderer implements WizardDisplay {
             stepStatuses.set(i, StepIndicator.Status.ACTIVE);
         }
         String numeral = "";
-        String name = "FIAT";
+        String name = "SIGILLUM";
         if (i < stepDefs.size()) {
             numeral = stepDefs.get(i).romanNumeral();
             name = stepDefs.get(i).latinName();
@@ -169,9 +169,21 @@ public class FallbackRenderer implements WizardDisplay {
     }
 
     @Override
-    public void reveal(String text) {
+    public void reveal(String text, StatusColor color) {
         out.println();
         out.println("   " + text);
+        out.flush();
+    }
+
+    @Override
+    public void rule(int row, String label) {
+        int width = effectiveWidth() - 6;
+        if (label == null || label.isEmpty()) {
+            out.println("   " + "-".repeat(Math.max(1, width)));
+        } else {
+            int tail = Math.max(1, width - label.length() - 6);
+            out.println("   -- " + label + " " + "-".repeat(tail));
+        }
         out.flush();
     }
 

@@ -102,9 +102,23 @@ public interface WizardDisplay {
     /**
      * Dramatic single-line reveal at the current row (scramble-decode in
      * full-screen mode, plain print in fallback). Reserved for earned moments:
-     * FIAT LUX, CORPUS INTEGRUM.
+     * FACTUM EST., CORPUS INTEGRUM. Defaults to BRIGHT.
      */
-    void reveal(String text);
+    default void reveal(String text) {
+        reveal(text, StatusColor.BRIGHT);
+    }
+
+    /**
+     * Dramatic single-line reveal resolving into the given status color
+     * (OK for CORPUS INTEGRUM — success is sage, only red is vivid).
+     */
+    void reveal(String text, StatusColor color);
+
+    /**
+     * Light horizontal rule with an inline label at an explicit panel row:
+     * ── LABEL ───────────. Internal structure against the heavy frame.
+     */
+    void rule(int row, String label);
 
     /**
      * Set the contextual key hints shown in the footer bar

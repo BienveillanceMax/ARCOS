@@ -89,6 +89,22 @@ public final class BannerPhase {
         Animations.scrambleDecode(tg, screen, subtitleX, subtitleY,
                 SUBTITLE, palette.dim(), palette.muted(), 400, lock);
 
+        // T+~1000ms: System readout in DIM — institutional density, pure atmosphere
+        String readout = "HOST " + hostname()
+                + " · JVM " + System.getProperty("java.specification.version", "?")
+                + " · TTY " + termWidth + "×" + termHeight;
+        int readoutX = Math.max(0, (termWidth - readout.length()) / 2);
+        Animations.sleep(150);
+        lock.lock();
+        try {
+            tg.setForegroundColor(palette.dim());
+            tg.putString(readoutX, subtitleY + 2, readout);
+            screen.refresh();
+        } catch (IOException ignored) {
+        } finally {
+            lock.unlock();
+        }
+
         // T+~1200ms: Show prompt and wait for Enter
         String prompt = "[ ↵ ENGAGE ]";
         int promptX = layout.leftMargin() + (layout.frameWidth() - prompt.length()) / 2;
@@ -105,5 +121,17 @@ public final class BannerPhase {
         }
 
         Animations.waitForEnter(screen);
+    }
+
+    /** Hostname without DNS lookups: $HOSTNAME, then /etc/hostname, then LOCAL. */
+    private static String hostname() {
+        String env = System.getenv("HOSTNAME");
+        if (env != null && !env.isBlank()) return env.trim();
+        try {
+            String fromFile = java.nio.file.Files.readString(java.nio.file.Path.of("/etc/hostname")).trim();
+            if (!fromFile.isBlank()) return fromFile;
+        } catch (Exception ignored) {
+        }
+        return "LOCAL";
     }
 }

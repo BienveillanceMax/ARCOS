@@ -100,8 +100,13 @@ public class MockWizardDisplay implements WizardDisplay {
     }
 
     @Override
-    public void reveal(String text) {
+    public void reveal(String text, StatusColor color) {
         printedLines.add("REVEAL: " + text);
+    }
+
+    @Override
+    public void rule(int row, String label) {
+        printedLines.add("RULE[" + row + "]: " + label);
     }
 
     @Override
