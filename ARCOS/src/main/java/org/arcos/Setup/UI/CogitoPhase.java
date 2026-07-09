@@ -12,6 +12,7 @@ import org.arcos.Setup.Health.PiperHealthChecker;
 import org.arcos.Setup.Health.QdrantHealthChecker;
 import org.arcos.Setup.Health.ServiceHealthCheck;
 import org.arcos.Setup.Health.SttHealthChecker;
+import org.arcos.Setup.Health.SttProbeTargetResolver;
 
 import java.io.IOException;
 import java.util.Random;
@@ -87,18 +88,7 @@ public final class CogitoPhase {
         String mistralKey = resolveEnv("MISTRALAI_API_KEY", null);
         String qdrantHost = resolveEnv("QDRANT_HOST", "localhost");
         int qdrantPort = resolveEnvInt("QDRANT_PORT", 6334);
-        String whisperUrl = resolveEnv("FASTER_WHISPER_URL", null);
-        String whisperHost;
-        int whisperPort;
-        if (whisperUrl != null && !whisperUrl.isBlank()) {
-            String stripped = whisperUrl.replaceFirst("^https?://", "");
-            String[] parts = stripped.split(":");
-            whisperHost = parts[0];
-            whisperPort = parts.length > 1 ? parseIntOrDefault(parts[1].replaceAll("/.*", ""), 8000) : 8000;
-        } else {
-            whisperHost = "localhost";
-            whisperPort = 8000;
-        }
+        SttProbeTargetResolver.SttTarget sttTarget = SttProbeTargetResolver.resolve();
 
         // If no Mistral key from env, try .env file
         if (mistralKey == null || mistralKey.isBlank()) {
@@ -120,7 +110,7 @@ public final class CogitoPhase {
             new SubsystemProbe("LONG-TERM MEMORY", new QdrantHealthChecker(),
                     ServiceHealthCheck.ServiceConfig.of(qdrantHost, qdrantPort), true),
             new SubsystemProbe("SPEECH RECOGNITION", new SttHealthChecker(),
-                    ServiceHealthCheck.ServiceConfig.of(whisperHost, whisperPort), true),
+                    ServiceHealthCheck.ServiceConfig.of(sttTarget.host(), sttTarget.port()), true),
             new SubsystemProbe("SPEECH SYNTHESIS", new PiperHealthChecker(),
                     ServiceHealthCheck.ServiceConfig.of(null, -1), false),
             new SubsystemProbe("PERSONALITY ENGINE", null, null, false),
