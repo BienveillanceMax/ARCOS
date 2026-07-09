@@ -12,8 +12,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.arcos.UserModel.UserModelProperties;
 import org.springframework.stereotype.Service;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -33,28 +32,30 @@ public class CrossEncoderService {
 
     @PostConstruct
     public void initialize() {
-        Path modelPath = Path.of(properties.getCrossEncoderModelPath());
-        Path tokenizerPath = Path.of(properties.getCrossEncoderTokenizerPath());
+        String modelResource = properties.getCrossEncoderModelPath();
+        String tokenizerResource = properties.getCrossEncoderTokenizerPath();
 
-        if (!Files.exists(modelPath)) {
-            log.warn("Cross-encoder ONNX model not found at {}. DFS Navigator will be disabled.", modelPath);
+        ClassLoader cl = getClass().getClassLoader();
+        if (cl.getResource(modelResource) == null) {
+            log.warn("Cross-encoder ONNX model not found on classpath at {}. DFS Navigator will be disabled.", modelResource);
             return;
         }
-        if (!Files.exists(tokenizerPath)) {
-            log.warn("Cross-encoder tokenizer not found at {}. DFS Navigator will be disabled.", tokenizerPath);
+        if (cl.getResource(tokenizerResource) == null) {
+            log.warn("Cross-encoder tokenizer not found on classpath at {}. DFS Navigator will be disabled.", tokenizerResource);
             return;
         }
 
-        try {
+        try (InputStream modelIn = cl.getResourceAsStream(modelResource);
+             InputStream tokenizerIn = cl.getResourceAsStream(tokenizerResource)) {
             env = OrtEnvironment.getEnvironment();
             OrtSession.SessionOptions opts = new OrtSession.SessionOptions();
             opts.setIntraOpNumThreads(properties.getDfsIntraOpThreads());
-            session = env.createSession(modelPath.toString(), opts);
+            session = env.createSession(modelIn.readAllBytes(), opts);
 
-            tokenizer = HuggingFaceTokenizer.newInstance(tokenizerPath);
+            tokenizer = HuggingFaceTokenizer.newInstance(tokenizerIn, Map.of());
 
             available = true;
-            log.info("CrossEncoderService initialized: model={}, tokenizer={}", modelPath, tokenizerPath);
+            log.info("CrossEncoderService initialized: model={}, tokenizer={}", modelResource, tokenizerResource);
         } catch (Exception e) {
             log.warn("Failed to initialize CrossEncoderService. DFS Navigator will be disabled.", e);
             available = false;

@@ -14,8 +14,8 @@ class CrossEncoderServiceTest {
     void shouldGracefullyDegradeWhenModelNotFound() {
         // Given — model path points to non-existent file
         UserModelProperties properties = new UserModelProperties();
-        properties.setCrossEncoderModelPath("/non/existent/model.onnx");
-        properties.setCrossEncoderTokenizerPath("/non/existent/tokenizer.json");
+        properties.setCrossEncoderModelPath("models/does-not-exist/model.onnx");
+        properties.setCrossEncoderTokenizerPath("models/does-not-exist/tokenizer.json");
 
         CrossEncoderService service = new CrossEncoderService(properties);
 
@@ -30,8 +30,8 @@ class CrossEncoderServiceTest {
     void shouldReturnEmptyArrayWhenNotAvailable() {
         // Given
         UserModelProperties properties = new UserModelProperties();
-        properties.setCrossEncoderModelPath("/non/existent/model.onnx");
-        properties.setCrossEncoderTokenizerPath("/non/existent/tokenizer.json");
+        properties.setCrossEncoderModelPath("models/does-not-exist/model.onnx");
+        properties.setCrossEncoderTokenizerPath("models/does-not-exist/tokenizer.json");
 
         CrossEncoderService service = new CrossEncoderService(properties);
         service.initialize();
@@ -47,7 +47,7 @@ class CrossEncoderServiceTest {
     void shouldReturnEmptyArrayForEmptyDescriptions() {
         // Given
         UserModelProperties properties = new UserModelProperties();
-        properties.setCrossEncoderModelPath("/non/existent/model.onnx");
+        properties.setCrossEncoderModelPath("models/does-not-exist/model.onnx");
 
         CrossEncoderService service = new CrossEncoderService(properties);
         service.initialize();

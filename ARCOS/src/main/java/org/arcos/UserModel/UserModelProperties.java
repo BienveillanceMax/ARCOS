@@ -28,7 +28,7 @@ public class UserModelProperties {
 
     private int leafMaxChars = 300;
 
-    // DFS Navigator (Epic 3)
+    // DFS Navigator (Epic 3) — chemins de RESSOURCE CLASSPATH (empaquetés dans le jar)
     private String crossEncoderModelPath = "models/finetuned-navigator-deep/model.onnx";
     private String crossEncoderTokenizerPath = "models/finetuned-navigator-deep/tokenizer.json";
     private int dfsTopNL1 = 3;
