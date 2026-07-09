@@ -413,12 +413,12 @@ public class PiperEmbeddedTTSModule {
             log.debug("TTS désactivé, ignoré : {}", text.substring(0, Math.min(30, text.length())));
             return java.util.concurrent.CompletableFuture.completedFuture(null);
         }
-        return speakAsync(text, 1.0f, 0.667f, 0.8f);
+        return speakAsync(text, VoiceDefaults.LENGTH_SCALE, VoiceDefaults.NOISE_SCALE, VoiceDefaults.NOISE_W);
     }
 
     /** Synthèse avec paramètres de voix par défaut et callback de fin de lecture. */
     public void speakAsync(String text, Runnable onComplete) {
-        speakAsync(text, 1.0f, 0.667f, 0.8f, onComplete);
+        speakAsync(text, VoiceDefaults.LENGTH_SCALE, VoiceDefaults.NOISE_SCALE, VoiceDefaults.NOISE_W, onComplete);
     }
 
     public Future<Void> speakAsync(String text, float lengthScale, float noiseScale, float noiseW) {
@@ -490,7 +490,7 @@ public class PiperEmbeddedTTSModule {
 
     public void speak(String text) {
         if (!enabled) return;
-        speak(text, 1.0f, 0.667f, 0.8f);
+        speak(text, VoiceDefaults.LENGTH_SCALE, VoiceDefaults.NOISE_SCALE, VoiceDefaults.NOISE_W);
     }
 
     public void speak(String text, float lengthScale, float noiseScale, float noiseW) {

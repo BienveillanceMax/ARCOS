@@ -140,9 +140,7 @@ public class FallbackRenderer implements WizardDisplay {
         for (int i = 0; i < items.size(); i++) {
             WizardDisplay.MenuItem item = items.get(i);
             String annotation = item.annotation() != null ? "  " + item.annotation() : "";
-            String label = item.label().length() >= labelWidth
-                    ? item.label()
-                    : item.label() + " ".repeat(labelWidth - item.label().length());
+            String label = String.format("%-" + labelWidth + "s", item.label());
             out.println("   [" + (i + 1) + "] " + label + annotation);
         }
         out.flush();

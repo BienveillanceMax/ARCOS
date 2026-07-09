@@ -40,7 +40,8 @@ public final class LanternaMenu {
         int selected = Math.max(0, Math.min(items.size() - 1, defaultIndex));
         int labelWidth = maxLabelWidth(items);
 
-        drawAll(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth);
+        render(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth,
+                ItemState.SELECTED, ItemState.IDLE);
         if (onHighlight != null) onHighlight.accept(selected);
 
         while (true) {
@@ -56,7 +57,8 @@ public final class LanternaMenu {
                 case ArrowUp -> selected = (selected + items.size() - 1) % items.size();
                 case ArrowDown -> selected = (selected + 1) % items.size();
                 case Enter -> {
-                    freeze(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth);
+                    render(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth,
+                            ItemState.CHOSEN, ItemState.DISCARDED);
                     return selected;
                 }
                 case Escape -> {
@@ -72,7 +74,8 @@ public final class LanternaMenu {
                     else if (c == 'j' || c == 'J') selected = (selected + 1) % items.size();
                     else if (c >= '1' && c < '1' + items.size()) {
                         selected = c - '1';
-                        freeze(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth);
+                        render(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth,
+                                ItemState.CHOSEN, ItemState.DISCARDED);
                         return selected;
                     }
                 }
@@ -80,40 +83,28 @@ public final class LanternaMenu {
             }
 
             if (selected != previous) {
-                drawAll(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth);
+                render(screen, tg, layout, palette, lock, startRow, items, selected, labelWidth,
+                        ItemState.SELECTED, ItemState.IDLE);
                 if (onHighlight != null) onHighlight.accept(selected);
             }
         }
     }
 
-    /** Redraws the whole menu with the active selection bar. */
-    private static void drawAll(Screen screen, TextGraphics tg,
-                                LayoutCalculator.ScreenLayout layout, LanternaPalette palette,
-                                ReentrantLock lock, int startRow,
-                                List<MenuItem> items, int selected, int labelWidth) {
-        lock.lock();
-        try {
-            for (int i = 0; i < items.size(); i++) {
-                drawItem(tg, layout, palette, startRow + i, items.get(i), labelWidth,
-                        i == selected ? ItemState.SELECTED : ItemState.IDLE);
-            }
-            screen.refresh();
-        } catch (IOException ignored) {
-        } finally {
-            lock.unlock();
-        }
-    }
-
-    /** Final render after selection: chosen row marked, others dimmed. */
-    private static void freeze(Screen screen, TextGraphics tg,
+    /**
+     * Redraws every row under the lock and refreshes once. The selected row is drawn with
+     * {@code onState}, the rest with {@code offState}: (SELECTED, IDLE) is the live navigation
+     * render, (CHOSEN, DISCARDED) is the post-selection freeze.
+     */
+    private static void render(Screen screen, TextGraphics tg,
                                LayoutCalculator.ScreenLayout layout, LanternaPalette palette,
                                ReentrantLock lock, int startRow,
-                               List<MenuItem> items, int selected, int labelWidth) {
+                               List<MenuItem> items, int selected, int labelWidth,
+                               ItemState onState, ItemState offState) {
         lock.lock();
         try {
             for (int i = 0; i < items.size(); i++) {
                 drawItem(tg, layout, palette, startRow + i, items.get(i), labelWidth,
-                        i == selected ? ItemState.CHOSEN : ItemState.DISCARDED);
+                        i == selected ? onState : offState);
             }
             screen.refresh();
         } catch (IOException ignored) {
