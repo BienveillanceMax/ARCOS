@@ -33,7 +33,7 @@ public class SpeechToTextProperties {
      * l'utilisateur a déjà abandonné — mieux vaut un message d'erreur rapide qu'une
      * attente de 60s (ancienne valeur).
      */
-    private long timeoutMs = 8000;
+    private long timeoutMs = 10000;
 
     public SttBackendType getBackend() { return backend; }
     public void setBackend(SttBackendType backend) { this.backend = backend; }
