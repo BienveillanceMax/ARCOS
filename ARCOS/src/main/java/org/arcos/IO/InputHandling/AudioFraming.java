@@ -4,16 +4,11 @@ package org.arcos.IO.InputHandling;
  * Audio framing utilities shared by the mic-capture path ({@link org.arcos.Producers.WakeWordProducer})
  * and benchmarks.
  *
- * Two static helpers:
- * <ul>
- *   <li>{@link #isSilence(byte[], int)} — RMS-based silence detection on a 16-bit little-endian PCM frame.</li>
- *   <li>{@link #downsample(short[], int, short[], int)} — 21-tap FIR low-pass + point-pick resampler
- *       (e.g. 44.1 kHz mic input → 16 kHz STT input).</li>
- * </ul>
+ * <p>{@link #downsample(short[], int, short[], int)} — 21-tap FIR low-pass + point-pick resampler
+ * (e.g. 44.1 kHz mic input → 16 kHz STT input).
  *
- * Extracted from {@code WakeWordProducer} so the silence-detection inner loop can be unit-tested
- * and benchmarked without standing up the full Spring Boot context. Behavior is otherwise identical
- * to the prior in-line implementation.
+ * <p>La détection parole/silence, jadis un seuil RMS ici ({@code isSilence}), est désormais
+ * assurée par {@link SpeechDetector} (Silero VAD neuronal).
  */
 public final class AudioFraming {
 
@@ -35,22 +30,6 @@ public final class AudioFraming {
             sum += LP_FILTER[i];
         }
         for (int i = 0; i < N; i++) LP_FILTER[i] /= sum;
-    }
-
-    /**
-     * Returns {@code true} when the RMS amplitude of {@code audioData} is strictly below
-     * {@code silenceThreshold}. Assumes 16-bit signed little-endian PCM, mono.
-     */
-    public static boolean isSilence(byte[] audioData, int silenceThreshold) {
-        long sum = 0;
-        int sampleCount = audioData.length / 2;
-        if (sampleCount == 0) return true;
-        for (int i = 0; i < audioData.length - 1; i += 2) {
-            short sample = (short) ((audioData[i + 1] << 8) | (audioData[i] & 0xFF));
-            sum += (long) sample * sample;
-        }
-        double rms = Math.sqrt((double) sum / sampleCount);
-        return rms < silenceThreshold;
     }
 
     /**

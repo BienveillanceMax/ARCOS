@@ -15,9 +15,11 @@ class AudioPropertiesTest {
         // Then
         assertEquals(-1, props.getInputDeviceIndex());
         assertEquals(44100, props.getSampleRate());
-        assertEquals(-1, props.getSilenceThreshold()); // -1 = auto (seuil recommandé par la source micro)
-        assertEquals(1200, props.getSilenceDurationMs());
+        assertEquals(500, props.getSilenceDurationMs());
         assertEquals(30, props.getMaxRecordingSeconds());
+        // VAD Silero : valeurs par défaut
+        assertEquals("models/silero-vad.onnx", props.getVad().getModelResource());
+        assertEquals(0.5f, props.getVad().getSpeechThreshold());
     }
 
     @Test
@@ -28,15 +30,15 @@ class AudioPropertiesTest {
         // When
         props.setInputDeviceIndex(5);
         props.setSampleRate(16000);
-        props.setSilenceThreshold(500);
         props.setSilenceDurationMs(800);
         props.setMaxRecordingSeconds(60);
+        props.getVad().setSpeechThreshold(0.7f);
 
         // Then
         assertEquals(5, props.getInputDeviceIndex());
         assertEquals(16000, props.getSampleRate());
-        assertEquals(500, props.getSilenceThreshold());
         assertEquals(800, props.getSilenceDurationMs());
         assertEquals(60, props.getMaxRecordingSeconds());
+        assertEquals(0.7f, props.getVad().getSpeechThreshold());
     }
 }

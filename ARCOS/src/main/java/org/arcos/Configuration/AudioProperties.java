@@ -22,15 +22,15 @@ public class AudioProperties {
     /** Fréquence d'échantillonnage du microphone en Hz. */
     private int sampleRate = 44100;
 
-    /**
-     * Seuil RMS en-dessous duquel l'audio est considéré comme silence.
-     * -1 = auto : le seuil recommandé par la source micro s'applique (75 PipeWire, 1000 JavaSound).
-     * Une valeur >= 0 force ce seuil — voir UtteranceCaptureService#resolveSilenceThreshold.
-     */
-    private int silenceThreshold = -1;
+    /** Détection parole/silence par modèle (Silero VAD). Voir {@link Vad}. */
+    private Vad vad = new Vad();
 
-    /** Durée de silence en ms avant d'arrêter l'enregistrement. */
-    private int silenceDurationMs = 1200;
+    /**
+     * Durée de silence en ms avant d'arrêter l'enregistrement.
+     * Valeur vive (application.properties) : 500 ms — les pauses intra-phrase dépassent
+     * couramment 200 ms.
+     */
+    private int silenceDurationMs = 500;
 
     /** Durée maximale d'enregistrement en secondes. */
     private int maxRecordingSeconds = 30;
@@ -71,12 +71,12 @@ public class AudioProperties {
         this.sampleRate = sampleRate;
     }
 
-    public int getSilenceThreshold() {
-        return silenceThreshold;
+    public Vad getVad() {
+        return vad;
     }
 
-    public void setSilenceThreshold(int silenceThreshold) {
-        this.silenceThreshold = silenceThreshold;
+    public void setVad(Vad vad) {
+        this.vad = vad;
     }
 
     public int getSilenceDurationMs() {
@@ -125,5 +125,31 @@ public class AudioProperties {
 
     public void setAlsaInitCommand(String alsaInitCommand) {
         this.alsaInitCommand = alsaInitCommand;
+    }
+
+    /** Configuration du VAD Silero (préfixe {@code arcos.audio.vad}). */
+    public static class Vad {
+
+        /** Ressource classpath du modèle ONNX Silero VAD. */
+        private String modelResource = "models/silero-vad.onnx";
+
+        /** Seuil de probabilité au-dessus duquel une fenêtre est classée « parole » (0.0–1.0). */
+        private float speechThreshold = 0.5f;
+
+        public String getModelResource() {
+            return modelResource;
+        }
+
+        public void setModelResource(String modelResource) {
+            this.modelResource = modelResource;
+        }
+
+        public float getSpeechThreshold() {
+            return speechThreshold;
+        }
+
+        public void setSpeechThreshold(float speechThreshold) {
+            this.speechThreshold = speechThreshold;
+        }
     }
 }

@@ -2,9 +2,9 @@ package org.arcos.Benchmarks;
 
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.Configuration.SpeechToTextProperties;
-import org.arcos.IO.InputHandling.AudioFraming;
 import org.arcos.IO.InputHandling.CaptureConfig;
 import org.arcos.IO.InputHandling.MicrophoneSource;
+import org.arcos.IO.InputHandling.SileroSpeechDetector;
 import org.arcos.IO.InputHandling.STT.SttBackendType;
 import org.arcos.IO.InputHandling.STT.SttGate;
 import org.arcos.IO.InputHandling.UtteranceCaptureService;
@@ -38,9 +38,9 @@ import java.util.concurrent.locks.LockSupport;
  * ({@link UtteranceCaptureService} : VAD, fin d'énoncé, STT spéculatif avec débounce et
  * annulation) au lieu d'un clone — via une {@link MicrophoneSource} qui rejoue en temps
  * réel une fixture de vraie parole française (voir fixtures/speech-fr, générées en P0),
- * suivie de silence synthétique. Le seuil VAD se résout comme en production
- * ({@link UtteranceCaptureService#resolveSilenceThreshold}). Deux scénarios sont mesurés :
- * le chemin wake-word et la fenêtre de conversation (silence de fin différent).
+ * suivie de silence synthétique. La détection parole/silence utilise le VAD de production
+ * ({@link SileroSpeechDetector}, modèle ONNX chargé depuis le classpath). Deux scénarios sont
+ * mesurés : le chemin wake-word et la fenêtre de conversation (silence de fin différent).
  *
  * Les chiffres ne sont PAS comparables aux runs de la campagne auto-research iters 0-9
  * (ancien clone : fixture de bruit, seuil VAD 1000, fin de parole codée en dur).
@@ -80,12 +80,10 @@ class EouLatencyBench {
         }
         String golden = readGolden(fixture);
 
-        int silenceThreshold = UtteranceCaptureService.resolveSilenceThreshold(
-                audio, new FixtureMicrophoneSource(wav.pcm));
         String sttUrl = backend == SttBackendType.WHISPER_CPP ? stt.getWhisperCppUrl() : stt.getFasterWhisperUrl();
         System.out.printf("BENCH fixture: %s | duration=%.3fs | golden=\"%s\"%n", fixture, wav.durationSec(), golden);
-        System.out.printf("BENCH config: backend=%s silenceThreshold=%d silenceDurationMs=%d conversationSilenceMs=%d sttUrl=%s lang=%s%n",
-                backend, silenceThreshold, audio.getSilenceDurationMs(), audio.getConversationSilenceMs(),
+        System.out.printf("BENCH config: backend=%s vad=SILERO speechThreshold=%.2f silenceDurationMs=%d conversationSilenceMs=%d sttUrl=%s lang=%s%n",
+                backend, audio.getVad().getSpeechThreshold(), audio.getSilenceDurationMs(), audio.getConversationSilenceMs(),
                 sttUrl, stt.getLanguage());
 
         // Warmup (chemin wake)
@@ -124,9 +122,14 @@ class EouLatencyBench {
     private Run runOne(Wav wav, String golden, CaptureConfig config, AudioProperties audio,
                        SpeechToTextProperties stt, SttBackendType backend) {
         FixtureMicrophoneSource source = new FixtureMicrophoneSource(wav.pcm);
-        int threshold = UtteranceCaptureService.resolveSilenceThreshold(audio, source);
+        SileroSpeechDetector detector = new SileroSpeechDetector(audio);
+        detector.initialize();
+        if (!detector.isAvailable()) {
+            throw new IllegalStateException("Silero VAD indisponible — modèle absent du classpath ? "
+                    + "resource=" + audio.getVad().getModelResource());
+        }
         SttGate gate = SttGate.create(backend, stt);
-        try (UtteranceCaptureService service = new UtteranceCaptureService(source, gate, threshold, new TurnTimeline())) {
+        try (UtteranceCaptureService service = new UtteranceCaptureService(source, gate, detector, new TurnTimeline())) {
             var result = service.capture(config);
             long eou = System.currentTimeMillis() - source.lastSpeechServedAtMs();
             double werPct = golden == null ? Double.NaN : Wer.compute(golden, result.text()) * 100.0;
@@ -194,10 +197,12 @@ class EouLatencyBench {
                 }
                 // Référence EOU = dernière trame NON silencieuse servie (la fin de la fixture
                 // peut être quasi silencieuse — queue de synthèse Piper — et la capture peut
-                // couper dessus avant d'avoir servi le dernier octet).
+                // couper dessus avant d'avoir servi le dernier octet). On garde ici une mesure
+                // RMS PRIVÉE AU BENCH : c'est la vérité-terrain « l'utilisateur a fini de parler »,
+                // indépendante du détecteur (Silero) mesuré — surtout pas de la prod.
                 byte[] frame = offset == 0 && length == buffer.length
                         ? buffer : Arrays.copyOfRange(buffer, offset, offset + length);
-                if (!AudioFraming.isSilence(frame, recommendedSilenceThreshold())) {
+                if (rms(frame) >= GROUND_TRUTH_RMS_THRESHOLD) {
                     lastSpeechServedAtMs = System.currentTimeMillis();
                 }
             } else {
@@ -210,7 +215,21 @@ class EouLatencyBench {
         @Override public boolean isAvailable() { return true; }
         @Override public String describe() { return "fixture-replay (16kHz, " + pcm.length + " bytes)"; }
         @Override public int getSampleRate() { return SAMPLE_RATE; }
-        @Override public int recommendedSilenceThreshold() { return 75; } // aligné PipeWire (prod)
+    }
+
+    /** Seuil RMS de la vérité-terrain EOU (aligné sur l'ancien PipeWire prod). Bench only. */
+    private static final int GROUND_TRUTH_RMS_THRESHOLD = 75;
+
+    /** RMS d'une trame PCM 16-bit LE mono — mesure de référence, privée au bench. */
+    private static double rms(byte[] frame) {
+        long sum = 0;
+        int n = frame.length / 2;
+        if (n == 0) return 0;
+        for (int i = 0; i + 1 < frame.length; i += 2) {
+            short s = (short) ((frame[i + 1] << 8) | (frame[i] & 0xFF));
+            sum += (long) s * s;
+        }
+        return Math.sqrt((double) sum / n);
     }
 
     // --- plumbing (inchangé : lecture de la config de prod + parsing WAV) ---
@@ -252,17 +271,24 @@ class EouLatencyBench {
         throw new IOException("application.properties not found on classpath or under ARCOS/src/main/resources");
     }
 
+    private static int intProp(Properties p, String key, String def) {
+        return Integer.parseInt(p.getProperty(key, def).trim());
+    }
+
+    private static float floatProp(Properties p, String key, String def) {
+        return Float.parseFloat(p.getProperty(key, def).trim());
+    }
+
     private static AudioProperties audioFromAppProps(Properties p) {
         AudioProperties a = new AudioProperties();
-        a.setSampleRate(Integer.parseInt(p.getProperty("arcos.audio.sample-rate", "44100").trim()));
-        a.setSilenceThreshold(Integer.parseInt(p.getProperty("arcos.audio.silence-threshold", "-1").trim()));
-        a.setSilenceDurationMs(Integer.parseInt(p.getProperty("arcos.audio.silence-duration-ms", "1200").trim()));
-        a.setMaxRecordingSeconds(Integer.parseInt(p.getProperty("arcos.audio.max-recording-seconds", "30").trim()));
+        a.setSampleRate(intProp(p, "arcos.audio.sample-rate", "44100"));
+        a.setSilenceDurationMs(intProp(p, "arcos.audio.silence-duration-ms", "500"));
+        a.setMaxRecordingSeconds(intProp(p, "arcos.audio.max-recording-seconds", "30"));
         a.setMultiTurnEnabled(Boolean.parseBoolean(p.getProperty("arcos.audio.multi-turn-enabled", "true").trim()));
-        a.setPostResponseListeningWindowMs(Integer.parseInt(p.getProperty("arcos.audio.post-response-listening-window-ms", "4000").trim()));
-        a.setConversationSilenceMs(Integer.parseInt(p.getProperty("arcos.audio.conversation-silence-ms", "1500").trim()));
-        String thr = System.getenv("ARCOS_BENCH_SILENCE_THRESHOLD");
-        if (thr != null) a.setSilenceThreshold(Integer.parseInt(thr));
+        a.setPostResponseListeningWindowMs(intProp(p, "arcos.audio.post-response-listening-window-ms", "4000"));
+        a.setConversationSilenceMs(intProp(p, "arcos.audio.conversation-silence-ms", "500"));
+        a.getVad().setModelResource(p.getProperty("arcos.audio.vad.model-resource", "models/silero-vad.onnx").trim());
+        a.getVad().setSpeechThreshold(floatProp(p, "arcos.audio.vad.speech-threshold", "0.5"));
         String dur = System.getenv("ARCOS_BENCH_SILENCE_DURATION_MS");
         if (dur != null) a.setSilenceDurationMs(Integer.parseInt(dur));
         return a;

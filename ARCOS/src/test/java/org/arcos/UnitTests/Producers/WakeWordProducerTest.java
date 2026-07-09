@@ -3,6 +3,7 @@ package org.arcos.UnitTests.Producers;
 import org.arcos.Configuration.AudioProperties;
 import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.EventBus.EventQueue;
+import org.arcos.IO.InputHandling.SileroSpeechDetector;
 import org.arcos.IO.OuputHandling.StateHandler.AudioCue.AudioCueFeedbackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.Telemetry.TurnTimeline;
@@ -29,6 +30,9 @@ class WakeWordProducerTest {
 
     @Mock
     private AudioCueFeedbackHandler audioCueFeedbackHandler;
+
+    @Mock
+    private SileroSpeechDetector speechDetector;
 
     private AudioProperties defaultAudioProperties() {
         return new AudioProperties();
@@ -88,7 +92,7 @@ class WakeWordProducerTest {
     private WakeWordProducer buildProducerViaDegradedPath() {
         WakeWordProducer[] holder = new WakeWordProducer[1];
         assertThatCode(() -> {
-            holder[0] = new WakeWordProducer(eventQueue, centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties(), new SpeechToTextProperties(), new TurnTimeline());
+            holder[0] = new WakeWordProducer(eventQueue, centralFeedBackHandler, audioCueFeedbackHandler, defaultAudioProperties(), new SpeechToTextProperties(), new TurnTimeline(), speechDetector);
         }).doesNotThrowAnyException();
         return holder[0];
     }

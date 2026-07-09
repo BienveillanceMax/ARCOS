@@ -25,9 +25,6 @@ public interface MicrophoneSource {
     /** Actual sample rate of the audio stream in Hz. */
     int getSampleRate();
 
-    /** Recommended RMS silence threshold for this source. */
-    int recommendedSilenceThreshold();
-
     /** Discard any buffered audio data (e.g. after pausing capture during TTS playback). */
     default void drain() {}
 }

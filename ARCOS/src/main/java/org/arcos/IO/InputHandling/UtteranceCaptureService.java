@@ -1,7 +1,6 @@
 package org.arcos.IO.InputHandling;
 
 import lombok.extern.slf4j.Slf4j;
-import org.arcos.Configuration.AudioProperties;
 import org.arcos.IO.InputHandling.STT.SttCall;
 import org.arcos.IO.InputHandling.STT.SttGate;
 import org.arcos.IO.InputHandling.STT.SttResult;
@@ -16,8 +15,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 /**
- * Capture d'un énoncé utilisateur : lecture des trames micro, VAD RMS, détection de fin
- * d'énoncé par silence, et transcription STT spéculative.
+ * Capture d'un énoncé utilisateur : lecture des trames micro, VAD ({@link SpeechDetector}),
+ * détection de fin d'énoncé par silence, et transcription STT spéculative.
  *
  * Source unique de la boucle de capture — utilisée par le chemin wake-word, la fenêtre de
  * conversation ({@link CaptureConfig} porte leurs différences) et le bench EOU (avec une
@@ -45,7 +44,7 @@ public class UtteranceCaptureService implements AutoCloseable {
     private final MicrophoneSource micSource;
     private final SttGate sttGate;
     private final TurnTimeline turnTimeline;
-    private final int silenceThreshold;
+    private final SpeechDetector speechDetector;
     private final ExecutorService speculationExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "stt-speculation");
         t.setDaemon(true);
@@ -54,22 +53,12 @@ public class UtteranceCaptureService implements AutoCloseable {
 
     public UtteranceCaptureService(MicrophoneSource micSource,
                                    SttGate sttGate,
-                                   int silenceThreshold,
+                                   SpeechDetector speechDetector,
                                    TurnTimeline turnTimeline) {
         this.micSource = micSource;
         this.sttGate = sttGate;
-        this.silenceThreshold = silenceThreshold;
+        this.speechDetector = speechDetector;
         this.turnTimeline = turnTimeline;
-    }
-
-    /**
-     * Seuil VAD effectif : la valeur de config si explicitement fixée (≥ 0),
-     * sinon le seuil recommandé par la source micro. Production et bench passent
-     * par cette même résolution.
-     */
-    public static int resolveSilenceThreshold(AudioProperties audio, MicrophoneSource micSource) {
-        int configured = audio.getSilenceThreshold();
-        return configured >= 0 ? configured : micSource.recommendedSilenceThreshold();
     }
 
     /** Spéculation en vol : l'appel HTTP annulable + le Future qui l'exécute. */
@@ -89,6 +78,7 @@ public class UtteranceCaptureService implements AutoCloseable {
                 config.label(), config.initialListenWindowMs(), config.silenceDurationMs());
 
         sttGate.reset();
+        speechDetector.reset();
 
         final int micSampleRate = micSource.getSampleRate();
         final boolean needsResample = micSampleRate != SAMPLE_RATE;
@@ -109,15 +99,19 @@ public class UtteranceCaptureService implements AutoCloseable {
 
         try {
             while (true) {
-                int bytesRead = micSource.read(micBuffer, 0, micFrameSize);
-                if (bytesRead <= 0) {
-                    continue;
+                // Trame COMPLÈTE obligatoire : pw-record fait des lectures partielles (~1/3 des
+                // read() rendent < micFrameSize). Sans ré-assemblage, la fin de micBuffer/whisperBuffer
+                // (réutilisés) resterait périmée d'une trame à l'autre — et le VAD, qui s'accroche à
+                // tout fragment de parole résiduel, ne verrait jamais le silence (énoncé jamais clos).
+                int bytesRead = readFullFrame(micBuffer, micFrameSize);
+                if (bytesRead < micFrameSize) {
+                    continue; // flux mort ou fin de trame : on saute, jamais de données périmées en aval
                 }
 
                 if (needsResample) {
                     resampleInto(micBuffer, bytesRead, whisperBuffer);
                 } else {
-                    System.arraycopy(micBuffer, 0, whisperBuffer, 0, Math.min(bytesRead, WHISPER_FRAME_SIZE));
+                    System.arraycopy(micBuffer, 0, whisperBuffer, 0, WHISPER_FRAME_SIZE);
                 }
 
                 // Ring buffer d'attaque, seulement en attente de parole
@@ -126,7 +120,7 @@ public class UtteranceCaptureService implements AutoCloseable {
                     preBufferIndex++;
                 }
 
-                boolean isSilent = AudioFraming.isSilence(whisperBuffer, silenceThreshold);
+                boolean isSilent = !speechDetector.isSpeech(whisperBuffer);
 
                 if (!isSilent) {
                     lastSoundTime = System.currentTimeMillis();
@@ -238,6 +232,24 @@ public class UtteranceCaptureService implements AutoCloseable {
         for (short s : downsampled) {
             bb.putShort(s);
         }
+    }
+
+    /**
+     * Lit une trame COMPLÈTE de {@code frameSize} octets en ré-assemblant les lectures partielles
+     * de la source (pw-record en fait fréquemment). Retourne {@code frameSize} si la trame est
+     * pleine, ou une valeur inférieure si le flux se tarit ({@code read} ≤ 0) — l'appelant saute
+     * alors la trame plutôt que de traiter des octets périmés du buffer réutilisé.
+     */
+    private int readFullFrame(byte[] buffer, int frameSize) {
+        int total = 0;
+        while (total < frameSize) {
+            int n = micSource.read(buffer, total, frameSize - total);
+            if (n <= 0) {
+                return total; // flux mort/EOF : trame incomplète, l'appelant l'ignore
+            }
+            total += n;
+        }
+        return total;
     }
 
     @Override

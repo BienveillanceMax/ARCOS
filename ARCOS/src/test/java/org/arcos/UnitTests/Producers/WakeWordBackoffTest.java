@@ -30,7 +30,7 @@ class WakeWordBackoffTest {
     @Test
     void backoffMillis_isExponential_cappedAt30s_andNeverZero() {
         WakeWordProducer p = new WakeWordProducer(eventQueue, centralFeedBackHandler,
-                audioCueFeedbackHandler, new AudioProperties(), new SpeechToTextProperties(), new TurnTimeline());
+                audioCueFeedbackHandler, new AudioProperties(), new SpeechToTextProperties(), new TurnTimeline(), null);
         long b1 = ReflectionTestUtils.invokeMethod(p, "backoffMillis", 1);
         long b2 = ReflectionTestUtils.invokeMethod(p, "backoffMillis", 2);
         long b3 = ReflectionTestUtils.invokeMethod(p, "backoffMillis", 3);

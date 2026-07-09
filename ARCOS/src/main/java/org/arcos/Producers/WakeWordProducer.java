@@ -11,6 +11,7 @@ import org.arcos.IO.InputHandling.CaptureConfig;
 import org.arcos.IO.InputHandling.JavaSoundMicrophoneSource;
 import org.arcos.IO.InputHandling.MicrophoneSource;
 import org.arcos.IO.InputHandling.PipeWireMicrophoneSource;
+import org.arcos.IO.InputHandling.SileroSpeechDetector;
 import org.arcos.IO.InputHandling.UtteranceCaptureService;
 import org.arcos.Configuration.SpeechToTextProperties;
 import org.arcos.IO.InputHandling.STT.SttGate;
@@ -54,6 +55,7 @@ public class WakeWordProducer implements Runnable {
     private final AudioProperties audioProperties;
     private final SpeechToTextProperties sttProperties;
     private final TurnTimeline turnTimeline;
+    private final SileroSpeechDetector speechDetector;
 
     /**
      * Boucle de capture partagée (VAD + fin d'énoncé + STT spéculatif) — créée une fois
@@ -66,18 +68,7 @@ public class WakeWordProducer implements Runnable {
 
     private static final int PORCUPINE_SAMPLE_RATE = 16000;
     private static final int BYTES_PER_SAMPLE = 2;
-    private int silenceThreshold;
     private int micFailureCount = 0;
-
-    /**
-     * 21-tap low-pass FIR filter (Hamming window, fc=7200Hz at 44100Hz).
-     * Moved to {@link org.arcos.IO.InputHandling.AudioFraming}; kept as a deprecated alias
-     * so any external code that still depends on this constant continues to resolve.
-     *
-     * @deprecated use {@link org.arcos.IO.InputHandling.AudioFraming#LP_FILTER}
-     */
-    @Deprecated
-    private static final double[] LP_FILTER = AudioFraming.LP_FILTER;
 
     private volatile boolean suspended = false;
     private volatile boolean needsDrain = false;
@@ -126,13 +117,15 @@ public class WakeWordProducer implements Runnable {
                             AudioCueFeedbackHandler audioCueFeedbackHandler,
                             AudioProperties audioProperties,
                             SpeechToTextProperties sttProperties,
-                            TurnTimeline turnTimeline) {
+                            TurnTimeline turnTimeline,
+                            SileroSpeechDetector speechDetector) {
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.audioCueFeedbackHandler = audioCueFeedbackHandler;
         this.eventQueue = eventQueue;
         this.audioProperties = audioProperties;
         this.sttProperties = sttProperties;
         this.turnTimeline = turnTimeline;
+        this.speechDetector = speechDetector;
     }
 
     /**
@@ -162,10 +155,18 @@ public class WakeWordProducer implements Runnable {
             }
             this.keywords = keywordPaths;
             initializePorcupine(keywordPaths, porcupineModelPath);
+            if (!speechDetector.isAvailable()) {
+                // Le VAD Silero est le seul détecteur de parole : sans lui, aucune capture n'est
+                // possible. On désactive la voix proprement plutôt que de capturer à l'aveugle.
+                centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.FAILURE));
+                log.error("VAD Silero indisponible (modèle absent ou init ONNX en échec). "
+                        + "Capture vocale désactivée — ARCOS démarrera sans reconnaissance de la parole.");
+                this.porcupineEnabled = false;
+                return;
+            }
             initializeMicrophone();
             if (this.micSource != null && this.micSource.isAvailable()) {
-                this.silenceThreshold = UtteranceCaptureService.resolveSilenceThreshold(audioProperties, micSource);
-                log.info("Silence threshold: {} (from {})", silenceThreshold, micSource.describe());
+                log.info("VAD: {}", speechDetector.describe());
                 this.sttGate = SttGate.create(sttProperties.getBackend(), sttProperties);
                 rebuildCaptureService();
             }
@@ -318,7 +319,8 @@ public class WakeWordProducer implements Runnable {
                             .asShortBuffer()
                             .get(micSamples);
 
-                    // Log RMS every 5 seconds to verify mic is capturing audio
+                    // Log RMS every 5 seconds to verify mic is capturing audio (santé micro,
+                    // pas de la détection — celle-ci est faite par le VAD Silero dans la capture)
                     long now = System.currentTimeMillis();
                     if (now - lastRmsLogTime > 5000) {
                         long sum = 0;
@@ -326,14 +328,14 @@ public class WakeWordProducer implements Runnable {
                             sum += (long) micSamples[i] * micSamples[i];
                         }
                         double rms = Math.sqrt((double) sum / samplesRead);
-                        log.info("Audio RMS level: {} (threshold: {}, samples: {}, source: {})",
-                                (int) rms, silenceThreshold, samplesRead, micSource.describe());
+                        log.info("Audio RMS level: {} (samples: {}, source: {})",
+                                (int) rms, samplesRead, micSource.describe());
                         lastRmsLogTime = now;
                     }
 
                     // Downsample to 16kHz if needed (PipeWire already outputs at 16kHz)
                     if (needsDownsampling) {
-                        downsample(micSamples, samplesRead, resampledBuffer, porcupineFrameLength);
+                        AudioFraming.downsample(micSamples, samplesRead, resampledBuffer, porcupineFrameLength);
                     } else {
                         System.arraycopy(micSamples, 0, resampledBuffer, 0, Math.min(samplesRead, porcupineFrameLength));
                     }
@@ -370,7 +372,6 @@ public class WakeWordProducer implements Runnable {
                     Thread.sleep(backoff);                 // interruptible — InterruptedException exits via the loop's catch
                     recreatePipeWireSource();
                     if (micSource.isAvailable()) {         // micSource is never null — see recreatePipeWireSource()
-                        this.silenceThreshold = UtteranceCaptureService.resolveSilenceThreshold(audioProperties, micSource);
                         rebuildCaptureService();           // le service référence la source remplacée
                         log.info("Source PipeWire rétablie après {} échec(s).", micFailureCount);
                         micFailureCount = 0;               // recovered: reset
@@ -408,16 +409,12 @@ public class WakeWordProducer implements Runnable {
         }
     }
 
-    private void downsample(short[] input, int inputLength, short[] output, int outputLength) {
-        AudioFraming.downsample(input, inputLength, output, outputLength);
-    }
-
-    /** (Re)crée la boucle de capture — à appeler quand micSource ou silenceThreshold change. */
+    /** (Re)crée la boucle de capture — à appeler quand micSource change. */
     private void rebuildCaptureService() {
         if (captureService != null) {
             captureService.close();
         }
-        this.captureService = new UtteranceCaptureService(micSource, sttGate, silenceThreshold, turnTimeline);
+        this.captureService = new UtteranceCaptureService(micSource, sttGate, speechDetector, turnTimeline);
     }
 
     /**

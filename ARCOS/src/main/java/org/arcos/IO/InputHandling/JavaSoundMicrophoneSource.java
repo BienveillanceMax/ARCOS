@@ -98,11 +98,6 @@ public class JavaSoundMicrophoneSource implements MicrophoneSource {
     }
 
     @Override
-    public int recommendedSilenceThreshold() {
-        return 1000;
-    }
-
-    @Override
     public void drain() {
         if (line != null) {
             line.flush();

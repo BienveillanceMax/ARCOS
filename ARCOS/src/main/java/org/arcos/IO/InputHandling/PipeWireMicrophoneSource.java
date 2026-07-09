@@ -106,11 +106,6 @@ public class PipeWireMicrophoneSource implements MicrophoneSource {
         return SAMPLE_RATE;
     }
 
-    @Override
-    public int recommendedSilenceThreshold() {
-        return 75;
-    }
-
     /**
      * Read and discard buffered audio for 500ms using blocking reads.
      * InputStream.available() is unreliable on process pipes (returns 0 even with data),
