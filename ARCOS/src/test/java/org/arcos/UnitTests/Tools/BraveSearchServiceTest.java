@@ -147,6 +147,24 @@ class BraveSearchServiceTest {
     }
 
     @Test
+    @DisplayName("Given HTML-escaped title/description, Then entities are unescaped (TTS-safe)")
+    void search_WithHtmlEntities_ShouldUnescape() throws Exception {
+        // Given
+        String json = """
+                {"web":{"results":[{"title":"L&#x27;espace","url":"https://a.com",
+                  "description":"Retour sur le vol d&#x27;essai &amp; ses suites."}]}}
+                """;
+
+        // When
+        SearchResult result = searchWithBody(json);
+
+        // Then
+        assertThat(result.getItems().get(0).getTitle()).isEqualTo("L'espace");
+        assertThat(result.getItems().get(0).getDescription())
+                .isEqualTo("Retour sur le vol d'essai & ses suites.");
+    }
+
+    @Test
     @DisplayName("Given published present, Then published wins over page_age")
     void search_WithPublished_ShouldPreferPublished() throws Exception {
         // Given

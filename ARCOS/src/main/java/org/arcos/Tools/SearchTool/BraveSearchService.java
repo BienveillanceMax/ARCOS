@@ -7,6 +7,7 @@ import org.arcos.Exceptions.SearchException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jsoup.parser.Parser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -134,11 +135,12 @@ public class BraveSearchService {
         if (apiResponse.web != null && apiResponse.web.results != null) {
             for (BraveWebResult result : apiResponse.web.results) {
                 items.add(new SearchResultItem(
-                        result.title,
+                        unescapeHtml(result.title),
                         result.url,
-                        result.description,
+                        unescapeHtml(result.description),
                         effectiveDate(result.publishedDate, result.pageAge),
-                        result.extraSnippets != null ? result.extraSnippets : List.of()
+                        result.extraSnippets == null ? List.of()
+                                : result.extraSnippets.stream().map(BraveSearchService::unescapeHtml).toList()
                 ));
             }
         }
@@ -148,6 +150,11 @@ public class BraveSearchService {
                 items,
                 apiResponse.web != null ? apiResponse.web.totalCount : 0
         );
+    }
+
+    /** Brave renvoie titres/descriptions HTML-échappés (&#x27; etc.) — inutilisable tel quel en vocal. */
+    private static String unescapeHtml(String value) {
+        return value == null ? null : Parser.unescapeEntities(value, false);
     }
 
     /** Date affichable : `published` si présent, sinon `page_age` réduit à sa partie date ISO. */
