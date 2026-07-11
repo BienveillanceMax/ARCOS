@@ -90,7 +90,9 @@ public class PlannedActionExecutor {
 
         toolRegistry.put("Lire_une_page_web", params -> {
             String url = (String) params.get("url");
-            return webPageActions.readWebPage(url);
+            Integer page = params.containsKey("page")
+                    ? ((Number) params.get("page")).intValue() : null;
+            return webPageActions.readWebPage(url, page);
         });
 
         toolRegistry.put("Consulter_la_meteo", params -> {

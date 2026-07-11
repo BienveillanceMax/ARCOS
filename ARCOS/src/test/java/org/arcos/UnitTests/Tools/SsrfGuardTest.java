@@ -94,9 +94,9 @@ class SsrfGuardTest {
     @DisplayName("WebPageActions surfaces SSRF block as a failure ActionResult, not a crash")
     void readWebPage_loopback_shouldReturnFailure() {
         WebPageService service = new WebPageService(new PageFetcher(guard), new ContentExtractor());
-        WebPageActions actions = new WebPageActions(service, centralFeedBackHandler, 4000, 5);
+        WebPageActions actions = new WebPageActions(service, centralFeedBackHandler, 4000, 40000, 5);
 
-        ActionResult result = actions.readWebPage("http://169.254.169.254/latest/meta-data/");
+        ActionResult result = actions.readWebPage("http://169.254.169.254/latest/meta-data/", null);
 
         assertThat(result.isSuccess()).isFalse();
         assertThat(result.getMessage()).contains("Erreur de lecture");

@@ -5,7 +5,10 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.WebPageActions;
+import org.arcos.Tools.WebCommon.ContentExtractor;
+import org.arcos.Tools.WebCommon.PageFetcher;
 import org.arcos.Tools.WebPageTool.WebPageService;
+import org.arcos.Tools.WebPageTool.WebPageService.PageSlice;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,115 +22,139 @@ import java.net.http.HttpTimeoutException;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.*;
 
 /**
  * Tests pour Lire_une_page_web (WebPageActions + WebPageService).
  *
  * Valide :
- * - AC3 : lecture de page web => contenu extrait (max 4000 chars)
+ * - AC3 : lecture de page web => titre + contenu par parties (pagination)
  * - AC6 : service indisponible (timeout, IOException) => degradation gracieuse
  */
 @ExtendWith(MockitoExtension.class)
 class WebPageToolTest {
 
-    @Mock
-    private WebPageService webPageService;
-
-    @Mock
-    private CentralFeedBackHandler centralFeedBackHandler;
-
-    private WebPageActions webPageActions;
-
     private static final int MAX_CONTENT_LENGTH = 4000;
+    private static final int MAX_TOTAL_CHARS = 40000;
     private static final int TIMEOUT_SECONDS = 15;
 
-    @BeforeEach
-    void setUp() {
-        webPageActions = new WebPageActions(webPageService, centralFeedBackHandler,
-                MAX_CONTENT_LENGTH, TIMEOUT_SECONDS);
-    }
-
     // ═══════════════════════════════════════════════════════════════════════════
-    // AC3 : normal operation
+    // WebPageActions — action layer (WebPageService mocké)
     // ═══════════════════════════════════════════════════════════════════════════
 
     @Nested
-    @DisplayName("Lire_une_page_web — normal operation")
-    class NormalOperationTests {
+    @DisplayName("Lire_une_page_web — action layer")
+    class ActionLayerTests {
+
+        @Mock
+        private WebPageService webPageService;
+
+        @Mock
+        private CentralFeedBackHandler centralFeedBackHandler;
+
+        private WebPageActions webPageActions;
+
+        @BeforeEach
+        void setUp() {
+            webPageActions = new WebPageActions(webPageService, centralFeedBackHandler,
+                    MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS);
+        }
 
         @Test
-        @DisplayName("Given valid URL, When page is fetched, Then content is returned in ActionResult")
-        void readWebPage_WithValidUrl_ShouldReturnExtractedContent() throws Exception {
+        @DisplayName("Given valid URL, When page is fetched, Then title and content are returned")
+        void readWebPage_WithValidUrl_ShouldReturnTitleAndContent() throws Exception {
             // Given
             String url = "https://www.lemonde.fr/article-important";
-            String content = "Voici le contenu principal de l'article sur l'intelligence artificielle.";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
-                    .thenReturn(content);
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
+                    .thenReturn(new PageSlice("Article important",
+                            "Voici le contenu principal de l'article.", 1, 1));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
             assertThat(result.isSuccess()).isTrue();
             assertThat(result.getMessage()).isEqualTo("Page lue avec succès");
             List<String> data = (List<String>) result.getData();
-            assertThat(data).hasSize(1);
-            assertThat(data.getFirst()).isEqualTo(content);
+            assertThat(data.get(0)).isEqualTo("Titre : Article important — Partie 1/1");
+            assertThat(data.get(1)).contains("contenu principal");
+            assertThat(data).noneMatch(d -> d.contains("Suite disponible"));
             assertThat(result.getMetadata()).containsEntry("url", url);
-            assertThat(result.getExecutionTimeMs()).isGreaterThanOrEqualTo(0);
+            assertThat(result.getMetadata()).containsEntry("titre", "Article important");
+            assertThat(result.getMetadata()).containsEntry("partie", "1/1");
         }
 
         @Test
-        @DisplayName("Given URL with long content, When page fetched, Then WebPageService handles truncation")
-        void readWebPage_WithLongContent_ShouldReturnTruncatedContent() throws Exception {
+        @DisplayName("Given a long page, When part 1 is read, Then continuation hint is present")
+        void readWebPage_WithLongPage_ShouldAnnounceContinuation() throws Exception {
             // Given
             String url = "https://www.example.com/long-article";
-            // WebPageService handles truncation internally — we just verify the action passes it through
-            String truncated = "A".repeat(4000) + " ... [contenu tronqué]";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
-                    .thenReturn(truncated);
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
+                    .thenReturn(new PageSlice("Long article", "Première partie du contenu.", 1, 3));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
-            assertThat(result.isSuccess()).isTrue();
             List<String> data = (List<String>) result.getData();
-            assertThat(data.getFirst()).contains("[contenu tronqué]");
-            assertThat(data.getFirst().length()).isGreaterThan(MAX_CONTENT_LENGTH);
+            assertThat(data.get(0)).contains("Partie 1/3");
+            assertThat(data.get(2)).contains("Suite disponible");
+            assertThat(data.get(2)).contains("page=2");
         }
 
         @Test
-        @DisplayName("Given http:// URL (not https), When reading, Then page is fetched normally")
-        void readWebPage_WithHttpUrl_ShouldSucceed() throws Exception {
+        @DisplayName("Given page=2 requested, When read, Then service receives part 2")
+        void readWebPage_WithPage2_ShouldRequestPart2() throws Exception {
             // Given
-            String url = "http://plain.example.com/page";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
-                    .thenReturn("content");
+            String url = "https://www.example.com/long-article";
+            when(webPageService.fetchPage(url, 2, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
+                    .thenReturn(new PageSlice("Long article", "Deuxième partie.", 2, 3));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, 2);
 
             // Then
-            assertThat(result.isSuccess()).isTrue();
-            verify(webPageService).fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS);
+            verify(webPageService).fetchPage(url, 2, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS);
+            assertThat(result.getMetadata()).containsEntry("partie", "2/3");
         }
-    }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // AC3 + AC6 : input validation and degradation
-    // ═══════════════════════════════════════════════════════════════════════════
+        @Test
+        @DisplayName("Given null or negative page, When read, Then defaults to part 1")
+        void readWebPage_WithInvalidPageNumber_ShouldDefaultToPart1() throws Exception {
+            // Given
+            String url = "https://example.com/page";
+            when(webPageService.fetchPage(eq(url), eq(1), anyInt(), anyInt(), anyInt()))
+                    .thenReturn(new PageSlice("T", "Contenu.", 1, 1));
 
-    @Nested
-    @DisplayName("Lire_une_page_web — validation and degradation")
-    class ValidationAndDegradationTests {
+            // When
+            webPageActions.readWebPage(url, -3);
+
+            // Then
+            verify(webPageService).fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS);
+        }
+
+        @Test
+        @DisplayName("Given untitled page, When read, Then header falls back to part indicator")
+        void readWebPage_WithoutTitle_ShouldUsePartIndicatorHeader() throws Exception {
+            // Given
+            String url = "https://example.com/page";
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
+                    .thenReturn(new PageSlice("", "Contenu sans titre.", 1, 1));
+
+            // When
+            ActionResult result = webPageActions.readWebPage(url, null);
+
+            // Then
+            List<String> data = (List<String>) result.getData();
+            assertThat(data.get(0)).isEqualTo("Partie 1/1");
+        }
 
         @Test
         @DisplayName("Given null URL, When reading, Then failure with explicit message, no crash")
         void readWebPage_WithNullUrl_ShouldReturnFailure() {
             // When
-            ActionResult result = webPageActions.readWebPage(null);
+            ActionResult result = webPageActions.readWebPage(null, null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
@@ -139,7 +166,7 @@ class WebPageToolTest {
         @DisplayName("Given ftp:// URL, When reading, Then failure with explicit message")
         void readWebPage_WithFtpUrl_ShouldReturnFailure() {
             // When
-            ActionResult result = webPageActions.readWebPage("ftp://files.example.com/doc");
+            ActionResult result = webPageActions.readWebPage("ftp://files.example.com/doc", null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
@@ -147,14 +174,21 @@ class WebPageToolTest {
         }
 
         @Test
-        @DisplayName("Given URL without protocol, When reading, Then failure with explicit message")
-        void readWebPage_WithNoProtocol_ShouldReturnFailure() {
+        @DisplayName("Given SPA page, When reading, Then failure carries the JavaScript diagnostic")
+        void readWebPage_WithSpaPage_ShouldReturnDiagnosticFailure() throws Exception {
+            // Given
+            String url = "https://spa.example.com/app";
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
+                    .thenThrow(new IOException(
+                            "Page probablement dynamique (JavaScript requis) — contenu non extractible."));
+
             // When
-            ActionResult result = webPageActions.readWebPage("www.example.com");
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
-            assertThat(result.getMessage()).contains("URL invalide");
+            assertThat(result.getMessage()).contains("dynamique");
+            assertThat(result.getMessage()).contains("JavaScript");
         }
 
         @Test
@@ -162,11 +196,11 @@ class WebPageToolTest {
         void readWebPage_WhenTimeout_ShouldReturnTimeoutResult() throws Exception {
             // Given
             String url = "https://slow-site.example.com";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
                     .thenThrow(new HttpTimeoutException("HTTP read timed out"));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
@@ -175,54 +209,15 @@ class WebPageToolTest {
         }
 
         @Test
-        @DisplayName("Given connection refused, When reading, Then failure with error details, no crash")
-        void readWebPage_WhenConnectionRefused_ShouldReturnFailureWithDetails() throws Exception {
-            // Given
-            String url = "https://down-site.example.com";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
-                    .thenThrow(new IOException("Connection refused"));
-
-            // When
-            ActionResult result = webPageActions.readWebPage(url);
-
-            // Then
-            assertThat(result.isSuccess()).isFalse();
-            assertThat(result.getMessage()).contains("Erreur de lecture");
-            assertThat(result.getMessage()).contains("Connection refused");
-            assertThat(result.getExecutionTimeMs()).isGreaterThanOrEqualTo(0);
-        }
-
-        @Test
-        @DisplayName("Given interrupted thread, When reading, Then failure and thread interrupt flag restored")
-        void readWebPage_WhenInterrupted_ShouldReturnFailureAndRestoreFlag() throws Exception {
-            // Given
-            String url = "https://example.com/page";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
-                    .thenThrow(new InterruptedException("Thread interrupted"));
-
-            // When
-            ActionResult result = webPageActions.readWebPage(url);
-
-            // Then
-            assertThat(result.isSuccess()).isFalse();
-            assertThat(result.getMessage()).contains("Lecture interrompue");
-            // Thread interrupt flag should have been restored
-            assertThat(Thread.currentThread().isInterrupted()).isTrue();
-
-            // Clean up interrupt flag for test runner
-            Thread.interrupted();
-        }
-
-        @Test
         @DisplayName("Given HTTP 404 from service, When reading, Then failure with HTTP status in message")
         void readWebPage_WhenHttp404_ShouldReturnFailure() throws Exception {
             // Given
             String url = "https://example.com/missing";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
                     .thenThrow(new IOException("HTTP 404 pour " + url));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
@@ -234,11 +229,11 @@ class WebPageToolTest {
         void readWebPage_WhenMalformedUrl_ShouldReturnFailure() throws Exception {
             // Given — passes the http:// prefix check but URI.create rejects it downstream
             String url = "https://exa mple.com/page";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
                     .thenThrow(new IllegalArgumentException("Illegal character in authority"));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
@@ -250,36 +245,47 @@ class WebPageToolTest {
         void readWebPage_WhenCircuitBreakerOpen_ShouldReturnFailure() throws Exception {
             // Given
             String url = "https://example.com/page";
-            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
                     .thenThrow(CallNotPermittedException.createCallNotPermittedException(
                             CircuitBreaker.ofDefaults("webPage")));
 
             // When
-            ActionResult result = webPageActions.readWebPage(url);
+            ActionResult result = webPageActions.readWebPage(url, null);
 
             // Then
             assertThat(result.isSuccess()).isFalse();
             assertThat(result.getMessage()).contains("temporairement indisponible");
         }
-    }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Feedback events
-    // ═══════════════════════════════════════════════════════════════════════════
+        @Test
+        @DisplayName("Given interrupted thread, When reading, Then failure and thread interrupt flag restored")
+        void readWebPage_WhenInterrupted_ShouldReturnFailureAndRestoreFlag() throws Exception {
+            // Given
+            String url = "https://example.com/page";
+            when(webPageService.fetchPage(url, 1, MAX_CONTENT_LENGTH, MAX_TOTAL_CHARS, TIMEOUT_SECONDS))
+                    .thenThrow(new InterruptedException("Thread interrupted"));
 
-    @Nested
-    @DisplayName("Lire_une_page_web — UX feedback")
-    class FeedbackTests {
+            // When
+            ActionResult result = webPageActions.readWebPage(url, null);
+
+            // Then
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.getMessage()).contains("Lecture interrompue");
+            assertThat(Thread.currentThread().isInterrupted()).isTrue();
+
+            // Clean up interrupt flag for test runner
+            Thread.interrupted();
+        }
 
         @Test
         @DisplayName("Given successful page read, Then LONGTASK start and end events are emitted")
         void readWebPage_Success_ShouldEmitStartAndEndFeedback() throws Exception {
             // Given
-            when(webPageService.fetchAndExtract(anyString(), anyInt(), anyInt()))
-                    .thenReturn("content");
+            when(webPageService.fetchPage(anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
+                    .thenReturn(new PageSlice("T", "contenu", 1, 1));
 
             // When
-            webPageActions.readWebPage("https://example.com");
+            webPageActions.readWebPage("https://example.com", null);
 
             // Then
             verify(centralFeedBackHandler, times(2)).handleFeedBack(any());
@@ -289,14 +295,110 @@ class WebPageToolTest {
         @DisplayName("Given page read fails, Then LONGTASK end event is still emitted (finally block)")
         void readWebPage_Failure_ShouldStillEmitEndFeedback() throws Exception {
             // Given
-            when(webPageService.fetchAndExtract(anyString(), anyInt(), anyInt()))
+            when(webPageService.fetchPage(anyString(), anyInt(), anyInt(), anyInt(), anyInt()))
                     .thenThrow(new IOException("Broken"));
 
             // When
-            webPageActions.readWebPage("https://failing.com");
+            webPageActions.readWebPage("https://failing.com", null);
 
             // Then — both start and end should be called (finally block)
             verify(centralFeedBackHandler, times(2)).handleFeedBack(any());
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // WebPageService — pagination (PageFetcher mocké, ContentExtractor réel)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    @Nested
+    @DisplayName("WebPageService — pagination")
+    class ServicePaginationTests {
+
+        @Mock
+        private PageFetcher pageFetcher;
+
+        private WebPageService webPageService;
+
+        @BeforeEach
+        void setUp() {
+            webPageService = new WebPageService(pageFetcher, new ContentExtractor());
+        }
+
+        private void givenPageWithText(String url, String title, String text) throws Exception {
+            String html = "<html><head><title>" + title + "</title></head><body><article><p>"
+                    + text + "</p></article></body></html>";
+            when(pageFetcher.fetch(eq(url), anyInt()))
+                    .thenReturn(new PageFetcher.FetchedPage(url, "text/html", html));
+        }
+
+        @Test
+        @DisplayName("Given 9000-char content with 4000-char parts, Then part 1 of 3 with word-boundary cut")
+        void fetchPage_WithLongText_ShouldSliceOnWordBoundaries() throws Exception {
+            // Given — ~9000 chars of repeated words
+            String text = "lorem ipsum dolor sit amet consectetur adipiscing elit ".repeat(160).trim();
+            givenPageWithText("https://a.com/long", "Long", text);
+
+            // When
+            PageSlice part1 = webPageService.fetchPage("https://a.com/long", 1, 4000, 40000, 5);
+            PageSlice part2 = webPageService.fetchPage("https://a.com/long", 2, 4000, 40000, 5);
+
+            // Then
+            assertThat(part1.totalPages()).isEqualTo(3);
+            assertThat(part1.page()).isEqualTo(1);
+            assertThat(part1.title()).isEqualTo("Long");
+            assertThat(part1.content().length()).isLessThanOrEqualTo(4000);
+            // Coupe sur frontière de mot : chaque tranche finit et commence sur un mot entier
+            List<String> words = List.of("lorem", "ipsum", "dolor", "sit", "amet",
+                    "consectetur", "adipiscing", "elit");
+            String lastWordOfPart1 = part1.content().substring(part1.content().lastIndexOf(' ') + 1);
+            String firstWordOfPart2 = part2.content().substring(0, part2.content().indexOf(' '));
+            assertThat(words).contains(lastWordOfPart1);
+            assertThat(words).contains(firstWordOfPart2);
+            assertThat(part2.page()).isEqualTo(2);
+        }
+
+        @Test
+        @DisplayName("Given out-of-range part number, Then clamped to last part")
+        void fetchPage_WithPageBeyondTotal_ShouldClampToLast() throws Exception {
+            // Given
+            String text = "mot ".repeat(2500).trim(); // ~10000 chars → 3 parties
+            givenPageWithText("https://a.com/long", "Long", text);
+
+            // When
+            PageSlice slice = webPageService.fetchPage("https://a.com/long", 99, 4000, 40000, 5);
+
+            // Then
+            assertThat(slice.page()).isEqualTo(slice.totalPages());
+        }
+
+        @Test
+        @DisplayName("Given content over max-total-chars, Then processing is capped")
+        void fetchPage_WithHugeText_ShouldCapTotalChars() throws Exception {
+            // Given — 50k chars (13 parties sans cap), cap 8000 → au plus 3 parties
+            // (la coupe sur frontière de mot peut laisser une petite tranche résiduelle)
+            String text = "abcd ".repeat(10000).trim();
+            givenPageWithText("https://a.com/huge", "Huge", text);
+
+            // When
+            PageSlice slice = webPageService.fetchPage("https://a.com/huge", 1, 4000, 8000, 5);
+
+            // Then
+            assertThat(slice.totalPages()).isBetween(2, 3);
+        }
+
+        @Test
+        @DisplayName("Given a SPA page, Then IOException with JavaScript diagnostic")
+        void fetchPage_WithSpaPage_ShouldThrowDiagnostic() throws Exception {
+            // Given — gros HTML sans texte
+            String html = "<html><head>" + "<script src='app.js'></script>".repeat(200)
+                    + "</head><body><div id='root'></div></body></html>";
+            when(pageFetcher.fetch(eq("https://spa.com/app"), anyInt()))
+                    .thenReturn(new PageFetcher.FetchedPage("https://spa.com/app", "text/html", html));
+
+            // When/Then
+            assertThatThrownBy(() -> webPageService.fetchPage("https://spa.com/app", 1, 4000, 40000, 5))
+                    .isInstanceOf(IOException.class)
+                    .hasMessageContaining("JavaScript requis");
         }
     }
 }

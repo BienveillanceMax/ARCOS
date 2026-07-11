@@ -229,7 +229,7 @@ public class PromptBuilder {
                 4. Supprimer_un_evenement — title:String (événement du jour)
                 5. Executer_du_code — code:String
                 6. Chercher_dans_ma_memoire — query:String, type:String (SOUVENIR/OPINION/DESIR)
-                7. Lire_une_page_web — url:String
+                7. Lire_une_page_web — url:String, page:int?
                 8. Consulter_la_meteo — city:String?, forecastDays:int=3
 
                 Règles:
