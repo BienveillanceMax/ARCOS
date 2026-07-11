@@ -4,6 +4,8 @@ import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.SearchActions;
 import org.arcos.Tools.SearchTool.BraveSearchService;
+import org.arcos.Tools.SearchTool.DeepSearchService;
+import org.arcos.Tools.SearchTool.SearchResultFormatter;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,13 +28,18 @@ class SearchActionsTest {
     private BraveSearchService searchService;
 
     @Mock
+    private DeepSearchService deepSearchService;
+
+    @Mock
     private CentralFeedBackHandler centralFeedBackHandler;
 
     private SearchActions searchActions;
 
     @BeforeEach
     void setUp() {
-        searchActions = new SearchActions(searchService, centralFeedBackHandler, 5, "FR", "fr");
+        searchActions = new SearchActions(searchService, deepSearchService,
+                new SearchResultFormatter(), centralFeedBackHandler,
+                5, "FR", "fr", true, 6000);
     }
 
     @Test
@@ -41,7 +48,7 @@ class SearchActionsTest {
         when(searchService.isAvailable()).thenReturn(false);
 
         // When
-        ActionResult result = searchActions.searchTheWeb("test query");
+        ActionResult result = searchActions.searchTheWeb("test query", null, null, null);
 
         // Then
         assertThat(result.isSuccess()).isFalse();
@@ -54,7 +61,7 @@ class SearchActionsTest {
         when(searchService.isAvailable()).thenReturn(false);
 
         // When
-        searchActions.searchTheWeb("test query");
+        searchActions.searchTheWeb("test query", null, null, null);
 
         // Then : la méthode search ne doit jamais être appelée
         verify(searchService, never()).search(anyString(), any(BraveSearchService.SearchOptions.class));
@@ -66,7 +73,7 @@ class SearchActionsTest {
         when(searchService.isAvailable()).thenReturn(false);
 
         // When
-        ActionResult result = searchActions.searchTheWeb("test query");
+        ActionResult result = searchActions.searchTheWeb("test query", null, null, null);
 
         // Then
         assertThat(result.getExecutionTimeMs()).isEqualTo(0);

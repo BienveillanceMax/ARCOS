@@ -223,7 +223,7 @@ public class PromptBuilder {
 
 
                 Outils (nom — params):
-                1. Chercher_sur_Internet — query:String
+                1. Chercher_sur_Internet — query:String, fraicheur:String? (jour|semaine|mois|annee), mode:String? (rapide|approfondi), page:int?
                 2. Lister_les_evenements_a_venir — maxResults:int
                 3. Ajouter_un_evenement_au_calendrier — title, description, location, startDateTimeStr, endDateTimeStr:String
                 4. Supprimer_un_evenement — title:String (événement du jour)
@@ -237,10 +237,11 @@ public class PromptBuilder {
                 - `$varName` référence résultat étape précédente
                 - `synthesisPromptTemplate`: placeholders `{varName}` pour résultats
                 - Synthèse TTS: naturelle/fluide
+                - Pour un briefing multi-recherches, utiliser mode:"rapide"
 
                 Exemple:
                 ```json
-                {"executionPlan":{"steps":[{"stepId":1,"toolName":"Lister_les_evenements_a_venir","parameters":{"maxResults":5},"outputVariable":"agenda","description":"Événements"},{"stepId":2,"toolName":"Chercher_sur_Internet","parameters":{"query":"actus France"},"outputVariable":"actus","description":"Actualités"},{"stepId":3,"toolName":"Chercher_sur_Internet","parameters":{"query":"météo Lyon"},"outputVariable":"meteo","description":"Météo"}]},"synthesisPromptTemplate":"Briefing matinal: Agenda {agenda}, Actus {actus}, Météo {meteo}."}
+                {"executionPlan":{"steps":[{"stepId":1,"toolName":"Lister_les_evenements_a_venir","parameters":{"maxResults":5},"outputVariable":"agenda","description":"Événements"},{"stepId":2,"toolName":"Chercher_sur_Internet","parameters":{"query":"actus France","mode":"rapide"},"outputVariable":"actus","description":"Actualités"},{"stepId":3,"toolName":"Chercher_sur_Internet","parameters":{"query":"météo Lyon","mode":"rapide"},"outputVariable":"meteo","description":"Météo"}]},"synthesisPromptTemplate":"Briefing matinal: Agenda {agenda}, Actus {actus}, Météo {meteo}."}
                 ```
 
                 Génère le plan.

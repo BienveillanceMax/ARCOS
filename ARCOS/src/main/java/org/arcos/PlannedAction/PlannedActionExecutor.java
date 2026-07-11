@@ -48,7 +48,11 @@ public class PlannedActionExecutor {
 
         toolRegistry.put("Chercher_sur_Internet", params -> {
             String query = (String) params.get("query");
-            return searchActions.searchTheWeb(query);
+            String fraicheur = (String) params.get("fraicheur");
+            String mode = (String) params.get("mode");
+            Integer page = params.containsKey("page")
+                    ? ((Number) params.get("page")).intValue() : null;
+            return searchActions.searchTheWeb(query, fraicheur, mode, page);
         });
 
         toolRegistry.put("Lister_les_evenements_a_venir", params -> {

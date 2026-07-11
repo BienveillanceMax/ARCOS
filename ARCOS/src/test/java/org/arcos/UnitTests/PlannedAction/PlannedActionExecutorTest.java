@@ -84,9 +84,9 @@ class PlannedActionExecutorTest {
 
         when(calendarActions.listCalendarEvents(5))
                 .thenReturn(ActionResult.success(List.of("Réunion 10h"), "Événements récupérés"));
-        when(searchActions.searchTheWeb("actualités France aujourd'hui"))
+        when(searchActions.searchTheWeb(eq("actualités France aujourd'hui"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("Actu 1"), "Recherche effectuée"));
-        when(searchActions.searchTheWeb("météo Lyon aujourd'hui"))
+        when(searchActions.searchTheWeb(eq("météo Lyon aujourd'hui"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("20°C ensoleillé"), "Recherche effectuée"));
 
         when(promptBuilder.buildPlannedActionSynthesisPrompt(eq(entry), any()))
@@ -100,7 +100,7 @@ class PlannedActionExecutorTest {
         // Then
         assertEquals("Bonjour ! Votre agenda : réunion à 10h. Actualités : rien de spécial. Météo : 20 degrés.", result);
         verify(calendarActions).listCalendarEvents(5);
-        verify(searchActions, times(2)).searchTheWeb(anyString());
+        verify(searchActions, times(2)).searchTheWeb(anyString(), isNull(), isNull(), isNull());
         verify(llmClient).generateToollessResponse(any(Prompt.class));
     }
 
@@ -111,9 +111,9 @@ class PlannedActionExecutorTest {
 
         when(calendarActions.listCalendarEvents(5))
                 .thenReturn(ActionResult.failure("Calendrier indisponible"));
-        when(searchActions.searchTheWeb("actualités France aujourd'hui"))
+        when(searchActions.searchTheWeb(eq("actualités France aujourd'hui"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("Actu 1"), "Recherche effectuée"));
-        when(searchActions.searchTheWeb("météo Lyon aujourd'hui"))
+        when(searchActions.searchTheWeb(eq("météo Lyon aujourd'hui"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("20°C"), "Recherche effectuée"));
 
         when(promptBuilder.buildPlannedActionSynthesisPrompt(eq(entry), any()))
@@ -127,7 +127,7 @@ class PlannedActionExecutorTest {
         // Then
         assertEquals("Briefing partiel sans agenda.", result);
         verify(calendarActions).listCalendarEvents(5);
-        verify(searchActions, times(2)).searchTheWeb(anyString());
+        verify(searchActions, times(2)).searchTheWeb(anyString(), isNull(), isNull(), isNull());
     }
 
     @Test
@@ -137,9 +137,9 @@ class PlannedActionExecutorTest {
 
         when(calendarActions.listCalendarEvents(5))
                 .thenReturn(ActionResult.success(List.of("Réunion 10h"), "Événements récupérés"));
-        when(searchActions.searchTheWeb("actualités France aujourd'hui"))
+        when(searchActions.searchTheWeb(eq("actualités France aujourd'hui"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("Actu 1"), "Recherche effectuée"));
-        when(searchActions.searchTheWeb("météo Lyon aujourd'hui"))
+        when(searchActions.searchTheWeb(eq("météo Lyon aujourd'hui"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("20°C"), "Recherche effectuée"));
 
         when(promptBuilder.buildPlannedActionSynthesisPrompt(eq(entry), any()))
@@ -174,7 +174,7 @@ class PlannedActionExecutorTest {
         );
         entry.setExecutionPlan(new ReWOOPlan(List.of(step1, step2)));
 
-        when(searchActions.searchTheWeb("actualités"))
+        when(searchActions.searchTheWeb(eq("actualités"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.successWithMessage("Résultat actu"));
         when(pythonActions.executePythonCode("Résultat actu"))
                 .thenReturn(ActionResult.successWithMessage("Processed"));
@@ -183,7 +183,7 @@ class PlannedActionExecutorTest {
         String result = executor.execute(entry);
 
         // Then
-        verify(searchActions).searchTheWeb("actualités");
+        verify(searchActions).searchTheWeb(eq("actualités"), isNull(), isNull(), isNull());
         verify(pythonActions).executePythonCode("Résultat actu");
     }
 
@@ -200,7 +200,7 @@ class PlannedActionExecutorTest {
         entry.setExecutionPlan(new ReWOOPlan(List.of(step1, step2)));
         entry.setSynthesisPromptTemplate(null);
 
-        when(searchActions.searchTheWeb("actualités"))
+        when(searchActions.searchTheWeb(eq("actualités"), isNull(), isNull(), isNull()))
                 .thenReturn(ActionResult.success(List.of("Titre A", "Titre B"), "Recherche effectuée"));
         when(pythonActions.executePythonCode(anyString()))
                 .thenReturn(ActionResult.successWithMessage("done"));
