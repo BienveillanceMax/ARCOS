@@ -32,7 +32,7 @@ class SearchActionsTest {
 
     @BeforeEach
     void setUp() {
-        searchActions = new SearchActions(searchService, centralFeedBackHandler, 5);
+        searchActions = new SearchActions(searchService, centralFeedBackHandler, 5, "FR", "fr");
     }
 
     @Test

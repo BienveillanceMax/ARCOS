@@ -23,14 +23,20 @@ public class SearchActions
     private final BraveSearchService searchService;
     private final CentralFeedBackHandler centralFeedBackHandler;
     private final int braveResultCount;
+    private final String country;
+    private final String language;
 
     @Autowired
     public SearchActions(BraveSearchService searchService,
                          CentralFeedBackHandler centralFeedBackHandler,
-                         @Value("${arcos.search.brave-result-count:5}") int braveResultCount) {
+                         @Value("${arcos.search.brave-result-count:5}") int braveResultCount,
+                         @Value("${arcos.search.country:FR}") String country,
+                         @Value("${arcos.search.language:fr}") String language) {
         this.searchService = searchService;
         this.centralFeedBackHandler = centralFeedBackHandler;
         this.braveResultCount = braveResultCount;
+        this.country = country;
+        this.language = language;
     }
 
     @Tool(name = "Chercher_sur_Internet", description = "Recherche des informations sur le web. [Instruction : ne précise tes sources que si cela a un vrai intérêt.]" +
@@ -51,6 +57,12 @@ public class SearchActions
         try {
             BraveSearchService.SearchOptions options = BraveSearchService.SearchOptions.defaultOptions()
                     .withCount(braveResultCount);
+            if (!country.isBlank()) {
+                options.withCountry(country);
+            }
+            if (!language.isBlank()) {
+                options.withLanguage(language);
+            }
             result = searchService.search(query, options);
         } catch (SearchException e) {
             log.error("Erreur de recherche Brave : {}", e.getMessage());

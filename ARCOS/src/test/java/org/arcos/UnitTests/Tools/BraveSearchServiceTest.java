@@ -70,6 +70,98 @@ class BraveSearchServiceTest {
         assertThat(request.uri().toString()).contains("freshness=pw");
     }
 
+    @Test
+    @DisplayName("Given FR locale options, Then URL contains country, search_lang and extra_snippets")
+    void search_WithFrenchLocale_ShouldAppendLocaleAndSnippetParams() throws Exception {
+        HttpRequest request = captureRequest(
+                SearchOptions.defaultOptions().withCountry("FR").withLanguage("fr"));
+
+        String uri = request.uri().toString();
+        assertThat(uri).contains("country=FR");
+        assertThat(uri).contains("search_lang=fr");
+        assertThat(uri).contains("extra_snippets=true");
+        assertThat(uri).contains("text_decorations=false");
+    }
+
+    // ── Parsing de la réponse (HttpClient mocké) ────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private static SearchResult searchWithBody(String jsonBody) throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn(jsonBody);
+        when(httpClient.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        BraveSearchService service = new BraveSearchService(httpClient, new ObjectMapper(), "test-key");
+        return service.search("requête", SearchOptions.defaultOptions());
+    }
+
+    @Test
+    @DisplayName("Given extra_snippets in response, Then items carry them")
+    void search_WithExtraSnippets_ShouldParseThem() throws Exception {
+        // Given
+        String json = """
+                {"web":{"results":[{"title":"T","url":"https://a.com","description":"D",
+                  "extra_snippets":["premier extrait","second extrait"]}]}}
+                """;
+
+        // When
+        SearchResult result = searchWithBody(json);
+
+        // Then
+        assertThat(result.getItems()).hasSize(1);
+        assertThat(result.getItems().get(0).getExtraSnippets())
+                .containsExactly("premier extrait", "second extrait");
+    }
+
+    @Test
+    @DisplayName("Given no extra_snippets field, Then items carry an empty list")
+    void search_WithoutExtraSnippets_ShouldReturnEmptyList() throws Exception {
+        // Given
+        String json = """
+                {"web":{"results":[{"title":"T","url":"https://a.com","description":"D"}]}}
+                """;
+
+        // When
+        SearchResult result = searchWithBody(json);
+
+        // Then
+        assertThat(result.getItems().get(0).getExtraSnippets()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("Given page_age but no published, Then date falls back to page_age date part")
+    void search_WithPageAgeOnly_ShouldUsePageAgeAsDate() throws Exception {
+        // Given
+        String json = """
+                {"web":{"results":[{"title":"T","url":"https://a.com","description":"D",
+                  "page_age":"2026-07-01T08:30:00"}]}}
+                """;
+
+        // When
+        SearchResult result = searchWithBody(json);
+
+        // Then
+        assertThat(result.getItems().get(0).getPublishedDate()).isPresent().hasValue("2026-07-01");
+    }
+
+    @Test
+    @DisplayName("Given published present, Then published wins over page_age")
+    void search_WithPublished_ShouldPreferPublished() throws Exception {
+        // Given
+        String json = """
+                {"web":{"results":[{"title":"T","url":"https://a.com","description":"D",
+                  "published":"2026-06-15","page_age":"2026-07-01T08:30:00"}]}}
+                """;
+
+        // When
+        SearchResult result = searchWithBody(json);
+
+        // Then
+        assertThat(result.getItems().get(0).getPublishedDate()).isPresent().hasValue("2026-06-15");
+    }
+
     // ── SearchOptions ───────────────────────────────────────────────────────
 
     @Test

@@ -107,6 +107,8 @@ public class BraveSearchService {
         url.append("&count=").append(options.getCount());
         url.append("&offset=").append(options.getOffset());
         url.append("&safesearch=").append(options.getSafeSearch().getValue());
+        url.append("&extra_snippets=true");      // ignoré par les plans Brave qui ne le supportent pas
+        url.append("&text_decorations=false");   // pas de marqueurs de surlignage dans les descriptions
 
         if (options.getFreshness() != Freshness.ALL) {
             url.append("&freshness=").append(options.getFreshness().getValue());
@@ -135,7 +137,8 @@ public class BraveSearchService {
                         result.title,
                         result.url,
                         result.description,
-                        result.publishedDate
+                        effectiveDate(result.publishedDate, result.pageAge),
+                        result.extraSnippets != null ? result.extraSnippets : List.of()
                 ));
             }
         }
@@ -145,6 +148,17 @@ public class BraveSearchService {
                 items,
                 apiResponse.web != null ? apiResponse.web.totalCount : 0
         );
+    }
+
+    /** Date affichable : `published` si présent, sinon `page_age` réduit à sa partie date ISO. */
+    private static String effectiveDate(String published, String pageAge) {
+        if (published != null && !published.isBlank()) {
+            return published;
+        }
+        if (pageAge == null || pageAge.isBlank()) {
+            return null;
+        }
+        return pageAge.length() >= 10 ? pageAge.substring(0, 10) : pageAge;
     }
 
     // Classes de données pour les résultats
@@ -183,18 +197,26 @@ public class BraveSearchService {
         private final String url;
         private final String description;
         private final String publishedDate;
+        private final List<String> extraSnippets;
 
         public SearchResultItem(String title, String url, String description, String publishedDate) {
+            this(title, url, description, publishedDate, List.of());
+        }
+
+        public SearchResultItem(String title, String url, String description, String publishedDate,
+                                List<String> extraSnippets) {
             this.title = title;
             this.url = url;
             this.description = description;
             this.publishedDate = publishedDate;
+            this.extraSnippets = List.copyOf(extraSnippets);
         }
 
         public String getTitle() { return title; }
         public String getUrl() { return url; }
         public String getDescription() { return description; }
         public Optional<String> getPublishedDate() { return Optional.ofNullable(publishedDate); }
+        public List<String> getExtraSnippets() { return extraSnippets; }
 
         @Override
         public String toString() {
@@ -328,5 +350,11 @@ public class BraveSearchService {
 
         @JsonProperty("published")
         public String publishedDate;
+
+        @JsonProperty("page_age")
+        public String pageAge;
+
+        @JsonProperty("extra_snippets")
+        public List<String> extraSnippets;
     }
 }

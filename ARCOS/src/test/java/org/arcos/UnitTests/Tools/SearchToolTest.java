@@ -13,6 +13,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -51,7 +52,7 @@ class SearchToolTest {
 
         @BeforeEach
         void setUp() {
-            searchActions = new SearchActions(searchService, centralFeedBackHandler, 5);
+            searchActions = new SearchActions(searchService, centralFeedBackHandler, 5, "FR", "fr");
         }
 
         // ── AC1 : normal operation ──────────────────────────────────────────
@@ -185,6 +186,24 @@ class SearchToolTest {
             // Then
             assertThat(result.isSuccess()).isFalse();
             assertThat(result.getMessage()).contains("temporairement indisponible");
+        }
+
+        @Test
+        @DisplayName("Given locale defaults, When searching, Then options carry country=FR and language=fr")
+        void searchTheWeb_ShouldApplyLocaleDefaults() throws SearchException {
+            // Given
+            when(searchService.isAvailable()).thenReturn(true);
+            when(searchService.search(anyString(), any(SearchOptions.class)))
+                    .thenReturn(new SearchResult("q", List.of(), 0));
+
+            // When
+            searchActions.searchTheWeb("q");
+
+            // Then
+            ArgumentCaptor<SearchOptions> captor = ArgumentCaptor.forClass(SearchOptions.class);
+            verify(searchService).search(anyString(), captor.capture());
+            assertThat(captor.getValue().getCountry()).isEqualTo("FR");
+            assertThat(captor.getValue().getLanguage()).isEqualTo("fr");
         }
 
         @Test
