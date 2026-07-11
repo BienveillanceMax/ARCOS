@@ -1,16 +1,74 @@
 package org.arcos.UnitTests.Tools;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.arcos.Tools.SearchTool.BraveSearchService;
 import org.arcos.Tools.SearchTool.BraveSearchService.*;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class BraveSearchServiceTest {
+
+    // ── Disponibilité (clé API injectée) ────────────────────────────────────
+
+    @Test
+    @DisplayName("Given blank API key, Then service is not available")
+    void isAvailable_WithBlankKey_ShouldBeFalse() {
+        BraveSearchService service = new BraveSearchService("");
+
+        assertThat(service.isAvailable()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Given an API key, Then service is available")
+    void isAvailable_WithKey_ShouldBeTrue() {
+        BraveSearchService service = new BraveSearchService("test-key");
+
+        assertThat(service.isAvailable()).isTrue();
+    }
+
+    // ── Construction de l'URL (HttpClient mocké) ────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private static HttpRequest captureRequest(SearchOptions options) throws Exception {
+        HttpClient httpClient = mock(HttpClient.class);
+        HttpResponse<String> response = mock(HttpResponse.class);
+        when(response.statusCode()).thenReturn(200);
+        when(response.body()).thenReturn("{\"web\":{\"results\":[]}}");
+        ArgumentCaptor<HttpRequest> captor = ArgumentCaptor.forClass(HttpRequest.class);
+        when(httpClient.send(captor.capture(), any(HttpResponse.BodyHandler.class))).thenReturn(response);
+
+        BraveSearchService service = new BraveSearchService(httpClient, new ObjectMapper(), "test-key");
+        service.search("requête test", options);
+        return captor.getValue();
+    }
+
+    @Test
+    @DisplayName("Given default options (freshness ALL), Then URL contains no freshness parameter")
+    void search_WithFreshnessAll_ShouldNotAppendFreshnessParam() throws Exception {
+        HttpRequest request = captureRequest(SearchOptions.defaultOptions());
+
+        assertThat(request.uri().toString()).doesNotContain("freshness");
+    }
+
+    @Test
+    @DisplayName("Given freshness PAST_WEEK, Then URL contains freshness=pw")
+    void search_WithFreshnessPastWeek_ShouldAppendFreshnessParam() throws Exception {
+        HttpRequest request = captureRequest(SearchOptions.defaultOptions().withFreshness(Freshness.PAST_WEEK));
+
+        assertThat(request.uri().toString()).contains("freshness=pw");
+    }
 
     // ── SearchOptions ───────────────────────────────────────────────────────
 
@@ -127,7 +185,6 @@ class BraveSearchServiceTest {
         assertThat(item.getUrl()).isEqualTo("https://url.com");
         assertThat(item.getDescription()).isEqualTo("Description");
         assertThat(item.getPublishedDate()).isPresent().hasValue("2026-03-21");
-        assertThat(item.getExtractedContent()).isEmpty();
     }
 
     @Test
@@ -137,18 +194,6 @@ class BraveSearchServiceTest {
 
         // Then
         assertThat(item.getPublishedDate()).isEmpty();
-    }
-
-    @Test
-    void searchResultItem_SetExtractedContent_ShouldBeRetrievable() {
-        // Given
-        SearchResultItem item = new SearchResultItem("Title", "https://url.com", "Desc", null);
-
-        // When
-        item.setExtractedContent("Extracted text content");
-
-        // Then
-        assertThat(item.getExtractedContent()).isPresent().hasValue("Extracted text content");
     }
 
     // ── Enums ───────────────────────────────────────────────────────────────

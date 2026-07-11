@@ -1,5 +1,7 @@
 package org.arcos.UnitTests.Tools;
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.arcos.Exceptions.SearchException;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
@@ -17,7 +19,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
@@ -98,8 +99,8 @@ class SearchToolTest {
         }
 
         @Test
-        @DisplayName("Given a query, When Brave returns single result, Then 'aucun résultat' is appended")
-        void searchTheWeb_WithSingleResult_ShouldAppendNoResultMessage() throws SearchException {
+        @DisplayName("Given a query, When Brave returns single result, Then that result is returned without 'aucun résultat'")
+        void searchTheWeb_WithSingleResult_ShouldReturnThatResult() throws SearchException {
             // Given
             when(searchService.isAvailable()).thenReturn(true);
             SearchResultItem item = new SearchResultItem("Single", "https://a.com", "Desc", null);
@@ -112,8 +113,9 @@ class SearchToolTest {
             // Then
             assertThat(result.isSuccess()).isTrue();
             List<String> data = (List<String>) result.getData();
-            assertThat(data).hasSize(2);
-            assertThat(data.get(1)).contains("Aucun résultat pertinent");
+            assertThat(data).hasSize(1);
+            assertThat(data.get(0)).contains("Single");
+            assertThat(data).noneMatch(d -> d.contains("Aucun résultat pertinent"));
         }
 
         @Test
@@ -152,32 +154,37 @@ class SearchToolTest {
         }
 
         @Test
-        @DisplayName("Given Brave API throws SearchException, When search called, Then RuntimeException is thrown (circuit breaker catches it)")
-        void searchTheWeb_WhenSearchException_ShouldThrowRuntimeException() throws SearchException {
+        @DisplayName("Given Brave API throws SearchException, When search called, Then failure ActionResult is returned")
+        void searchTheWeb_WhenSearchException_ShouldReturnFailure() throws SearchException {
             // Given
             when(searchService.isAvailable()).thenReturn(true);
             when(searchService.search(anyString(), any(SearchOptions.class)))
                     .thenThrow(new SearchException("API rate limit exceeded"));
 
-            // When/Then — SearchActions wraps SearchException in RuntimeException
-            // The circuit breaker fallback would catch this in production
-            assertThatThrownBy(() -> searchActions.searchTheWeb("test"))
-                    .isInstanceOf(RuntimeException.class)
-                    .hasMessageContaining("Erreur de recherche Brave")
-                    .hasCauseInstanceOf(SearchException.class);
+            // When
+            ActionResult result = searchActions.searchTheWeb("test");
+
+            // Then
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.getMessage()).contains("Erreur de recherche");
+            assertThat(result.getMessage()).contains("API rate limit exceeded");
         }
 
         @Test
-        @DisplayName("Circuit breaker fallback should return failure ActionResult")
-        void searchTheWebFallback_ShouldReturnFailureResult() {
+        @DisplayName("Given circuit breaker open, When search called, Then failure with 'temporairement indisponible'")
+        void searchTheWeb_WhenCircuitBreakerOpen_ShouldReturnFailure() throws SearchException {
+            // Given
+            when(searchService.isAvailable()).thenReturn(true);
+            when(searchService.search(anyString(), any(SearchOptions.class)))
+                    .thenThrow(CallNotPermittedException.createCallNotPermittedException(
+                            CircuitBreaker.ofDefaults("braveSearch")));
+
             // When
-            ActionResult result = searchActions.searchTheWebFallback(
-                    "test", new RuntimeException("Connection timeout"));
+            ActionResult result = searchActions.searchTheWeb("test");
 
             // Then
             assertThat(result.isSuccess()).isFalse();
             assertThat(result.getMessage()).contains("temporairement indisponible");
-            assertThat(result.getExecutionTimeMs()).isEqualTo(0);
         }
 
         @Test

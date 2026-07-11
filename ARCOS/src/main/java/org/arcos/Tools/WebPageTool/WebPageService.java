@@ -1,5 +1,6 @@
 package org.arcos.Tools.WebPageTool;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -31,6 +32,7 @@ public class WebPageService {
                 .build();
     }
 
+    @CircuitBreaker(name = "webPage")
     public String fetchAndExtract(String url, int maxContentLength, int timeoutSeconds)
             throws IOException, InterruptedException {
         log.info("Fetching web page: {}", url);
@@ -64,6 +66,9 @@ public class WebPageService {
         if (finalStatus >= 300 && finalStatus < 400) {
             // Redirect budget exhausted — do NOT fall through and parse the 3xx body as page content.
             throw new IOException("Trop de redirections (max " + MAX_REDIRECTS + ") pour " + url);
+        }
+        if (finalStatus >= 400) {
+            throw new IOException("HTTP " + finalStatus + " pour " + url);
         }
 
         String html = response.body();

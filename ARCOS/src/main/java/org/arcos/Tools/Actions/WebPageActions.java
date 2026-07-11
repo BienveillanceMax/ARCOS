@@ -1,6 +1,6 @@
 package org.arcos.Tools.Actions;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
 import org.arcos.IO.OuputHandling.StateHandler.UXEventType;
@@ -36,7 +36,6 @@ public class WebPageActions {
     @Tool(name = "Lire_une_page_web",
           description = "Lit et extrait le contenu textuel d'une page web à partir de son URL. "
                       + "Utile après une recherche pour approfondir un résultat.")
-    @CircuitBreaker(name = "webPage", fallbackMethod = "readWebPageFallback")
     public ActionResult readWebPage(String url) {
         long startTime = System.currentTimeMillis();
 
@@ -70,13 +69,18 @@ public class WebPageActions {
             return ActionResult.failure("Lecture interrompue : " + e.getMessage(), e)
                     .withExecutionTime(System.currentTimeMillis() - startTime);
 
+        } catch (IllegalArgumentException e) {
+            log.warn("URL invalide {} : {}", url, e.getMessage());
+            return ActionResult.failure("URL invalide : " + e.getMessage(), e)
+                    .withExecutionTime(System.currentTimeMillis() - startTime);
+
+        } catch (CallNotPermittedException e) {
+            log.warn("Circuit breaker webPage ouvert : {}", e.getMessage());
+            return ActionResult.failure("Service de lecture de page temporairement indisponible.", null)
+                    .withExecutionTime(System.currentTimeMillis() - startTime);
+
         } finally {
             centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.LONGTASK_END));
         }
-    }
-
-    public ActionResult readWebPageFallback(String url, Throwable t) {
-        log.warn("Circuit breaker webPage ouvert : {}", t.getMessage());
-        return ActionResult.failure("Service de lecture de page temporairement indisponible.", null).withExecutionTime(0);
     }
 }

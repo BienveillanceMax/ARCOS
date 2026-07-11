@@ -1,5 +1,7 @@
 package org.arcos.UnitTests.Tools;
 
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.Tools.Actions.ActionResult;
 import org.arcos.Tools.Actions.WebPageActions;
@@ -212,11 +214,48 @@ class WebPageToolTest {
         }
 
         @Test
-        @DisplayName("Circuit breaker fallback should return failure ActionResult")
-        void readWebPageFallback_ShouldReturnFailure() {
+        @DisplayName("Given HTTP 404 from service, When reading, Then failure with HTTP status in message")
+        void readWebPage_WhenHttp404_ShouldReturnFailure() throws Exception {
+            // Given
+            String url = "https://example.com/missing";
+            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+                    .thenThrow(new IOException("HTTP 404 pour " + url));
+
             // When
-            ActionResult result = webPageActions.readWebPageFallback(
-                    "https://example.com", new RuntimeException("Too many failures"));
+            ActionResult result = webPageActions.readWebPage(url);
+
+            // Then
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.getMessage()).contains("HTTP 404");
+        }
+
+        @Test
+        @DisplayName("Given malformed URL rejected by service, When reading, Then failure with 'URL invalide'")
+        void readWebPage_WhenMalformedUrl_ShouldReturnFailure() throws Exception {
+            // Given — passes the http:// prefix check but URI.create rejects it downstream
+            String url = "https://exa mple.com/page";
+            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+                    .thenThrow(new IllegalArgumentException("Illegal character in authority"));
+
+            // When
+            ActionResult result = webPageActions.readWebPage(url);
+
+            // Then
+            assertThat(result.isSuccess()).isFalse();
+            assertThat(result.getMessage()).contains("URL invalide");
+        }
+
+        @Test
+        @DisplayName("Given circuit breaker open, When reading, Then failure with 'temporairement indisponible'")
+        void readWebPage_WhenCircuitBreakerOpen_ShouldReturnFailure() throws Exception {
+            // Given
+            String url = "https://example.com/page";
+            when(webPageService.fetchAndExtract(url, MAX_CONTENT_LENGTH, TIMEOUT_SECONDS))
+                    .thenThrow(CallNotPermittedException.createCallNotPermittedException(
+                            CircuitBreaker.ofDefaults("webPage")));
+
+            // When
+            ActionResult result = webPageActions.readWebPage(url);
 
             // Then
             assertThat(result.isSuccess()).isFalse();

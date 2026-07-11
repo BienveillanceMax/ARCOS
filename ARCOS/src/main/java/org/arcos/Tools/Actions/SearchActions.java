@@ -1,6 +1,6 @@
 package org.arcos.Tools.Actions;
 
-import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import org.arcos.Exceptions.SearchException;
 import org.arcos.IO.OuputHandling.StateHandler.CentralFeedBackHandler;
 import org.arcos.IO.OuputHandling.StateHandler.FeedBackEvent;
@@ -35,7 +35,6 @@ public class SearchActions
 
     @Tool(name = "Chercher_sur_Internet", description = "Recherche des informations sur le web. [Instruction : ne précise tes sources que si cela a un vrai intérêt.]" +
             "Ne peut pas accéder au contenu complet des pages, seulement aux métadonnées des résultats.")
-    @CircuitBreaker(name = "braveSearch", fallbackMethod = "searchTheWebFallback")
     public ActionResult searchTheWeb(String query) {
         if (!searchService.isAvailable()) {
             log.warn("Recherche web demandée mais BRAVE_SEARCH_API_KEY absent.");
@@ -43,8 +42,7 @@ public class SearchActions
                     .withExecutionTime(0);
         }
 
-        log.info("Recherche d'info sur le web");
-        log.info("{}", query);
+        log.info("Recherche web : {}", query);
 
         long startTime = System.currentTimeMillis();
         BraveSearchService.SearchResult result;
@@ -55,8 +53,13 @@ public class SearchActions
                     .withCount(braveResultCount);
             result = searchService.search(query, options);
         } catch (SearchException e) {
-            log.error(e.getMessage());
-            throw new RuntimeException("Erreur de recherche Brave : " + e.getMessage(), e);
+            log.error("Erreur de recherche Brave : {}", e.getMessage());
+            return ActionResult.failure("Erreur de recherche : " + e.getMessage(), e)
+                    .withExecutionTime(System.currentTimeMillis() - startTime);
+        } catch (CallNotPermittedException e) {
+            log.warn("Circuit breaker braveSearch ouvert : {}", e.getMessage());
+            return ActionResult.failure("Service de recherche temporairement indisponible.", null)
+                    .withExecutionTime(System.currentTimeMillis() - startTime);
         } finally {
             centralFeedBackHandler.handleFeedBack(new FeedBackEvent(UXEventType.LONGTASK_END));
         }
@@ -78,17 +81,12 @@ public class SearchActions
             processedResults.add(builder.toString());
         }
 
-        if (processedResults.size() <= 1) {
+        if (processedResults.isEmpty()) {
             processedResults.add("Aucun résultat pertinent trouvé.");
         }
 
         return ActionResult.success(processedResults, "Recherche effectuée avec succès")
                 .addMetadata("query", query)
                 .withExecutionTime(System.currentTimeMillis() - startTime);
-    }
-
-    public ActionResult searchTheWebFallback(String query, Throwable t) {
-        log.warn("Circuit breaker braveSearch ouvert : {}", t.getMessage());
-        return ActionResult.failure("Service de recherche temporairement indisponible.", null).withExecutionTime(0);
     }
 }

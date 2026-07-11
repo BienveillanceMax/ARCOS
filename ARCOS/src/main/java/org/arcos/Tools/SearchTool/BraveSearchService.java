@@ -1,22 +1,21 @@
 package org.arcos.Tools.SearchTool;
 
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import lombok.extern.slf4j.Slf4j;
 import org.arcos.Exceptions.SearchException;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
-import org.jsoup.Jsoup;
-import org.springframework.stereotype.Component;
-import org.springframework.stereotype.Service;
-
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -29,66 +28,42 @@ import java.util.Optional;
  * Conçu pour être intégré dans un assistant IA
  */
 
+@Slf4j
 @Service
 public class BraveSearchService {
 
-    private static final Logger logger = LoggerFactory.getLogger(BraveSearchService.class);
     private static final String BRAVE_API_BASE_URL = "https://api.search.brave.com/res/v1/web/search";
 
     private final HttpClient httpClient;
     private final ObjectMapper objectMapper;
     private final String apiKey;
 
-    public BraveSearchService() {
-        this.apiKey = System.getenv("BRAVE_SEARCH_API_KEY");
-        this.httpClient = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-        this.objectMapper = new ObjectMapper();
+    @Autowired
+    public BraveSearchService(@Value("${BRAVE_SEARCH_API_KEY:}") String apiKey) {
+        this(HttpClient.newBuilder()
+                        .connectTimeout(Duration.ofSeconds(10))
+                        .build(),
+                new ObjectMapper(),
+                apiKey);
+    }
+
+    public BraveSearchService(HttpClient httpClient, ObjectMapper objectMapper, String apiKey) {
+        this.httpClient = httpClient;
+        this.objectMapper = objectMapper;
+        this.apiKey = apiKey;
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("BRAVE_SEARCH_API_KEY absent — recherche web désactivée.");
+        }
     }
 
     public boolean isAvailable() {
-        return apiKey != null && !apiKey.isEmpty();
+        return apiKey != null && !apiKey.isBlank();
     }
-
-    /**
-     * Effectue une recherche web avec des paramètres par défaut
-     */
-    public SearchResult search(String query) throws SearchException {
-        return search(query, SearchOptions.defaultOptions());
-    }
-
-    public SearchResult searchAndExtractContent(String query) throws SearchException {
-        SearchResult searchResult = search(query, SearchOptions.defaultOptions());
-
-        if (searchResult.hasResults()) {
-            SearchResultItem topResult = searchResult.getItems().get(0);
-            try {
-                String content = fetchAndExtractContent(topResult.getUrl());
-                topResult.setExtractedContent(content);
-            } catch (IOException | InterruptedException e) {
-                logger.error("Failed to fetch and extract content for url: {}", topResult.getUrl(), e);
-            }
-        }
-
-        return searchResult;
-    }
-
-    private String fetchAndExtractContent(String url) throws IOException, InterruptedException {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        return Jsoup.parse(response.body()).text();
-    }
-
 
     /**
      * Effectue une recherche web avec des options personnalisées
      */
+    @CircuitBreaker(name = "braveSearch")
     public SearchResult search(String query, SearchOptions options) throws SearchException {
         try {
             String encodedQuery = URLEncoder.encode(query, StandardCharsets.UTF_8);
@@ -103,7 +78,7 @@ public class BraveSearchService {
                     .GET()
                     .build();
 
-            logger.debug("Recherche Brave: {} avec options: {}", query, options);
+            log.debug("Recherche Brave: {} avec options: {}", query, options);
 
             HttpResponse<String> response = httpClient.send(request,
                     HttpResponse.BodyHandlers.ofString());
@@ -132,7 +107,10 @@ public class BraveSearchService {
         url.append("&count=").append(options.getCount());
         url.append("&offset=").append(options.getOffset());
         url.append("&safesearch=").append(options.getSafeSearch().getValue());
-        url.append("&freshness=").append(options.getFreshness().getValue());
+
+        if (options.getFreshness() != Freshness.ALL) {
+            url.append("&freshness=").append(options.getFreshness().getValue());
+        }
 
         if (options.getCountry() != null) {
             url.append("&country=").append(options.getCountry());
@@ -205,7 +183,6 @@ public class BraveSearchService {
         private final String url;
         private final String description;
         private final String publishedDate;
-        private String extractedContent;
 
         public SearchResultItem(String title, String url, String description, String publishedDate) {
             this.title = title;
@@ -218,11 +195,6 @@ public class BraveSearchService {
         public String getUrl() { return url; }
         public String getDescription() { return description; }
         public Optional<String> getPublishedDate() { return Optional.ofNullable(publishedDate); }
-        public Optional<String> getExtractedContent() { return Optional.ofNullable(extractedContent); }
-
-        public void setExtractedContent(String extractedContent) {
-            this.extractedContent = extractedContent;
-        }
 
         @Override
         public String toString() {
